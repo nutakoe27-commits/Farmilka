@@ -1,4 +1,4 @@
-import type { EntityKind, WeaponId, MobId, BuildingId, DeathCause } from './types.js';
+import type { EntityKind, WeaponId, MobId, BossId, BuildingId, DeathCause } from './types.js';
 import type { WeaponCfg, BuildingCfg } from './balance-schema.js';
 
 // ---------- Entity state as seen by clients ----------
@@ -15,10 +15,13 @@ export interface EntityState {
   name?: string;
   weapon?: WeaponId;
   mobType?: MobId;
+  bossType?: BossId;
   buildingType?: BuildingId;
   owner?: string; // owner player id (buildings, projectiles)
   value?: number; // coins
   dead?: boolean;
+  /** spawn protection active */
+  prot?: boolean;
 }
 
 export interface EntityDelta {
@@ -29,6 +32,7 @@ export interface EntityDelta {
   hp?: number;
   weapon?: WeaponId;
   dead?: boolean;
+  prot?: boolean;
 }
 
 export interface SelfState {
@@ -40,10 +44,11 @@ export interface SelfState {
   weapons: WeaponId[];
   equipped: WeaponId;
   buildings: number;
-  inSafe: boolean;
   food: number;
   /** seconds until food can be eaten again (0 = ready) */
   foodIn: number;
+  /** seconds of spawn protection remaining */
+  protIn: number;
   respawnIn?: number;
 }
 
@@ -53,11 +58,11 @@ export type GameEvent =
   | { e: 'kill'; killer: string; victim: string; weapon: string }
   | { e: 'damage'; target: string; amount: number; x: number; y: number }
   | { e: 'death'; dropped: number; respawnIn: number; cause: DeathCause }
-  | { e: 'bossWarn'; x: number; y: number; inSec: number }
-  | { e: 'bossSpawned'; x: number; y: number }
+  | { e: 'bossWarn'; boss: string; x: number; y: number; inSec: number }
+  | { e: 'bossSpawned'; boss: string; x: number; y: number }
   | { e: 'bossTelegraph'; kind: 'slam' | 'burst'; x: number; y: number; angle: number; range: number; arc: number; sec: number }
-  | { e: 'bossKilled'; rewards: { name: string; amount: number }[] }
-  | { e: 'bossGone' }
+  | { e: 'bossKilled'; boss: string; rewards: { name: string; amount: number }[] }
+  | { e: 'bossGone'; boss: string }
   | { e: 'buildingAttacked'; id: string; x: number; y: number }
   | { e: 'buildingDestroyed'; id: string; byName: string; own: boolean }
   | { e: 'purchase'; ok: boolean; item: string; reason?: string }
@@ -94,7 +99,7 @@ export interface WelcomeMsg {
   id: string;
   time: number;
   registered: boolean;
-  world: { size: number; safeZoneRadius: number; viewRadius: number };
+  world: { size: number; viewRadius: number };
   player: { speed: number; radius: number };
   weapons: Record<WeaponId, WeaponCfg>;
   buildings: Record<BuildingId, BuildingCfg>;

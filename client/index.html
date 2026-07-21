@@ -86,17 +86,24 @@
     #place-hint { position: fixed; top: 100px; left: 50%; transform: translateX(-50%); background: rgba(20,40,20,.9); border: 1px solid #2ea043; padding: 6px 16px; border-radius: 8px; font-size: 13px; z-index: 16; max-width: 90vw; text-align: center; }
 
     /* mobile controls */
-    .joy-zone { position: fixed; bottom: 0; top: 40%; width: 45%; z-index: 11; pointer-events: auto; display: none; }
-    #joy-left { left: 0; }
-    #joy-right { right: 0; }
+    .joy-zone { position: fixed; bottom: 0; top: 35%; left: 0; width: 55%; z-index: 11; pointer-events: auto; display: none; }
     .joy-base { position: absolute; width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.18); display: none; }
     .joy-stick { position: absolute; width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,.25); border: 2px solid rgba(255,255,255,.4); }
-    #mob-buttons { position: fixed; right: 12px; top: 46%; display: none; flex-direction: column; gap: 10px; z-index: 12; pointer-events: auto; }
-    .mob-btn { width: 52px; height: 52px; border-radius: 14px; background: rgba(14,17,25,.85); border: 1px solid #2c3242; color: #e8e8ef; font-size: 22px; }
+    #atk-btn { position: fixed; right: 26px; bottom: 30px; width: 96px; height: 96px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, rgba(212,84,74,.9), rgba(150,40,35,.9)); border: 3px solid rgba(255,255,255,.25); display: none; z-index: 12; pointer-events: auto; align-items: center; justify-content: center; font-size: 38px; user-select: none; box-shadow: 0 4px 18px rgba(0,0,0,.5); }
+    #atk-btn.pressed { filter: brightness(1.3); transform: scale(1.05); }
+    #atk-btn .lbl { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 9px; color: rgba(255,255,255,.75); font-weight: 700; }
+    #atk-dir { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #fff; display: none; pointer-events: none; }
+    #mob-buttons { position: fixed; right: 34px; bottom: 140px; display: none; flex-direction: column; gap: 10px; z-index: 12; pointer-events: auto; }
+    .mob-btn { width: 54px; height: 54px; border-radius: 16px; background: rgba(14,17,25,.85); border: 1px solid #2c3242; color: #e8e8ef; font-size: 22px; }
     body.touch .joy-zone { display: block; }
+    body.touch #atk-btn { display: flex; }
     body.touch #mob-buttons { display: flex; }
     body.touch #hint { display: none; }
-    body.touch #hotbar { bottom: 12px; }
+    body.touch #hotbar { left: 40%; bottom: 12px; }
+    body.touch #hp-wrap { left: 40%; }
+    body.touch #minimap { right: 12px; top: 12px; bottom: auto; }
+    body.touch #killfeed { top: 130px; right: 12px; }
+    body.touch #settings-btn { left: 12px; right: auto; }
     body.touch #food-slot { display: none; } /* mobile uses the side button */
   </style>
 </head>
@@ -105,7 +112,7 @@
 
   <div id="hud" class="hidden">
     <div id="money">💰 0</div>
-    <div id="zone-label" class="hidden">🛡 Безопасная зона — PvP отключён, магазин доступен</div>
+    <div id="zone-label" class="hidden">🛡 Защита после возрождения</div>
     <div id="hp-wrap">
       <div id="hp-bar-bg"><div id="hp-bar"></div></div>
       <div id="hp-text">100 / 100</div>
@@ -138,7 +145,7 @@
   <div id="shop" class="panel hidden">
     <button id="shop-close">✕</button>
     <h2>Магазин</h2>
-    <div class="sub">Покупка и продажа — только в безопасной зоне. Постройки ставятся в мире (вне зоны). При смерти теряются купленное оружие и еда!</div>
+    <div class="sub">Магазин работает из любой точки мира. При смерти теряются купленное оружие и еда!</div>
     <div id="shop-msg"></div>
     <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Еда</h3>
     <div class="shop-grid" id="shop-food"></div>
@@ -154,12 +161,12 @@
       <p id="death-info"></p>
       <p style="color:#ff9d8a;font-size:12px">Купленное оружие и еда потеряны!</p>
       <div id="respawn-count">4</div>
-      <p style="color:#8a8fa3;font-size:12px">Возрождение в безопасной зоне…</p>
+      <p style="color:#8a8fa3;font-size:12px">Возрождение… (после спавна — 3с защиты)</p>
     </div>
   </div>
 
   <div id="joy-left" class="joy-zone"><div class="joy-base" id="joy-left-base"><div class="joy-stick" id="joy-left-stick"></div></div></div>
-  <div id="joy-right" class="joy-zone"><div class="joy-base" id="joy-right-base"><div class="joy-stick" id="joy-right-stick"></div></div></div>
+  <div id="atk-btn">⚔<div id="atk-dir"></div><span class="lbl">тап — атака · тяни — прицел</span></div>
   <div id="mob-buttons">
     <button class="mob-btn" id="mob-eat">🍖<div style="font-size:10px;color:#ffd76e" id="mob-eat-cnt">0</div></button>
     <button class="mob-btn" id="mob-shop">🛒</button>

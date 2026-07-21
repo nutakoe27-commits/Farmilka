@@ -38,7 +38,12 @@ export class Hud {
       this.lastMoney = self.money;
       $('money').textContent = `💰 ${self.money}`;
     }
-    $('zone-label').classList.toggle('hidden', !self.inSafe);
+    if (self.protIn > 0) {
+      $('zone-label').textContent = `🛡 Защита после возрождения: ${Math.ceil(self.protIn)}с`;
+      $('zone-label').classList.remove('hidden');
+    } else {
+      $('zone-label').classList.add('hidden');
+    }
     this.renderHotbar(self);
 
     // food slot: count + radial-ish cooldown wipe

@@ -22,10 +22,6 @@ export function tryPlaceBuilding(world: World, p: Player, type: BuildingId, x: n
     return { ok: false, reason: 'За границей мира' };
   }
   if (dist(p.x, p.y, x, y) > PLACE_RANGE) return { ok: false, reason: 'Слишком далеко от вас' };
-  const c = world.center;
-  if (dist(x, y, c, c) < bal.world.safeZoneRadius + bal.economy.buildingSafeZoneDist) {
-    return { ok: false, reason: 'Слишком близко к безопасной зоне' };
-  }
   for (const b of world.grid.queryCircle(x, y, bal.economy.buildingMinDist + 50)) {
     if (b.kind === 'building' && dist(x, y, b.x, b.y) < bal.economy.buildingMinDist) {
       return { ok: false, reason: 'Слишком близко к другой постройке' };
@@ -90,7 +86,7 @@ export function updateBuildings(world: World, dt: number, now: number): void {
       let best: Player | null = null;
       let bestD = Infinity;
       for (const e of world.grid.queryCircle(b.x, b.y, cfg.range)) {
-        if (e.kind !== 'player' || e.dead || e.id === b.ownerId || world.inSafeZone(e.x, e.y)) continue;
+        if (e.kind !== 'player' || e.dead || e.id === b.ownerId) continue;
         const d = dist(b.x, b.y, e.x, e.y);
         if (d < bestD) {
           best = e;

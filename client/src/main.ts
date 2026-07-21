@@ -94,14 +94,14 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   $('app').appendChild(app.canvas);
 
   const scene = new Scene(app);
-  scene.drawGround(welcome.world.size, welcome.world.safeZoneRadius);
+  scene.drawGround(welcome.world.size);
   const effects = new Effects(scene.layers.effects, scene.layers.telegraphs);
   const settings = new Settings();
   const hud = new Hud();
   hud.setFoodCooldown(welcome.food.cooldownSec);
   hud.killFeedEnabled = settings.values.killFeed;
   const shop = new Shop(welcome);
-  const minimap = new Minimap(welcome.world.size, welcome.world.safeZoneRadius);
+  const minimap = new Minimap(welcome.world.size);
   const input = new InputManager();
   const mobile = isTouchDevice() ? new MobileControls() : null;
   hud.show();
@@ -117,6 +117,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   let seq = 0;
   let selfDead = false;
   let bossWarnUntil = 0;
+  let bossWarnName = '';
 
   let ghost: Graphics | null = null;
 
@@ -132,6 +133,27 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       default: return scene.layers.effects;
     }
   };
+
+  /** Nearest attackable target within range — mobile auto-aim. */
+  function autoAimAngle(): number | null {
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (const r of conn.entities.values()) {
+      const st = r.state;
+      if (st.id === welcome.id) continue;
+      if (st.kind !== 'mob' && st.kind !== 'player' && st.kind !== 'boss' && st.kind !== 'building') continue;
+      if (st.kind === 'building' && st.owner === welcome.id) continue;
+      const d = Math.hypot(st.x - dispX, st.y - dispY);
+      // prefer non-buildings: bias building distance up
+      const weighted = st.kind === 'building' ? d * 1.6 : d;
+      if (weighted < bestD && d < 800) {
+        bestD = weighted;
+        best = st;
+      }
+    }
+    if (!best) return null;
+    return Math.atan2(best.y - dispY, best.x - dispX);
+  }
 
   function moveSpeed(attack: boolean): number {
     let speed = welcome.player.speed;
@@ -209,11 +231,12 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       case 'bossWarn':
         bossWarnUntil = performance.now() + ev.inSec * 1000;
+        bossWarnName = ev.boss;
         minimap.ping(ev.x, ev.y, ev.inSec * 1000);
         break;
       case 'bossSpawned':
         bossWarnUntil = 0;
-        hud.bossBanner('💀 БОСС ПОЯВИЛСЯ! Убей его ради награды!');
+        hud.bossBanner(`💀 ${ev.boss} появился! Убей его ради награды!`);
         minimap.ping(ev.x, ev.y, 60_000);
         setTimeout(() => hud.bossBanner(null), 6000);
         break;
@@ -222,12 +245,12 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       case 'bossKilled': {
         const top = ev.rewards.slice(0, 3).map((r) => `${escapeHtml(r.name)}: +${r.amount}`).join(' · ');
-        hud.bossBanner(`💀 Босс повержен! ${top}`);
+        hud.bossBanner(`💀 ${ev.boss} повержен! ${top}`);
         setTimeout(() => hud.bossBanner(null), 8000);
         break;
       }
       case 'bossGone':
-        hud.bossBanner('Босс исчез…');
+        hud.bossBanner(`${ev.boss} исчез…`);
         setTimeout(() => hud.bossBanner(null), 4000);
         break;
       case 'buildingAttacked':
@@ -316,9 +339,11 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         mx = ts.moveX;
         my = ts.moveY;
       }
-      if (ts.aimActive) {
-        aim = ts.aimAngle;
-        attack = ts.firing;
+      if (ts.firing) {
+        const auto = ts.manualAim ?? autoAimAngle();
+        if (auto !== null) aim = auto;
+        else if (mx !== 0 || my !== 0) aim = Math.atan2(my, mx);
+        attack = true;
       }
     }
     seq++;
@@ -370,7 +395,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     }
 
     if (bossWarnUntil > now) {
-      hud.bossBanner(`⚠ Босс появится через ${Math.ceil((bossWarnUntil - now) / 1000)}с — смотри на миникарту!`);
+      hud.bossBanner(`⚠ ${bossWarnName} появится через ${Math.ceil((bossWarnUntil - now) / 1000)}с — смотри на миникарту!`);
     }
 
     hud.killFeedEnabled = settings.values.killFeed;

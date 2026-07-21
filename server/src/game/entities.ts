@@ -1,4 +1,4 @@
-import type { EntityKind, WeaponId, MobId, BuildingId } from '@shared/types.js';
+import type { EntityKind, WeaponId, MobId, BossId, BuildingId } from '@shared/types.js';
 import type { WebSocket } from 'ws';
 
 export interface BaseEntity {
@@ -44,6 +44,8 @@ export interface Player extends BaseEntity {
   equipped: WeaponId;
   food: number;
   foodReadyAt: number;
+  /** spawn protection: damage-immune until this time; broken by attacking */
+  invulnUntil: number;
   /** account name when logged in, null for guests */
   account: string | null;
   attackReadyAt: number;
@@ -72,6 +74,9 @@ export interface Mob extends BaseEntity {
 
 export interface Boss extends BaseEntity {
   kind: 'boss';
+  bossType: BossId;
+  /** biome the boss is bound to; it will not chase beyond it */
+  homeBiome: string;
   targetId: string | null;
   attackReadyAt: number;
   telegraph: { kind: 'slam' | 'burst'; resolveAt: number; angle: number } | null;

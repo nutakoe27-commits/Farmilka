@@ -1,13 +1,14 @@
 import { WebSocket } from 'ws';
 import { encode, type GameEvent, type ServerMsg } from '@shared/protocol.js';
-import type { MobId, WeaponId } from '@shared/types.js';
+import type { MobId, BossId, WeaponId } from '@shared/types.js';
 import { clamp, dist } from '@shared/math.js';
+import { randomPointInBiome } from '@shared/biomes.js';
 import { getBalance } from './balance.js';
 import { SpatialGrid } from './grid.js';
 import type { Entity, Player, Mob, Boss, Projectile, Coin, Food, Building } from './entities.js';
 import { updatePlayers } from './player.js';
 import { updateMobs, populateMobs } from './mobs.js';
-import { updateBoss, updateBossTimer } from './boss.js';
+import { updateBosses, updateBossTimers } from './boss.js';
 import { updateBuildings } from './buildings.js';
 import { updateCoins } from './economy.js';
 import { updateProjectiles } from './combat.js';
@@ -23,21 +24,22 @@ export class World {
   coins = new Map<string, Coin>();
   foods = new Map<string, Food>();
   buildings = new Map<string, Building>();
-  boss: Boss | null = null;
+  bosses = new Map<string, Boss>();
 
   grid: SpatialGrid<Entity>;
   mobRespawnQueue: { mobType: MobId; at: number }[] = [];
 
-  bossNextSpawnAt: number;
-  bossWarned = false;
-  bossSpawnPos = { x: 0, y: 0 };
+  bossTimers = new Map<BossId, { nextSpawnAt: number; warned: boolean; pos: { x: number; y: number } }>();
 
   private nextId = 1;
 
   constructor() {
     const bal = getBalance();
     this.grid = new SpatialGrid<Entity>(bal.world.size, 200);
-    this.bossNextSpawnAt = Date.now() + bal.boss.spawnIntervalSec * 1000;
+    const now = Date.now();
+    for (const [id, cfg] of Object.entries(bal.bosses)) {
+      this.bossTimers.set(id as BossId, { nextSpawnAt: now + cfg.spawnIntervalSec * 1000, warned: false, pos: { x: 0, y: 0 } });
+    }
     populateMobs(this);
   }
 
@@ -47,11 +49,6 @@ export class World {
 
   get center(): number {
     return getBalance().world.size / 2;
-  }
-
-  inSafeZone(x: number, y: number): boolean {
-    const c = this.center;
-    return dist(x, y, c, c) <= getBalance().world.safeZoneRadius;
   }
 
   addEntity(e: Entity): void {
@@ -64,7 +61,7 @@ export class World {
       case 'coin': this.coins.set(e.id, e); break;
       case 'food': this.foods.set(e.id, e); break;
       case 'building': this.buildings.set(e.id, e); break;
-      case 'boss': this.boss = e; break;
+      case 'boss': this.bosses.set(e.id, e); break;
     }
   }
 
@@ -78,7 +75,7 @@ export class World {
       case 'coin': this.coins.delete(e.id); break;
       case 'food': this.foods.delete(e.id); break;
       case 'building': this.buildings.delete(e.id); break;
-      case 'boss': if (this.boss === e) this.boss = null; break;
+      case 'boss': this.bosses.delete(e.id); break;
     }
   }
 
@@ -125,18 +122,25 @@ export class World {
 
   // ---------- spawning ----------
 
+  /** Spawn point: somewhere around the middle of the normal biome. */
+  private spawnPoint(): { x: number; y: number } {
+    const size = getBalance().world.size;
+    const pos = randomPointInBiome('normal', size, 200);
+    // bias toward the biome's middle so freshly spawned players are not on a border
+    const c = this.center;
+    return { x: (pos.x + c) / 2, y: (pos.y + c) / 2 };
+  }
+
   spawnPlayer(name: string, ws: WebSocket, account?: { name: string; money: number; weapons: WeaponId[] }): Player {
     const bal = getBalance();
-    const c = this.center;
-    const a = Math.random() * Math.PI * 2;
-    const r = Math.random() * bal.world.safeZoneRadius * 0.6;
+    const pos = this.spawnPoint();
     const weapons: WeaponId[] = account ? [...account.weapons] : ['fists'];
     if (!weapons.includes('fists')) weapons.unshift('fists');
     const p: Player = {
       id: this.id('p'),
       kind: 'player',
-      x: c + Math.cos(a) * r,
-      y: c + Math.sin(a) * r,
+      x: pos.x,
+      y: pos.y,
       angle: 0,
       radius: bal.player.radius,
       hp: bal.player.hp,
@@ -153,6 +157,7 @@ export class World {
       equipped: 'fists',
       food: 0,
       foodReadyAt: 0,
+      invulnUntil: Date.now() + bal.player.spawnProtectSec * 1000,
       account: account ? account.name : null,
       attackReadyAt: 0,
       lastDamagedAt: 0,
@@ -168,15 +173,14 @@ export class World {
 
   respawnPlayer(p: Player): void {
     const bal = getBalance();
-    const c = this.center;
-    const a = Math.random() * Math.PI * 2;
-    const r = Math.random() * bal.world.safeZoneRadius * 0.6;
-    p.x = c + Math.cos(a) * r;
-    p.y = c + Math.sin(a) * r;
+    const pos = this.spawnPoint();
+    p.x = pos.x;
+    p.y = pos.y;
     p.hp = bal.player.hp;
     p.maxHp = bal.player.hp;
     p.dead = false;
     p.respawnAt = 0;
+    p.invulnUntil = Date.now() + bal.player.spawnProtectSec * 1000;
     p.equipped = p.weapons.includes(p.equipped) ? p.equipped : 'fists';
     p.movedTick = this.tickNo;
     p.dirtyTick = this.tickNo;
@@ -287,8 +291,8 @@ export class World {
     this.time = now;
     updatePlayers(this, dt, now);
     updateMobs(this, dt, now);
-    updateBossTimer(this, now);
-    updateBoss(this, dt, now);
+    updateBossTimers(this, now);
+    updateBosses(this, dt, now);
     updateProjectiles(this, dt, now);
     updateBuildings(this, dt, now);
     updateCoins(this, now);

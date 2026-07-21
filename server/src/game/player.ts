@@ -36,6 +36,12 @@ export function updatePlayers(world: World, dt: number, now: number): void {
       performAttack(world, p, w, now);
     }
 
+    // spawn protection expiry must dirty the entity so others see the ring drop
+    if (p.invulnUntil !== 0 && p.invulnUntil <= now) {
+      p.invulnUntil = 0;
+      p.dirtyTick = world.tickNo;
+    }
+
     // out-of-combat regen
     if (p.hp < p.maxHp && now - p.lastDamagedAt > bal.player.regenDelaySec * 1000) {
       p.hp = Math.min(p.maxHp, p.hp + bal.player.regenPerSec * dt);

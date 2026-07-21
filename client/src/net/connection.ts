@@ -96,6 +96,7 @@ export class Connection {
       if (d.angle !== undefined) r.state.angle = d.angle;
       if (d.hp !== undefined) r.state.hp = d.hp;
       if (d.weapon !== undefined) r.state.weapon = d.weapon;
+      if (d.prot !== undefined) r.state.prot = d.prot;
       r.buf.push({ t: s.time, x: d.x, y: d.y, angle: d.angle ?? r.state.angle });
       if (r.buf.length > 12) r.buf.shift();
     }

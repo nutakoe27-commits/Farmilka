@@ -1,13 +1,16 @@
 /**
- * Touch controls: left joystick moves, right joystick aims and fires while held.
- * Extra on-screen buttons: eat food, open shop.
+ * Touch controls, Brawl-Stars style:
+ *  - left joystick: movement
+ *  - big attack button (bottom-right): tap = one attack at the nearest enemy
+ *    (auto-aim), hold & drag = manual aim + continuous fire
+ *  - side buttons: eat food, open shop
  */
 export interface TouchState {
   moveX: number;
   moveY: number;
-  aimActive: boolean;
-  aimAngle: number;
   firing: boolean;
+  /** manual aim angle when dragging the attack button, null = use auto-aim */
+  manualAim: number | null;
 }
 
 export function isTouchDevice(): boolean {
@@ -15,6 +18,8 @@ export function isTouchDevice(): boolean {
 }
 
 const STICK_RANGE = 45;
+const DRAG_THRESHOLD = 22;
+const TAP_MS = 220;
 
 class Joystick {
   active = false;
@@ -78,16 +83,83 @@ class Joystick {
   }
 }
 
+class AttackButton {
+  held = false;
+  manualAim: number | null = null;
+  private tapFireUntil = 0;
+  private touchId: number | null = null;
+  private startX = 0;
+  private startY = 0;
+  private startAt = 0;
+
+  constructor() {
+    const btn = document.getElementById('atk-btn')!;
+    const dir = document.getElementById('atk-dir')!;
+
+    btn.addEventListener('touchstart', (e) => {
+      const t = e.changedTouches[0];
+      if (this.touchId !== null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.touchId = t.identifier;
+      this.held = true;
+      this.manualAim = null;
+      this.startX = t.clientX;
+      this.startY = t.clientY;
+      this.startAt = performance.now();
+      btn.classList.add('pressed');
+    }, { passive: false });
+
+    const move = (e: TouchEvent): void => {
+      for (const t of Array.from(e.changedTouches)) {
+        if (t.identifier !== this.touchId) continue;
+        e.preventDefault();
+        const dx = t.clientX - this.startX;
+        const dy = t.clientY - this.startY;
+        if (Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+          this.manualAim = Math.atan2(dy, dx);
+          const len = Math.min(26, Math.hypot(dx, dy) * 0.4);
+          dir.style.display = 'block';
+          dir.style.transform = `translate(${Math.cos(this.manualAim) * len}px, ${Math.sin(this.manualAim) * len}px)`;
+        } else {
+          this.manualAim = null;
+          dir.style.display = 'none';
+        }
+      }
+    };
+    const end = (e: TouchEvent): void => {
+      for (const t of Array.from(e.changedTouches)) {
+        if (t.identifier !== this.touchId) continue;
+        e.preventDefault();
+        const quick = performance.now() - this.startAt < TAP_MS && this.manualAim === null;
+        if (quick) this.tapFireUntil = performance.now() + 350; // one auto-aimed attack
+        this.touchId = null;
+        this.held = false;
+        this.manualAim = null;
+        btn.classList.remove('pressed');
+        dir.style.display = 'none';
+      }
+    };
+    window.addEventListener('touchmove', move, { passive: false });
+    window.addEventListener('touchend', end);
+    window.addEventListener('touchcancel', end);
+  }
+
+  firing(): boolean {
+    return this.held || performance.now() < this.tapFireUntil;
+  }
+}
+
 export class MobileControls {
   private left: Joystick;
-  private right: Joystick;
+  private atk: AttackButton;
   onEat: () => void = () => {};
   onShop: () => void = () => {};
 
   constructor() {
     document.body.classList.add('touch');
     this.left = new Joystick('joy-left', 'joy-left-base', 'joy-left-stick');
-    this.right = new Joystick('joy-right', 'joy-right-base', 'joy-right-stick');
+    this.atk = new AttackButton();
     document.getElementById('mob-eat')!.addEventListener('touchstart', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -101,13 +173,11 @@ export class MobileControls {
   }
 
   state(): TouchState {
-    const aimActive = this.right.active && (Math.abs(this.right.dx) > 0.15 || Math.abs(this.right.dy) > 0.15);
     return {
       moveX: this.left.dx,
       moveY: this.left.dy,
-      aimActive,
-      aimAngle: Math.atan2(this.right.dy, this.right.dx),
-      firing: aimActive,
+      firing: this.atk.firing(),
+      manualAim: this.atk.manualAim,
     };
   }
 

@@ -1,46 +1,66 @@
-import { angleDiff, dist } from '@shared/math.js';
+import { angleDiff, clamp, dist } from '@shared/math.js';
+import type { BossId } from '@shared/types.js';
+import type { BiomeId } from '@shared/biomes.js';
+import { biomeRect, randomPointInBiome } from '@shared/biomes.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Boss, Player } from './entities.js';
 import { applyDamage, type DamageSource } from './combat.js';
 import { telemetry } from '../db/telemetry.js';
 
-function scheduleNext(world: World, now: number): void {
-  world.bossNextSpawnAt = now + getBalance().boss.spawnIntervalSec * 1000;
-  world.bossWarned = false;
+const CENTRAL: BiomeId[] = ['snow', 'normal', 'desert'];
+
+function scheduleNext(world: World, bossType: BossId, now: number): void {
+  const cfg = getBalance().bosses[bossType];
+  world.bossTimers.set(bossType, { nextSpawnAt: now + cfg.spawnIntervalSec * 1000, warned: false, pos: { x: 0, y: 0 } });
 }
 
-export function updateBossTimer(world: World, now: number): void {
-  if (world.boss) return;
-  const bal = getBalance();
-  // live balance tuning: a shortened spawn interval takes effect immediately
-  const maxAt = now + bal.boss.spawnIntervalSec * 1000;
-  if (world.bossNextSpawnAt > maxAt) world.bossNextSpawnAt = maxAt;
-  if (!world.bossWarned && now >= world.bossNextSpawnAt - bal.boss.warnSec * 1000) {
-    const half = bal.world.size / 2;
-    const c = world.center;
-    const a = Math.random() * Math.PI * 2;
-    const r = half * (0.6 + Math.random() * 0.3);
-    world.bossSpawnPos = { x: c + Math.cos(a) * r, y: c + Math.sin(a) * r };
-    world.bossWarned = true;
-    world.broadcast({ e: 'bossWarn', x: world.bossSpawnPos.x, y: world.bossSpawnPos.y, inSec: bal.boss.warnSec });
+function liveBossOfType(world: World, bossType: BossId): Boss | null {
+  for (const b of world.bosses.values()) {
+    if (b.bossType === bossType) return b;
   }
-  if (now >= world.bossNextSpawnAt) {
-    spawnBoss(world, world.bossSpawnPos.x, world.bossSpawnPos.y, now);
+  return null;
+}
+
+export function updateBossTimers(world: World, now: number): void {
+  const bal = getBalance();
+  for (const [bossType, cfg] of Object.entries(bal.bosses) as [BossId, (typeof bal.bosses)[BossId]][]) {
+    if (liveBossOfType(world, bossType)) continue;
+    let timer = world.bossTimers.get(bossType);
+    if (!timer) {
+      timer = { nextSpawnAt: now + cfg.spawnIntervalSec * 1000, warned: false, pos: { x: 0, y: 0 } };
+      world.bossTimers.set(bossType, timer);
+    }
+    // live balance tuning: a shortened spawn interval takes effect immediately
+    const maxAt = now + cfg.spawnIntervalSec * 1000;
+    if (timer.nextSpawnAt > maxAt) timer.nextSpawnAt = maxAt;
+
+    if (!timer.warned && now >= timer.nextSpawnAt - cfg.warnSec * 1000) {
+      const biome: BiomeId = cfg.biome === 'central' ? CENTRAL[Math.floor(Math.random() * CENTRAL.length)] : cfg.biome;
+      timer.pos = randomPointInBiome(biome, bal.world.size, 250);
+      (timer as { biome?: BiomeId }).biome = biome;
+      timer.warned = true;
+      world.broadcast({ e: 'bossWarn', boss: cfg.name, x: timer.pos.x, y: timer.pos.y, inSec: cfg.warnSec });
+    }
+    if (now >= timer.nextSpawnAt) {
+      spawnBoss(world, bossType, timer.pos.x, timer.pos.y, now, (timer as { biome?: BiomeId }).biome ?? 'normal');
+    }
   }
 }
 
-export function spawnBoss(world: World, x: number, y: number, now: number): Boss {
-  const bal = getBalance();
+export function spawnBoss(world: World, bossType: BossId, x: number, y: number, now: number, homeBiome: BiomeId = 'normal'): Boss {
+  const cfg = getBalance().bosses[bossType];
   const boss: Boss = {
     id: world.id('boss'),
     kind: 'boss',
+    bossType,
+    homeBiome,
     x,
     y,
     angle: 0,
-    radius: bal.boss.radius,
-    hp: bal.boss.hp,
-    maxHp: bal.boss.hp,
+    radius: cfg.radius,
+    hp: cfg.hp,
+    maxHp: cfg.hp,
     dead: false,
     cell: -1,
     movedTick: world.tickNo,
@@ -49,10 +69,10 @@ export function spawnBoss(world: World, x: number, y: number, now: number): Boss
     attackReadyAt: now + 2000,
     telegraph: null,
     damageLedger: new Map(),
-    despawnAt: now + bal.boss.despawnSec * 1000,
+    despawnAt: now + cfg.despawnSec * 1000,
   };
   world.addEntity(boss);
-  world.broadcast({ e: 'bossSpawned', x, y });
+  world.broadcast({ e: 'bossSpawned', boss: cfg.name, x, y });
   return boss;
 }
 
@@ -62,13 +82,13 @@ export function onBossDamaged(boss: Boss, src: DamageSource, amount: number): vo
 }
 
 export function onBossKilled(world: World, boss: Boss, src: DamageSource, now: number): void {
-  const bal = getBalance();
+  const cfg = getBalance().bosses[boss.bossType];
   world.removeEntity(boss);
 
   const eligible: { name: string; dmg: number }[] = [];
   let totalDmg = 0;
   for (const [name, dmg] of boss.damageLedger) {
-    if (dmg >= bal.boss.minDamageForReward) {
+    if (dmg >= cfg.minDamageForReward) {
       eligible.push({ name, dmg });
       totalDmg += dmg;
     }
@@ -76,7 +96,7 @@ export function onBossKilled(world: World, boss: Boss, src: DamageSource, now: n
 
   const rewards: { name: string; amount: number }[] = [];
   for (const { name, dmg } of eligible) {
-    const amount = Math.round((bal.boss.reward * dmg) / totalDmg);
+    const amount = Math.round((cfg.reward * dmg) / totalDmg);
     rewards.push({ name, amount });
     for (const p of world.players.values()) {
       if (p.name === name && p.ws) {
@@ -87,15 +107,15 @@ export function onBossKilled(world: World, boss: Boss, src: DamageSource, now: n
       }
     }
   }
-  world.broadcast({ e: 'bossKilled', rewards });
-  scheduleNext(world, now);
+  world.broadcast({ e: 'bossKilled', boss: cfg.name, rewards });
+  scheduleNext(world, boss.bossType, now);
 }
 
 function pickTarget(world: World, boss: Boss): Player | null {
   let best: Player | null = null;
   let bestD = Infinity;
   for (const p of world.players.values()) {
-    if (p.dead || !p.ws || world.inSafeZone(p.x, p.y)) continue;
+    if (p.dead || !p.ws) continue;
     const d = dist(boss.x, boss.y, p.x, p.y);
     if (d < bestD && d < 1500) {
       best = p;
@@ -105,15 +125,19 @@ function pickTarget(world: World, boss: Boss): Player | null {
   return best;
 }
 
-export function updateBoss(world: World, dt: number, now: number): void {
-  const boss = world.boss;
-  if (!boss) return;
-  const bal = getBalance();
+export function updateBosses(world: World, dt: number, now: number): void {
+  for (const boss of [...world.bosses.values()]) {
+    updateBoss(world, boss, dt, now);
+  }
+}
+
+function updateBoss(world: World, boss: Boss, dt: number, now: number): void {
+  const cfg = getBalance().bosses[boss.bossType];
 
   if (now >= boss.despawnAt) {
     world.removeEntity(boss);
-    world.broadcast({ e: 'bossGone' });
-    scheduleNext(world, now);
+    world.broadcast({ e: 'bossGone', boss: cfg.name });
+    scheduleNext(world, boss.bossType, now);
     return;
   }
 
@@ -123,22 +147,22 @@ export function updateBoss(world: World, dt: number, now: number): void {
     const tg = boss.telegraph;
     boss.telegraph = null;
     if (tg.kind === 'slam') {
-      const cfg = bal.boss.slam;
-      const arcRad = (cfg.arc * Math.PI) / 180;
-      const targets = world.grid.queryCircle(boss.x, boss.y, cfg.range + 40);
+      const atk = cfg.slam;
+      const arcRad = (atk.arc * Math.PI) / 180;
+      const targets = world.grid.queryCircle(boss.x, boss.y, atk.range + 40);
       for (const t of targets) {
         if (t.kind !== 'player' || t.dead) continue;
         const d = dist(boss.x, boss.y, t.x, t.y);
-        if (d > cfg.range + t.radius) continue;
+        if (d > atk.range + t.radius) continue;
         const ang = Math.atan2(t.y - boss.y, t.x - boss.x);
         if (Math.abs(angleDiff(ang, tg.angle)) > arcRad / 2) continue;
-        applyDamage(world, t, cfg.damage, { id: boss.id, name: 'Boss', weapon: 'boss-slam', cause: 'boss' }, now, d);
+        applyDamage(world, t, atk.damage, { id: boss.id, name: cfg.name, weapon: 'boss-slam', cause: 'boss' }, now, d);
       }
     } else {
-      const cfg = bal.boss.burst;
-      for (let i = 0; i < cfg.count; i++) {
-        const a = (i / cfg.count) * Math.PI * 2;
-        world.spawnProjectile(boss.id, 'boss', 'boss-burst', boss.x + Math.cos(a) * (boss.radius + 12), boss.y + Math.sin(a) * (boss.radius + 12), a, cfg.projSpeed, cfg.damage, cfg.projRange);
+      const atk = cfg.burst;
+      for (let i = 0; i < atk.count; i++) {
+        const a = (i / atk.count) * Math.PI * 2;
+        world.spawnProjectile(boss.id, 'boss', 'boss-burst', boss.x + Math.cos(a) * (boss.radius + 12), boss.y + Math.sin(a) * (boss.radius + 12), a, atk.projSpeed, atk.damage, atk.projRange);
       }
     }
     return;
@@ -151,30 +175,34 @@ export function updateBoss(world: World, dt: number, now: number): void {
   boss.angle = Math.atan2(target.y - boss.y, target.x - boss.x);
   boss.movedTick = world.tickNo;
 
-  if (d > bal.boss.slam.range * 0.6) {
-    world.moveEntity(boss, boss.x + Math.cos(boss.angle) * bal.boss.speed * dt, boss.y + Math.sin(boss.angle) * bal.boss.speed * dt);
+  if (d > cfg.slam.range * 0.6) {
+    // bosses never leave their home biome while chasing
+    const rect = biomeRect(boss.homeBiome as never, getBalance().world.size);
+    const nx = clamp(boss.x + Math.cos(boss.angle) * cfg.speed * dt, rect.x0 + boss.radius, rect.x1 - boss.radius);
+    const ny = clamp(boss.y + Math.sin(boss.angle) * cfg.speed * dt, rect.y0 + boss.radius, rect.y1 - boss.radius);
+    world.moveEntity(boss, nx, ny);
   }
 
   // contact damage with a per-player 1s cooldown
   if (d < boss.radius + target.radius + 5 && now - target.lastBossContactAt > 1000) {
     target.lastBossContactAt = now;
-    applyDamage(world, target, bal.boss.contactDamage, { id: boss.id, name: 'Boss', weapon: 'boss-contact', cause: 'boss' }, now, d);
+    applyDamage(world, target, cfg.contactDamage, { id: boss.id, name: cfg.name, weapon: 'boss-contact', cause: 'boss' }, now, d);
   }
 
   if (now >= boss.attackReadyAt) {
-    if (d <= bal.boss.slam.range * 0.9) {
-      const cfg = bal.boss.slam;
-      boss.telegraph = { kind: 'slam', resolveAt: now + cfg.telegraphSec * 1000, angle: boss.angle };
-      boss.attackReadyAt = now + cfg.cooldownSec * 1000;
+    if (d <= cfg.slam.range * 0.9) {
+      const atk = cfg.slam;
+      boss.telegraph = { kind: 'slam', resolveAt: now + atk.telegraphSec * 1000, angle: boss.angle };
+      boss.attackReadyAt = now + atk.cooldownSec * 1000;
       world.sendNear(boss.x, boss.y, {
-        e: 'bossTelegraph', kind: 'slam', x: boss.x, y: boss.y, angle: boss.angle, range: cfg.range, arc: cfg.arc, sec: cfg.telegraphSec,
+        e: 'bossTelegraph', kind: 'slam', x: boss.x, y: boss.y, angle: boss.angle, range: atk.range, arc: atk.arc, sec: atk.telegraphSec,
       });
     } else if (d <= 700) {
-      const cfg = bal.boss.burst;
-      boss.telegraph = { kind: 'burst', resolveAt: now + cfg.telegraphSec * 1000, angle: 0 };
-      boss.attackReadyAt = now + cfg.cooldownSec * 1000;
+      const atk = cfg.burst;
+      boss.telegraph = { kind: 'burst', resolveAt: now + atk.telegraphSec * 1000, angle: 0 };
+      boss.attackReadyAt = now + atk.cooldownSec * 1000;
       world.sendNear(boss.x, boss.y, {
-        e: 'bossTelegraph', kind: 'burst', x: boss.x, y: boss.y, angle: 0, range: cfg.projRange, arc: 360, sec: cfg.telegraphSec,
+        e: 'bossTelegraph', kind: 'burst', x: boss.x, y: boss.y, angle: 0, range: atk.projRange, arc: 360, sec: atk.telegraphSec,
       });
     }
   }

@@ -1,4 +1,5 @@
-import type { WeaponId, MobId, BuildingId } from './types.js';
+import type { WeaponId, MobId, BossId, BuildingId } from './types.js';
+import type { BiomeId } from './biomes.js';
 
 export interface WeaponCfg {
   type: 'melee' | 'ranged';
@@ -13,6 +14,7 @@ export interface WeaponCfg {
 }
 
 export interface MobCfg {
+  biome: BiomeId;
   hp: number;
   damage: number;
   speed: number;
@@ -23,9 +25,41 @@ export interface MobCfg {
   attackRate: number;
   flees: boolean;
   count: number;
-  zoneMin: number;
-  zoneMax: number;
   leashRange: number;
+}
+
+export interface BossAttackSlam {
+  damage: number;
+  range: number;
+  arc: number;
+  telegraphSec: number;
+  cooldownSec: number;
+}
+
+export interface BossAttackBurst {
+  damage: number;
+  count: number;
+  projSpeed: number;
+  projRange: number;
+  telegraphSec: number;
+  cooldownSec: number;
+}
+
+export interface BossCfg {
+  name: string;
+  /** 'central' = random of snow/normal/desert; otherwise a specific biome */
+  biome: BiomeId | 'central';
+  hp: number;
+  speed: number;
+  radius: number;
+  contactDamage: number;
+  spawnIntervalSec: number;
+  warnSec: number;
+  despawnSec: number;
+  reward: number;
+  minDamageForReward: number;
+  slam: BossAttackSlam;
+  burst: BossAttackBurst;
 }
 
 export interface BuildingCfg {
@@ -43,7 +77,6 @@ export interface BuildingCfg {
 export interface Balance {
   world: {
     size: number;
-    safeZoneRadius: number;
     viewRadius: number;
     maxPlayers: number;
     tickRate: number;
@@ -57,22 +90,11 @@ export interface Balance {
     respawnSec: number;
     startMoney: number;
     dropMoneyFrac: number;
+    spawnProtectSec: number;
   };
   weapons: Record<WeaponId, WeaponCfg>;
   mobs: Record<MobId, MobCfg>;
-  boss: {
-    hp: number;
-    speed: number;
-    radius: number;
-    contactDamage: number;
-    spawnIntervalSec: number;
-    warnSec: number;
-    despawnSec: number;
-    reward: number;
-    minDamageForReward: number;
-    slam: { damage: number; range: number; arc: number; telegraphSec: number; cooldownSec: number };
-    burst: { damage: number; count: number; projSpeed: number; projRange: number; telegraphSec: number; cooldownSec: number };
-  };
+  bosses: Record<BossId, BossCfg>;
   buildings: Record<BuildingId, BuildingCfg>;
   food: {
     heal: number;
@@ -86,7 +108,6 @@ export interface Balance {
   economy: {
     maxBuildingsPerPlayer: number;
     buildingMinDist: number;
-    buildingSafeZoneDist: number;
     raidLootFrac: number;
     sellFrac: number;
     coinDespawnSec: number;
@@ -95,8 +116,10 @@ export interface Balance {
 }
 
 const WEAPON_IDS: WeaponId[] = ['fists', 'sword', 'spear', 'hammer', 'bow', 'crossbow'];
-const MOB_IDS: MobId[] = ['slime', 'wolf', 'golem'];
+export const MOB_IDS: MobId[] = ['slime', 'wolf', 'ice_slime', 'yeti', 'scorpion', 'sand_golem', 'shade', 'treant', 'wisp', 'crystal_golem'];
+export const BOSS_IDS: BossId[] = ['champion', 'shadow_lord', 'crystal_queen'];
 const BUILDING_IDS: BuildingId[] = ['farm', 'mine', 'turret'];
+const BIOME_IDS = ['normal', 'snow', 'desert', 'mystic_west', 'mystic_east'];
 
 function num(obj: Record<string, unknown>, key: string, path: string, min = 0): number {
   const v = obj[key];
@@ -119,13 +142,12 @@ export function validateBalance(raw: unknown): Balance {
 
   const world = section(root, 'world');
   num(world, 'size', 'world', 500);
-  num(world, 'safeZoneRadius', 'world');
   num(world, 'viewRadius', 'world', 100);
   num(world, 'maxPlayers', 'world', 1);
   num(world, 'tickRate', 'world', 1);
 
   const player = section(root, 'player');
-  for (const k of ['hp', 'speed', 'radius', 'regenPerSec', 'regenDelaySec', 'respawnSec', 'startMoney', 'dropMoneyFrac']) {
+  for (const k of ['hp', 'speed', 'radius', 'regenPerSec', 'regenDelaySec', 'respawnSec', 'startMoney', 'dropMoneyFrac', 'spawnProtectSec']) {
     num(player, k, 'player');
   }
 
@@ -141,20 +163,28 @@ export function validateBalance(raw: unknown): Balance {
   const mobs = section(root, 'mobs');
   for (const id of MOB_IDS) {
     const m = section(mobs, id);
-    for (const k of ['hp', 'damage', 'speed', 'reward', 'radius', 'aggroRadius', 'attackRange', 'attackRate', 'count', 'zoneMin', 'zoneMax', 'leashRange']) {
+    for (const k of ['hp', 'damage', 'speed', 'reward', 'radius', 'aggroRadius', 'attackRange', 'attackRate', 'count', 'leashRange']) {
       num(m, k, `mobs.${id}`);
     }
     if (typeof m.flees !== 'boolean') throw new Error(`balance: mobs.${id}.flees must be boolean`);
+    if (!BIOME_IDS.includes(String(m.biome))) throw new Error(`balance: mobs.${id}.biome must be one of ${BIOME_IDS.join('|')}`);
   }
 
-  const boss = section(root, 'boss');
-  for (const k of ['hp', 'speed', 'radius', 'contactDamage', 'spawnIntervalSec', 'warnSec', 'despawnSec', 'reward', 'minDamageForReward']) {
-    num(boss, k, 'boss');
+  const bosses = section(root, 'bosses');
+  for (const id of BOSS_IDS) {
+    const b = section(bosses, id);
+    if (typeof b.name !== 'string' || !b.name) throw new Error(`balance: bosses.${id}.name must be a string`);
+    if (b.biome !== 'central' && !BIOME_IDS.includes(String(b.biome))) {
+      throw new Error(`balance: bosses.${id}.biome must be 'central' or one of ${BIOME_IDS.join('|')}`);
+    }
+    for (const k of ['hp', 'speed', 'radius', 'contactDamage', 'spawnIntervalSec', 'warnSec', 'despawnSec', 'reward', 'minDamageForReward']) {
+      num(b, k, `bosses.${id}`);
+    }
+    const slam = section(b, 'slam');
+    for (const k of ['damage', 'range', 'arc', 'telegraphSec', 'cooldownSec']) num(slam, k, `bosses.${id}.slam`);
+    const burst = section(b, 'burst');
+    for (const k of ['damage', 'count', 'projSpeed', 'projRange', 'telegraphSec', 'cooldownSec']) num(burst, k, `bosses.${id}.burst`);
   }
-  const slam = section(boss, 'slam');
-  for (const k of ['damage', 'range', 'arc', 'telegraphSec', 'cooldownSec']) num(slam, k, 'boss.slam');
-  const burst = section(boss, 'burst');
-  for (const k of ['damage', 'count', 'projSpeed', 'projRange', 'telegraphSec', 'cooldownSec']) num(burst, k, 'boss.burst');
 
   const buildings = section(root, 'buildings');
   for (const id of BUILDING_IDS) {
@@ -168,7 +198,7 @@ export function validateBalance(raw: unknown): Balance {
   }
 
   const economy = section(root, 'economy');
-  for (const k of ['maxBuildingsPerPlayer', 'buildingMinDist', 'buildingSafeZoneDist', 'raidLootFrac', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
+  for (const k of ['maxBuildingsPerPlayer', 'buildingMinDist', 'raidLootFrac', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
     num(economy, k, 'economy');
   }
 

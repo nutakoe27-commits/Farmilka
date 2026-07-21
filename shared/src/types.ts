@@ -1,7 +1,13 @@
 export type EntityKind = 'player' | 'mob' | 'boss' | 'projectile' | 'coin' | 'building' | 'food';
 
 export type WeaponId = 'fists' | 'sword' | 'spear' | 'hammer' | 'bow' | 'crossbow';
-export type MobId = 'slime' | 'wolf' | 'golem';
+export type MobId =
+  | 'slime' | 'wolf'                 // normal
+  | 'ice_slime' | 'yeti'             // snow
+  | 'scorpion' | 'sand_golem'        // desert
+  | 'shade' | 'treant'               // mystic west
+  | 'wisp' | 'crystal_golem';        // mystic east
+export type BossId = 'champion' | 'shadow_lord' | 'crystal_queen';
 export type BuildingId = 'farm' | 'mine' | 'turret';
 
 export type IncomeSource = 'mob' | 'boss' | 'building' | 'loot' | 'raid';

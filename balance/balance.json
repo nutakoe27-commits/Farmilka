@@ -1,7 +1,6 @@
 {
   "world": {
     "size": 4000,
-    "safeZoneRadius": 300,
     "viewRadius": 1200,
     "maxPlayers": 40,
     "tickRate": 120
@@ -14,7 +13,8 @@
     "regenDelaySec": 5,
     "respawnSec": 4,
     "startMoney": 50,
-    "dropMoneyFrac": 0.5
+    "dropMoneyFrac": 0.5,
+    "spawnProtectSec": 3
   },
   "weapons": {
     "fists": {
@@ -74,6 +74,7 @@
   },
   "mobs": {
     "slime": {
+      "biome": "normal",
       "hp": 30,
       "damage": 5,
       "speed": 90,
@@ -83,12 +84,11 @@
       "attackRange": 30,
       "attackRate": 1.0,
       "flees": true,
-      "count": 40,
-      "zoneMin": 0.12,
-      "zoneMax": 0.4,
+      "count": 8,
       "leashRange": 500
     },
     "wolf": {
+      "biome": "normal",
       "hp": 70,
       "damage": 12,
       "speed": 250,
@@ -98,51 +98,206 @@
       "attackRange": 40,
       "attackRate": 1.2,
       "flees": false,
-      "count": 25,
-      "zoneMin": 0.4,
-      "zoneMax": 0.7,
+      "count": 6,
       "leashRange": 600
     },
-    "golem": {
-      "hp": 200,
+    "ice_slime": {
+      "biome": "snow",
+      "hp": 45,
+      "damage": 8,
+      "speed": 110,
+      "reward": 18,
+      "radius": 18,
+      "aggroRadius": 0,
+      "attackRange": 30,
+      "attackRate": 1.0,
+      "flees": true,
+      "count": 7,
+      "leashRange": 500
+    },
+    "yeti": {
+      "biome": "snow",
+      "hp": 250,
+      "damage": 28,
+      "speed": 140,
+      "reward": 120,
+      "radius": 32,
+      "aggroRadius": 250,
+      "attackRange": 55,
+      "attackRate": 0.6,
+      "flees": false,
+      "count": 4,
+      "leashRange": 600
+    },
+    "scorpion": {
+      "biome": "desert",
+      "hp": 60,
+      "damage": 16,
+      "speed": 270,
+      "reward": 35,
+      "radius": 18,
+      "aggroRadius": 320,
+      "attackRange": 40,
+      "attackRate": 1.4,
+      "flees": false,
+      "count": 7,
+      "leashRange": 600
+    },
+    "sand_golem": {
+      "biome": "desert",
+      "hp": 220,
       "damage": 25,
-      "speed": 120,
-      "reward": 100,
+      "speed": 110,
+      "reward": 110,
       "radius": 30,
       "aggroRadius": 200,
       "attackRange": 55,
       "attackRate": 0.5,
       "flees": false,
-      "count": 10,
-      "zoneMin": 0.7,
-      "zoneMax": 0.98,
+      "count": 4,
+      "leashRange": 500
+    },
+    "shade": {
+      "biome": "mystic_west",
+      "hp": 120,
+      "damage": 30,
+      "speed": 290,
+      "reward": 180,
+      "radius": 20,
+      "aggroRadius": 400,
+      "attackRange": 45,
+      "attackRate": 1.3,
+      "flees": false,
+      "count": 5,
+      "leashRange": 800
+    },
+    "treant": {
+      "biome": "mystic_west",
+      "hp": 400,
+      "damage": 40,
+      "speed": 90,
+      "reward": 300,
+      "radius": 34,
+      "aggroRadius": 250,
+      "attackRange": 60,
+      "attackRate": 0.5,
+      "flees": false,
+      "count": 3,
+      "leashRange": 500
+    },
+    "wisp": {
+      "biome": "mystic_east",
+      "hp": 90,
+      "damage": 22,
+      "speed": 320,
+      "reward": 150,
+      "radius": 16,
+      "aggroRadius": 350,
+      "attackRange": 40,
+      "attackRate": 1.5,
+      "flees": false,
+      "count": 5,
+      "leashRange": 800
+    },
+    "crystal_golem": {
+      "biome": "mystic_east",
+      "hp": 450,
+      "damage": 45,
+      "speed": 100,
+      "reward": 350,
+      "radius": 34,
+      "aggroRadius": 250,
+      "attackRange": 60,
+      "attackRate": 0.45,
+      "flees": false,
+      "count": 3,
       "leashRange": 500
     }
   },
-  "boss": {
-    "hp": 5000,
-    "speed": 100,
-    "radius": 60,
-    "contactDamage": 15,
-    "spawnIntervalSec": 900,
-    "warnSec": 30,
-    "despawnSec": 300,
-    "reward": 3000,
-    "minDamageForReward": 100,
-    "slam": {
-      "damage": 60,
-      "range": 260,
-      "arc": 90,
-      "telegraphSec": 1.0,
-      "cooldownSec": 5
+  "bosses": {
+    "champion": {
+      "name": "Чемпион",
+      "biome": "central",
+      "hp": 5000,
+      "speed": 100,
+      "radius": 60,
+      "contactDamage": 15,
+      "spawnIntervalSec": 900,
+      "warnSec": 30,
+      "despawnSec": 300,
+      "reward": 3000,
+      "minDamageForReward": 100,
+      "slam": {
+        "damage": 60,
+        "range": 260,
+        "arc": 90,
+        "telegraphSec": 1.0,
+        "cooldownSec": 5
+      },
+      "burst": {
+        "damage": 25,
+        "count": 8,
+        "projSpeed": 450,
+        "projRange": 800,
+        "telegraphSec": 1.0,
+        "cooldownSec": 8
+      }
     },
-    "burst": {
-      "damage": 25,
-      "count": 8,
-      "projSpeed": 450,
-      "projRange": 800,
-      "telegraphSec": 1.0,
-      "cooldownSec": 8
+    "shadow_lord": {
+      "name": "Владыка Теней",
+      "biome": "mystic_west",
+      "hp": 9000,
+      "speed": 130,
+      "radius": 66,
+      "contactDamage": 25,
+      "spawnIntervalSec": 1200,
+      "warnSec": 30,
+      "despawnSec": 300,
+      "reward": 6000,
+      "minDamageForReward": 200,
+      "slam": {
+        "damage": 90,
+        "range": 300,
+        "arc": 110,
+        "telegraphSec": 0.9,
+        "cooldownSec": 4.5
+      },
+      "burst": {
+        "damage": 35,
+        "count": 10,
+        "projSpeed": 520,
+        "projRange": 900,
+        "telegraphSec": 0.9,
+        "cooldownSec": 7
+      }
+    },
+    "crystal_queen": {
+      "name": "Кристальная Королева",
+      "biome": "mystic_east",
+      "hp": 9000,
+      "speed": 110,
+      "radius": 66,
+      "contactDamage": 25,
+      "spawnIntervalSec": 1200,
+      "warnSec": 30,
+      "despawnSec": 300,
+      "reward": 6000,
+      "minDamageForReward": 200,
+      "slam": {
+        "damage": 80,
+        "range": 280,
+        "arc": 100,
+        "telegraphSec": 0.9,
+        "cooldownSec": 5
+      },
+      "burst": {
+        "damage": 30,
+        "count": 12,
+        "projSpeed": 600,
+        "projRange": 1000,
+        "telegraphSec": 0.9,
+        "cooldownSec": 6.5
+      }
     }
   },
   "buildings": {
@@ -184,7 +339,6 @@
   "economy": {
     "maxBuildingsPerPlayer": 5,
     "buildingMinDist": 100,
-    "buildingSafeZoneDist": 400,
     "raidLootFrac": 0.5,
     "coinDespawnSec": 60,
     "coinPickupRadius": 50,

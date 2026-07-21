@@ -18,6 +18,7 @@ function fullState(e: Entity): EntityState {
       s.maxHp = e.maxHp;
       s.name = e.name;
       s.weapon = e.equipped;
+      if (e.invulnUntil > Date.now()) s.prot = true;
       break;
     case 'mob':
       s.hp = Math.round(e.hp);
@@ -27,6 +28,7 @@ function fullState(e: Entity): EntityState {
     case 'boss':
       s.hp = Math.round(e.hp);
       s.maxHp = e.maxHp;
+      s.bossType = e.bossType;
       break;
     case 'building':
       s.hp = Math.round(e.hp);
@@ -69,7 +71,10 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
       };
       if (e.dirtyTick === world.tickNo) {
         d.hp = Math.round(e.hp);
-        if (e.kind === 'player') d.weapon = e.equipped;
+        if (e.kind === 'player') {
+          d.weapon = e.equipped;
+          d.prot = e.invulnUntil > world.time;
+        }
       }
       upd.push(d);
     }
@@ -92,9 +97,9 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     weapons: p.weapons,
     equipped: p.equipped,
     buildings: p.buildingIds.size,
-    inSafe: world.inSafeZone(p.x, p.y),
     food: p.food,
     foodIn: Math.max(0, Math.round((p.foodReadyAt - world.time) / 100) / 10),
+    protIn: Math.max(0, Math.round((p.invulnUntil - world.time) / 100) / 10),
   };
   if (p.dead && p.respawnAt) {
     self.respawnIn = Math.max(0, (p.respawnAt - world.time) / 1000);

@@ -90,7 +90,6 @@ export function startServer(world: World): http.Server {
           registered: !!account,
           world: {
             size: bal.world.size,
-            safeZoneRadius: bal.world.safeZoneRadius,
             viewRadius: bal.world.viewRadius,
           },
           player: { speed: bal.player.speed, radius: bal.player.radius },

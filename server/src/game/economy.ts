@@ -11,7 +11,6 @@ export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boo
   const bal = getBalance();
   if (!WEAPON_IDS.includes(item)) return { ok: false, reason: 'Неизвестный предмет' };
   if (p.dead) return { ok: false, reason: 'Вы мертвы' };
-  if (!world.inSafeZone(p.x, p.y)) return { ok: false, reason: 'Покупки только в безопасной зоне' };
   if (p.weapons.includes(item)) return { ok: false, reason: 'Уже куплено' };
   if (p.weapons.length >= 4) return { ok: false, reason: 'Хотбар заполнен (кулаки + 3 оружия)' };
   const cfg = bal.weapons[item];
@@ -27,7 +26,6 @@ export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boo
 export function tryBuyFood(world: World, p: Player): { ok: boolean; reason?: string } {
   const bal = getBalance();
   if (p.dead) return { ok: false, reason: 'Вы мертвы' };
-  if (!world.inSafeZone(p.x, p.y)) return { ok: false, reason: 'Покупки только в безопасной зоне' };
   if (p.food >= bal.food.maxCarry) return { ok: false, reason: `Максимум еды: ${bal.food.maxCarry}` };
   if (p.money < bal.food.price) return { ok: false, reason: 'Недостаточно денег' };
   p.money -= bal.food.price;
@@ -40,7 +38,6 @@ export function trySellWeapon(world: World, p: Player, weapon: WeaponId): { ok: 
   const bal = getBalance();
   if (p.dead) return { ok: false, reason: 'Вы мертвы' };
   if (weapon === 'fists') return { ok: false, reason: 'Кулаки не продаются' };
-  if (!world.inSafeZone(p.x, p.y)) return { ok: false, reason: 'Продажа только в безопасной зоне' };
   const idx = p.weapons.indexOf(weapon);
   if (idx < 0) return { ok: false, reason: 'У вас нет этого оружия' };
   const refund = Math.floor(bal.weapons[weapon].price * bal.economy.sellFrac);

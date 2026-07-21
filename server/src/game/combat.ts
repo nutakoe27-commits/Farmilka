@@ -18,6 +18,11 @@ export interface DamageSource {
 const ATTACKABLE = new Set(['player', 'mob', 'boss', 'building']);
 
 export function performAttack(world: World, p: Player, w: WeaponCfg, now: number): void {
+  // attacking breaks your own spawn protection
+  if (p.invulnUntil > now) {
+    p.invulnUntil = 0;
+    p.dirtyTick = world.tickNo;
+  }
   if (w.type === 'ranged') {
     const speed = w.projSpeed ?? 600;
     const sx = p.x + Math.cos(p.angle) * (p.radius + 10);
@@ -57,18 +62,11 @@ export function applyDamage(
   distance: number,
 ): boolean {
   if (target.dead) return false;
-  const pvp = src.cause === 'player' || src.cause === 'turret';
-  if (target.kind === 'player' && pvp) {
-    // the safe zone always protects the victim
-    if (world.inSafeZone(target.x, target.y)) return false;
+  if (target.kind === 'player') {
     if (src.id === target.id) return false;
-    // a player attacking from inside the safe zone deals no damage — but this must
-    // NOT gate turrets: a turret is autonomous, its owner's position is irrelevant
-    // (owners commonly stand at their safe-zone base while the turret defends).
-    if (src.cause === 'player') {
-      const attacker = world.players.get(src.id);
-      if (attacker && world.inSafeZone(attacker.x, attacker.y)) return false;
-    }
+    // spawn protection: fresh spawns are immune until the timer runs out
+    // (their own first attack drops it — see performAttack)
+    if (target.invulnUntil > now) return false;
   }
   if (target.kind === 'building') {
     if (src.cause !== 'player' && src.cause !== 'turret') return false;

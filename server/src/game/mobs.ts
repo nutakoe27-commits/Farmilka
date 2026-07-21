@@ -1,27 +1,16 @@
-import { dist } from '@shared/math.js';
+import { clamp, dist } from '@shared/math.js';
 import type { MobId } from '@shared/types.js';
+import { MOB_IDS } from '@shared/balance-schema.js';
+import { biomeRect, randomPointInBiome } from '@shared/biomes.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Mob, Player } from './entities.js';
 import { applyDamage } from './combat.js';
 
-const MOB_IDS: MobId[] = ['slime', 'wolf', 'golem'];
-
-/** Random position inside the mob's difficulty ring, outside the safe zone. */
-function ringPos(world: World, zoneMin: number, zoneMax: number): { x: number; y: number } {
-  const bal = getBalance();
-  const half = bal.world.size / 2;
-  const c = world.center;
-  const minR = Math.max(zoneMin * half, bal.world.safeZoneRadius + 150);
-  const maxR = Math.max(minR + 50, zoneMax * half);
-  const a = Math.random() * Math.PI * 2;
-  const r = minR + Math.random() * (maxR - minR);
-  return { x: c + Math.cos(a) * r, y: c + Math.sin(a) * r };
-}
-
 export function spawnMob(world: World, mobType: MobId): Mob {
-  const cfg = getBalance().mobs[mobType];
-  const pos = ringPos(world, cfg.zoneMin, cfg.zoneMax);
+  const bal = getBalance();
+  const cfg = bal.mobs[mobType];
+  const pos = randomPointInBiome(cfg.biome, bal.world.size, 120);
   const mob: Mob = {
     id: world.id('m'),
     kind: 'mob',
@@ -59,7 +48,7 @@ export function populateMobs(world: World): void {
 function validTarget(world: World, id: string | null): Player | null {
   if (!id) return null;
   const p = world.players.get(id);
-  if (!p || p.dead || !p.ws || world.inSafeZone(p.x, p.y)) return null;
+  if (!p || p.dead || !p.ws) return null;
   return p;
 }
 
@@ -123,16 +112,12 @@ export function updateMobs(world: World, dt: number, now: number): void {
     }
 
     if (vx !== 0 || vy !== 0) {
-      const nx = mob.x + vx * dt;
-      const ny = mob.y + vy * dt;
-      // mobs never enter the safe zone
-      const c = world.center;
-      if (dist(nx, ny, c, c) > bal.world.safeZoneRadius + 60) {
-        mob.angle = Math.atan2(vy, vx);
-        world.moveEntity(mob, nx, ny);
-      } else {
-        mob.state = 'return';
-      }
+      // mobs stay inside their home biome — keeps biome identity crisp
+      const rect = biomeRect(cfg.biome, bal.world.size);
+      const nx = clamp(mob.x + vx * dt, rect.x0 + mob.radius, rect.x1 - mob.radius);
+      const ny = clamp(mob.y + vy * dt, rect.y0 + mob.radius, rect.y1 - mob.radius);
+      mob.angle = Math.atan2(vy, vx);
+      world.moveEntity(mob, nx, ny);
     }
   }
 }
@@ -183,7 +168,7 @@ function tryAggro(world: World, mob: Mob): boolean {
   let best: Player | null = null;
   let bestD = Infinity;
   for (const e of near) {
-    if (e.kind !== 'player' || e.dead || !e.ws || world.inSafeZone(e.x, e.y)) continue;
+    if (e.kind !== 'player' || e.dead || !e.ws) continue;
     const d = dist(mob.x, mob.y, e.x, e.y);
     if (d < bestD) {
       best = e;

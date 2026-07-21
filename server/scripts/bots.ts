@@ -81,10 +81,8 @@ class Bot {
   think(): void {
     if (!this.welcome || this.dead || this.ws.readyState !== WebSocket.OPEN) return;
 
-    // try to buy a weapon when rich and in the safe zone
-    const c = this.welcome.world.size / 2;
-    const distToCenter = Math.hypot(this.x - c, this.y - c);
-    if (this.weapons.length < 3 && distToCenter < this.welcome.world.safeZoneRadius) {
+    // shop works from anywhere now
+    if (this.weapons.length < 3) {
       for (const [id, cfg] of Object.entries(this.welcome.weapons)) {
         if (cfg.price > 0 && cfg.price <= this.money && !this.weapons.includes(id)) {
           this.ws.send(encode({ t: 'buy', item: id } as ClientMsg));
@@ -93,18 +91,16 @@ class Bot {
       }
     }
     // occasionally place a farm
-    if (this.money > 400 && Math.random() < 0.01 && distToCenter > this.welcome.world.safeZoneRadius + 500) {
+    if (this.money > 400 && Math.random() < 0.01) {
       this.ws.send(encode({ t: 'place', building: 'farm', x: Math.round(this.x + 120), y: Math.round(this.y) } as ClientMsg));
     }
 
-    // nearest attackable entity; ignore targets protected by the safe zone
-    const inSafe = (ex: number, ey: number): boolean => Math.hypot(ex - c, ey - c) < this.welcome!.world.safeZoneRadius;
+    // nearest attackable entity
     let target: EntityState | null = null;
     let bestD = Infinity;
     for (const e of this.entities.values()) {
       if (e.id === this.id) continue;
       if (e.kind !== 'mob' && e.kind !== 'player' && e.kind !== 'boss') continue;
-      if (e.kind === 'player' && (inSafe(e.x, e.y) || inSafe(this.x, this.y))) continue;
       const d = Math.hypot(e.x - this.x, e.y - this.y);
       if (d < bestD) {
         bestD = d;

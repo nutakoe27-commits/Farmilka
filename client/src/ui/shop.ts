@@ -79,7 +79,7 @@ export class Shop {
     const sellFrac = this.welcome.economy.sellFrac;
 
     const foodBtn = $('shop-food').querySelector('button') as HTMLButtonElement;
-    foodBtn.disabled = !self.inSafe || self.money < this.welcome.food.price || self.food >= this.welcome.food.maxCarry;
+    foodBtn.disabled = self.money < this.welcome.food.price || self.food >= this.welcome.food.maxCarry;
     foodBtn.textContent = self.food >= this.welcome.food.maxCarry ? 'Максимум' : `💰 ${this.welcome.food.price}`;
 
     for (const el of document.querySelectorAll<HTMLElement>('#shop-weapons .shop-item')) {
@@ -94,10 +94,10 @@ export class Shop {
         buy.disabled = true;
         sell.classList.remove('hidden');
         sell.textContent = `Продать +${Math.floor(cfg.price * sellFrac)}`;
-        sell.disabled = !self.inSafe;
+        sell.disabled = false;
       } else {
         buy.textContent = `💰 ${cfg.price}`;
-        buy.disabled = !self.inSafe || self.money < cfg.price || self.weapons.length >= 4;
+        buy.disabled = self.money < cfg.price || self.weapons.length >= 4;
         sell.classList.add('hidden');
       }
     }

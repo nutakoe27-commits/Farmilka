@@ -1,3 +1,4 @@
+import { biomeRect, type BiomeId } from '@shared/biomes.js';
 import type { Remote } from '../net/connection.js';
 
 interface Ping {
@@ -6,12 +7,20 @@ interface Ping {
   until: number;
 }
 
+const MINI_BIOME_COLORS: Record<BiomeId, string> = {
+  normal: '#1d2b1f',
+  snow: '#26324a',
+  desert: '#3a2e18',
+  mystic_west: '#2c1b3e',
+  mystic_east: '#16383c',
+};
+
 export class Minimap {
   private ctx: CanvasRenderingContext2D;
   private size = 160;
   private pings: Ping[] = [];
 
-  constructor(private worldSize: number, private safeR: number) {
+  constructor(private worldSize: number) {
     const canvas = document.getElementById('minimap') as HTMLCanvasElement;
     this.ctx = canvas.getContext('2d')!;
   }
@@ -25,11 +34,12 @@ export class Minimap {
     const k = this.size / this.worldSize;
     ctx.clearRect(0, 0, this.size, this.size);
 
-    // safe zone
-    ctx.beginPath();
-    ctx.arc((this.worldSize / 2) * k, (this.worldSize / 2) * k, this.safeR * k, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(46,160,67,.25)';
-    ctx.fill();
+    // biome map
+    for (const b of ['mystic_west', 'mystic_east', 'snow', 'normal', 'desert'] as BiomeId[]) {
+      const r = biomeRect(b, this.worldSize);
+      ctx.fillStyle = MINI_BIOME_COLORS[b];
+      ctx.fillRect(r.x0 * k, r.y0 * k, (r.x1 - r.x0) * k, (r.y1 - r.y0) * k);
+    }
 
     for (const r of entities.values()) {
       const s = r.state;
