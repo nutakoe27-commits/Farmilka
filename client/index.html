@@ -28,6 +28,8 @@
     /* HUD */
     #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
     #hp-wrap { position: fixed; left: 50%; transform: translateX(-50%); bottom: 86px; width: min(320px, 60vw); }
+    #level-badge { text-align: center; font-size: 12px; font-weight: 700; color: #ffd76e; margin-bottom: 4px; text-shadow: 0 1px 3px #000; }
+    #level-badge .mx { color: #8a8fa3; font-weight: 400; }
     #hp-bar-bg { height: 14px; background: rgba(0,0,0,.55); border: 1px solid #2c3242; border-radius: 8px; overflow: hidden; }
     #hp-bar { height: 100%; width: 100%; background: linear-gradient(90deg,#2ea043,#7ee787); transition: width .15s; border-radius: 8px; }
     #hp-text { text-align: center; font-size: 11px; color: #bfc4d4; margin-top: 3px; text-shadow: 0 1px 2px #000; }
@@ -120,6 +122,7 @@
     <div id="money">💰 0</div>
     <div id="zone-label" class="hidden">🛡 Защита после возрождения</div>
     <div id="hp-wrap">
+      <div id="level-badge">⭐ Ур. 1<span class="mx">/10</span></div>
       <div id="hp-bar-bg"><div id="hp-bar"></div></div>
       <div id="hp-text">100 / 100</div>
     </div>
@@ -157,6 +160,15 @@
     <h2>Магазин</h2>
     <div class="sub">Магазин работает из любой точки мира. При смерти теряются купленное оружие и еда!</div>
     <div id="shop-msg"></div>
+    <div id="level-box" style="background:linear-gradient(135deg,#14231a,#151926);border:1px solid #2d523a;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div>
+          <div style="font-size:15px;font-weight:700">⭐ Уровень <span id="level-cur" style="color:#7ee787"></span><span id="level-max" style="color:#8a8fa3;font-weight:400"></span></div>
+          <div id="level-desc" style="font-size:11px;color:#8a8fa3;margin-top:3px">+HP и +урон за каждый уровень. Теряется при смерти. На боссов урон не действует.</div>
+        </div>
+        <button id="level-btn" style="cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#2ea043,#1f7a33);color:#fff;white-space:nowrap"></button>
+      </div>
+    </div>
     <div id="prestige-box" style="background:linear-gradient(135deg,#1a1428,#151926);border:1px solid #3a2d52;border-radius:10px;padding:12px 14px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
         <div>

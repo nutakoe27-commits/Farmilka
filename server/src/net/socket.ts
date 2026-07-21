@@ -10,8 +10,9 @@ import type { World } from '../game/world.js';
 import type { Player } from '../game/entities.js';
 import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip } from '../game/economy.js';
 import { tryPlaceBuilding, removePlayerBuildings } from '../game/buildings.js';
-import { tryLootbox, tryEquipHat, applyHatMaxHp } from '../game/hats.js';
+import { tryLootbox, tryEquipHat, recomputeMaxHp } from '../game/hats.js';
 import { tryPrestige } from '../game/prestige.js';
+import { tryBuyLevel } from '../game/levels.js';
 import { telemetry } from '../db/telemetry.js';
 import { accountExists, login, register, saveProgress, type Account } from '../db/accounts.js';
 import { adminRouter } from '../admin/stats.js';
@@ -105,7 +106,7 @@ export function startServer(worlds: World[]): http.Server {
         }
 
         player = world.spawnPlayer(name, ws, account);
-        applyHatMaxHp(world, player);
+        recomputeMaxHp(world, player);
         try {
           sessionIds.set(player, telemetry.sessionStart(name));
         } catch (err) {
@@ -133,6 +134,7 @@ export function startServer(worlds: World[]): http.Server {
           },
           hats: { items: bal.hats.items, lootboxPrice: bal.hats.lootboxPrice, dupGold: bal.hats.dupGold },
           prestige: bal.prestige,
+          levels: bal.levels,
           economy: { sellFrac: bal.economy.sellFrac },
           maxBuildings: bal.economy.maxBuildingsPerPlayer,
         };
@@ -179,6 +181,11 @@ export function startServer(worlds: World[]): http.Server {
         case 'prestige': {
           const res = tryPrestige(world, player);
           if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'prestige', reason: res.reason });
+          break;
+        }
+        case 'buyLevel': {
+          const res = tryBuyLevel(world, player);
+          if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'level', reason: res.reason });
           break;
         }
         case 'equipHat': {

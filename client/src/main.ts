@@ -103,6 +103,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   settings.currentServer = welcome.server;
   const hud = new Hud();
   hud.setFoodCooldown(welcome.food.cooldownSec);
+  hud.setMaxLevel(welcome.levels.max);
   hud.killFeedEnabled = settings.values.killFeed;
   const shop = new Shop(welcome);
   const minimap = new Minimap(welcome.world.size);
@@ -268,6 +269,13 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         setTimeout(() => hud.bossBanner(null), 5000);
         break;
       }
+      case 'level': {
+        const maxed = ev.level >= ev.max;
+        hud.notice(maxed
+          ? `⭐ <b style="color:#7ee787">Максимальный уровень ${ev.level}!</b> Ты силён в PvE — но босса в одиночку не одолеть.`
+          : `⭐ Уровень <b style="color:#7ee787">${ev.level}</b> — больше HP и урона`);
+        break;
+      }
       case 'death':
         selfDead = true;
         hud.showDeath(ev.dropped, ev.cause);
@@ -331,6 +339,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   shop.onLootbox = () => conn.send({ t: 'lootbox' });
   shop.onEquipHat = (hat) => conn.send({ t: 'equipHat', hat });
   shop.onPrestige = () => conn.send({ t: 'prestige' });
+  shop.onBuyLevel = () => conn.send({ t: 'buyLevel' });
   settings.onExit = () => conn.ws.close();
   if (mobile) {
     mobile.onEat = () => conn.send({ t: 'eat' });

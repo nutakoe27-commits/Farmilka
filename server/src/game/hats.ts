@@ -1,4 +1,5 @@
 import type { HatTier } from '@shared/balance-schema.js';
+import { levelHpBonus } from '@shared/levels.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Player } from './entities.js';
@@ -52,10 +53,10 @@ export function randomHatOfTier(tier: HatTier): string | null {
   return ids[Math.floor(Math.random() * ids.length)];
 }
 
-/** Recomputes max HP from the base value + equipped hat bonus. */
-export function applyHatMaxHp(world: World, p: Player): void {
-  const base = getBalance().player.hp;
-  const newMax = base + hatEffects(p.hat).maxHpAdd;
+/** Recomputes max HP from base + level bonus + equipped-hat bonus. */
+export function recomputeMaxHp(world: World, p: Player): void {
+  const bal = getBalance();
+  const newMax = bal.player.hp + levelHpBonus(p.level, bal.levels) + hatEffects(p.hat).maxHpAdd;
   if (newMax !== p.maxHp) {
     p.maxHp = newMax;
     p.hp = Math.min(p.hp, p.maxHp);
@@ -88,7 +89,7 @@ export function tryEquipHat(world: World, p: Player, hatId: string | null): void
   if (hatId !== null && !p.hats.includes(hatId)) return;
   if (p.hat === hatId) return;
   p.hat = hatId;
-  applyHatMaxHp(world, p);
+  recomputeMaxHp(world, p);
   world.markDirty(p);
 }
 

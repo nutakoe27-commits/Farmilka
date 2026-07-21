@@ -1,6 +1,7 @@
 import type { WeaponId, MobId, BossId, BuildingId } from './types.js';
 import type { BiomeId } from './biomes.js';
 import type { PrestigeCfg } from './prestige.js';
+import type { LevelsCfg } from './levels.js';
 
 export interface WeaponCfg {
   type: 'melee' | 'ranged';
@@ -142,6 +143,7 @@ export interface Balance {
     dropMoneyFrac: number;
     spawnProtectSec: number;
   };
+  levels: LevelsCfg;
   weapons: Record<WeaponId, WeaponCfg>;
   mobs: Record<MobId, MobCfg>;
   bosses: Record<BossId, BossCfg>;
@@ -206,6 +208,12 @@ export function validateBalance(raw: unknown): Balance {
   for (const k of ['hp', 'speed', 'radius', 'regenPerSec', 'regenDelaySec', 'respawnSec', 'startMoney', 'dropMoneyFrac', 'spawnProtectSec']) {
     num(player, k, 'player');
   }
+
+  const levels = section(root, 'levels');
+  num(levels, 'max', 'levels', 1);
+  num(levels, 'cost', 'levels');
+  num(levels, 'hpPerLevel', 'levels');
+  num(levels, 'damagePerLevel', 'levels');
 
   const weapons = section(root, 'weapons');
   for (const id of WEAPON_IDS) {

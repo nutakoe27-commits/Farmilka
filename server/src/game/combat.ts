@@ -1,6 +1,7 @@
 import { angleDiff, dist } from '@shared/math.js';
 import type { WeaponCfg } from '@shared/balance-schema.js';
 import type { DeathCause } from '@shared/types.js';
+import { levelDamageMult } from '@shared/levels.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Entity, Player, Mob, Building } from './entities.js';
@@ -139,10 +140,15 @@ export function applyDamage(
   }
   if (target.kind === 'mob' && src.cause !== 'player') return false;
 
-  // hat bonus that only applies against bosses (PvE, PvP-safe)
-  if (target.kind === 'boss' && src.cause === 'player') {
+  // player-dealt damage scales with the attacker's level for PvP and normal
+  // PvE — but NOT against bosses, which stay a group fight regardless of level.
+  // Bosses instead take the boss-only hat bonus (also PvP-safe).
+  if (src.cause === 'player') {
     const attacker = world.players.get(src.id);
-    if (attacker) amount *= hatEffects(attacker.hat).bossDmgMult;
+    if (attacker) {
+      if (target.kind === 'boss') amount *= hatEffects(attacker.hat).bossDmgMult;
+      else amount *= levelDamageMult(attacker.level, getBalance().levels);
+    }
   }
 
   target.hp -= amount;

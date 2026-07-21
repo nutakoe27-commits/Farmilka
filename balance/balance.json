@@ -17,6 +17,12 @@
     "dropMoneyFrac": 0.5,
     "spawnProtectSec": 3
   },
+  "levels": {
+    "max": 10,
+    "cost": 100,
+    "hpPerLevel": 10,
+    "damagePerLevel": 0.03
+  },
   "weapons": {
     "fists": {
       "type": "melee",

@@ -41,10 +41,13 @@ export class Shop {
   onLootbox: () => void = () => {};
   onEquipHat: (hat: string | null) => void = () => {};
   onPrestige: () => void = () => {};
+  onBuyLevel: () => void = () => {};
 
   constructor(private welcome: WelcomeMsg) {
     $('shop-close').onclick = () => this.hide();
     ($('prestige-btn') as HTMLButtonElement).onclick = () => this.onPrestige();
+    ($('level-btn') as HTMLButtonElement).onclick = () => this.onBuyLevel();
+    $('level-max').textContent = `/${this.welcome.levels.max}`;
     this.buildItems();
   }
 
@@ -163,6 +166,17 @@ export class Shop {
       btn.disabled = self.money < cfg.price || self.buildings >= this.welcome.maxBuildings;
     }
     $('build-count').textContent = `(${self.buildings}/${this.welcome.maxBuildings})`;
+
+    // level
+    $('level-cur').textContent = String(self.level);
+    const lvlBtn = $('level-btn') as HTMLButtonElement;
+    if (self.levelCost <= 0) {
+      lvlBtn.textContent = 'Максимум';
+      lvlBtn.disabled = true;
+    } else {
+      lvlBtn.textContent = `💰 ${self.levelCost}`;
+      lvlBtn.disabled = self.money < self.levelCost;
+    }
 
     // prestige
     const pcfg = this.welcome.prestige;

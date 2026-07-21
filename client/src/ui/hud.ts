@@ -6,6 +6,8 @@ const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 export class Hud {
   private lastMoney = -1;
+  private lastLevel = -1;
+  private maxLevel = 10;
   private foodCooldownSec = 2;
   killFeedEnabled = true;
   onEquip: (w: WeaponId) => void = () => {};
@@ -22,6 +24,10 @@ export class Hud {
     this.foodCooldownSec = sec;
   }
 
+  setMaxLevel(max: number): void {
+    this.maxLevel = max;
+  }
+
   show(): void {
     $('hud').classList.remove('hidden');
   }
@@ -34,6 +40,10 @@ export class Hud {
     const hpFrac = Math.max(0, self.hp / self.maxHp);
     ($('hp-bar') as HTMLElement).style.width = `${hpFrac * 100}%`;
     $('hp-text').textContent = `${self.hp} / ${self.maxHp}`;
+    if (self.level !== this.lastLevel) {
+      this.lastLevel = self.level;
+      $('level-badge').innerHTML = `⭐ Ур. ${self.level}<span class="mx">/${this.maxLevel}</span>`;
+    }
     if (self.money !== this.lastMoney) {
       this.lastMoney = self.money;
       $('money').textContent = `💰 ${self.money}`;

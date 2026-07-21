@@ -6,6 +6,7 @@ import { randomPointInBiome } from '@shared/biomes.js';
 import { getBalance } from './balance.js';
 import { SpatialGrid } from './grid.js';
 import { freshStatus } from './entities.js';
+import { recomputeMaxHp } from './hats.js';
 import type { Entity, Player, Mob, Boss, Projectile, Coin, Food, Building } from './entities.js';
 import { updatePlayers } from './player.js';
 import { updateMobs, populateMobs } from './mobs.js';
@@ -161,6 +162,7 @@ export class World {
       hats: account ? [...account.hats] : [],
       hat: account ? account.hat : null,
       prestige: account ? account.prestige : 0,
+      level: 1,
       ...freshStatus(),
       invulnUntil: Date.now() + bal.player.spawnProtectSec * 1000,
       account: account ? account.name : null,
@@ -182,8 +184,10 @@ export class World {
     p.x = pos.x;
     p.y = pos.y;
     Object.assign(p, freshStatus());
-    p.hp = bal.player.hp;
+    p.level = 1; // levels are per-life — reset on death
     p.maxHp = bal.player.hp;
+    recomputeMaxHp(this, p); // fold in the equipped hat's HP bonus (level is 1)
+    p.hp = p.maxHp; // respawn at full HP
     p.dead = false;
     p.respawnAt = 0;
     p.invulnUntil = Date.now() + bal.player.spawnProtectSec * 1000;

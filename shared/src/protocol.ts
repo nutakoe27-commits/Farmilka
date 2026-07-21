@@ -1,6 +1,7 @@
 import type { EntityKind, WeaponId, MobId, BossId, BuildingId, DeathCause } from './types.js';
 import type { WeaponCfg, BuildingCfg, HatCfg, HatTier } from './balance-schema.js';
 import type { PrestigeCfg } from './prestige.js';
+import type { LevelsCfg } from './levels.js';
 
 // ---------- Entity state as seen by clients ----------
 
@@ -58,6 +59,10 @@ export interface SelfState {
   hat: string | null;
   prestige: number;
   prestigeCost: number;
+  /** current player level (1..levels.max) */
+  level: number;
+  /** gold cost of the next level-up (0 = maxed) */
+  levelCost: number;
   food: number;
   /** seconds until food can be eaten again (0 = ready) */
   foodIn: number;
@@ -87,6 +92,7 @@ export type GameEvent =
   | { e: 'hat'; hat: string; name: string; tier: HatTier; source: 'mob' | 'boss' | 'lootbox'; dup: boolean; gold: number }
   | { e: 'lootbox'; result: 'hat' | 'gold' | 'nothing'; gold: number }
   | { e: 'prestige'; level: number; tier: string | null }
+  | { e: 'level'; level: number; max: number }
   | { e: 'notice'; text: string };
 
 // ---------- Client -> Server ----------
@@ -110,6 +116,7 @@ export type ClientMsg =
   | { t: 'eat' }
   | { t: 'lootbox' }
   | { t: 'prestige' }
+  | { t: 'buyLevel' }
   | { t: 'equipHat'; hat: string | null }
   | { t: 'place'; building: BuildingId; x: number; y: number }
   | { t: 'ping'; ts: number };
@@ -130,6 +137,7 @@ export interface WelcomeMsg {
   food: { heal: number; cooldownSec: number; maxCarry: number; price: number };
   hats: { items: Record<string, HatCfg>; lootboxPrice: number; dupGold: Record<HatTier, number> };
   prestige: PrestigeCfg;
+  levels: LevelsCfg;
   economy: { sellFrac: number };
   maxBuildings: number;
 }

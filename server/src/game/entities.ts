@@ -64,6 +64,8 @@ export interface Player extends BaseEntity, StatusEffects {
   hat: string | null;
   /** account prestige level (0 = none) */
   prestige: number;
+  /** per-life character level (1..levels.max); bought with gold, reset on death */
+  level: number;
   /** spawn protection: damage-immune until this time; broken by attacking */
   invulnUntil: number;
   /** account name when logged in, null for guests */

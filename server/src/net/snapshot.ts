@@ -3,6 +3,7 @@ import { getBalance } from '../game/balance.js';
 import type { World } from '../game/world.js';
 import type { Entity, Player } from '../game/entities.js';
 import { nextPrestigeCost } from '../game/prestige.js';
+import { playerLevelCost } from '../game/levels.js';
 
 function statusFx(e: { poisonUntil: number; chillUntil: number }): number {
   const now = Date.now();
@@ -116,6 +117,8 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     hat: p.hat,
     prestige: p.prestige,
     prestigeCost: nextPrestigeCost(p),
+    level: p.level,
+    levelCost: playerLevelCost(p),
     food: p.food,
     foodIn: Math.max(0, Math.round((p.foodReadyAt - world.time) / 100) / 10),
     protIn: Math.max(0, Math.round((p.invulnUntil - world.time) / 100) / 10),
