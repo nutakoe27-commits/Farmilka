@@ -26,6 +26,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/client/dist ./client/dist
+COPY tsconfig.base.json ./
 COPY shared ./shared
 COPY server ./server
 COPY balance ./balance
