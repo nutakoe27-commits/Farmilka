@@ -43,6 +43,8 @@ function playerLink(name: string, token: string): string {
   return `<a href="/admin/player?token=${encodeURIComponent(token)}&name=${encodeURIComponent(name)}">${esc(name)}</a>`;
 }
 
+const PLAYER_WEAPONS = ['fists', 'sword', 'spear', 'hammer', 'bow', 'crossbow'];
+
 export function adminRouter(worlds: World[]): Router {
   const router = Router();
   const token = process.env.ADMIN_TOKEN ?? 'dev';
@@ -138,10 +140,13 @@ ${table('Последние сессии', ['Вход', 'Длительност�
     const periodPlayers = (db.prepare('SELECT COUNT(DISTINCT player COLLATE NOCASE) n FROM sessions WHERE joined_ts >= ?').get(since) as { n: number }).n;
 
     // --- weapon balance ---
-    const pvpKills = db.prepare(`SELECT weapon, COUNT(*) n, AVG(distance) avgDist FROM kills WHERE victim_kind='player' AND ts>=? GROUP BY weapon`).all(since) as { weapon: string; n: number; avgDist: number }[];
-    const allKills = db.prepare(`SELECT weapon, COUNT(*) n FROM kills WHERE ts>=? GROUP BY weapon`).all(since) as { weapon: string; n: number }[];
-    const deathsEq = db.prepare(`SELECT equipped, COUNT(*) n FROM deaths WHERE ts>=? GROUP BY equipped`).all(since) as { equipped: string; n: number }[];
-    const dmg = db.prepare(`SELECT weapon, SUM(amount) total, COUNT(DISTINCT attacker) users FROM damage WHERE ts>=? GROUP BY weapon`).all(since) as { weapon: string; total: number; users: number }[];
+    // Restrict to real player weapons: mobs/bosses/turrets record their own type
+    // as the "weapon", which would otherwise pollute this table.
+    const wIn = `(${PLAYER_WEAPONS.map(() => '?').join(',')})`;
+    const pvpKills = db.prepare(`SELECT weapon, COUNT(*) n, AVG(distance) avgDist FROM kills WHERE victim_kind='player' AND weapon IN ${wIn} AND ts>=? GROUP BY weapon`).all(...PLAYER_WEAPONS, since) as { weapon: string; n: number; avgDist: number }[];
+    const allKills = db.prepare(`SELECT weapon, COUNT(*) n FROM kills WHERE weapon IN ${wIn} AND ts>=? GROUP BY weapon`).all(...PLAYER_WEAPONS, since) as { weapon: string; n: number }[];
+    const deathsEq = db.prepare(`SELECT equipped, COUNT(*) n FROM deaths WHERE equipped IN ${wIn} AND ts>=? GROUP BY equipped`).all(...PLAYER_WEAPONS, since) as { equipped: string; n: number }[];
+    const dmg = db.prepare(`SELECT weapon, SUM(amount) total, COUNT(DISTINCT attacker) users FROM damage WHERE weapon IN ${wIn} AND ts>=? GROUP BY weapon`).all(...PLAYER_WEAPONS, since) as { weapon: string; total: number; users: number }[];
 
     const weaponSet = new Set<string>();
     for (const r of pvpKills) weaponSet.add(r.weapon);
@@ -173,6 +178,10 @@ ${table('Последние сессии', ['Вход', 'Длительност�
     const bossIncome = db.prepare(`SELECT COUNT(DISTINCT player) players, SUM(amount) total, COUNT(*) payouts FROM income WHERE source='boss' AND ts>=?`).get(since) as { players: number; total: number | null; payouts: number };
     const bossRows = [[bossKills.n, bossIncome.players ?? 0, bossIncome.payouts ?? 0, fmt(bossIncome.total ?? 0)]];
 
+    // --- mob kills (PvE), kept separate from the weapon table ---
+    // kills.victim holds the mob type, kills.weapon holds the killer's weapon
+    const mobRows = (db.prepare(`SELECT victim AS mob, COUNT(*) n FROM kills WHERE victim_kind='mob' AND ts>=? GROUP BY victim ORDER BY n DESC`).all(since) as { mob: string; n: number }[]).map((r) => [r.mob, r.n]);
+
     // --- deaths by cause ---
     const deathRows = (db.prepare(`SELECT cause, COUNT(*) n, SUM(money_dropped) lost FROM deaths WHERE ts>=? GROUP BY cause ORDER BY n DESC`).all(since) as { cause: string; n: number; lost: number }[]).map((r) => [r.cause, r.n, fmt(r.lost)]);
 
@@ -201,7 +210,8 @@ ${table('Всего за всё время', ['Уникальных игроко
   totalPlayers, totalAccounts, totalSessions, fmtDur(totalPlayMs), newAccounts, periodPlayers,
 ]])}
 ${table('Топ игроков за период', ['Игрок', 'Убийств', 'Смертей', 'K/D', 'Заработано', 'Время'], topRows, true)}
-${table('Баланс оружия', ['Оружие', 'Убийств всего', 'PvP-убийств', 'Доля PvP', 'Смертей с ним', 'K/D (PvP)', 'Урон', 'Игроков', 'Ср. дистанция'], weaponRows)}
+${table('Баланс оружия (только игроцкое оружие)', ['Оружие', 'Убийств всего', 'PvP-убийств', 'Доля PvP', 'Смертей с ним', 'K/D (PvP)', 'Урон', 'Игроков', 'Ср. дистанция'], weaponRows)}
+${table('Убито мобов (PvE)', ['Моб', 'Убито'], mobRows)}
 ${table('Доход по источникам', ['Источник', 'Всего', 'Событий', 'Доход / игро-час'], incomeRows)}
 ${table('Еда (скилловый фактор)', ['Съедено', 'Отхилено HP', 'Игроков ело'], [[healsAgg.n, fmt(healsAgg.total ?? 0), healsAgg.players]])}
 ${table('Топ по еде', ['Игрок', 'Съедено', 'Отхилено'], topHealers.map((r) => [playerLink(r.player, token), String(r.n), fmt(r.total)]), true)}
