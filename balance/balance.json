@@ -172,6 +172,15 @@
       "projSpeed": 700
     }
   },
+  "food": {
+    "heal": 30,
+    "cooldownSec": 2,
+    "maxCarry": 8,
+    "price": 25,
+    "dropChance": 0.45,
+    "pickupRadius": 50,
+    "despawnSec": 90
+  },
   "economy": {
     "maxBuildingsPerPlayer": 5,
     "buildingMinDist": 100,
@@ -179,6 +188,6 @@
     "raidLootFrac": 0.5,
     "coinDespawnSec": 60,
     "coinPickupRadius": 50,
-    "ownerOfflineDespawnSec": 600
+    "sellFrac": 0.5
   }
 }

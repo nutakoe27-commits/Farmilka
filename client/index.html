@@ -2,57 +2,78 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Farmilka</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0f14; font-family: 'Segoe UI', system-ui, sans-serif; color: #e8e8ef; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0f14; font-family: 'Segoe UI', system-ui, sans-serif; color: #e8e8ef; touch-action: none; overscroll-behavior: none; }
     canvas { display: block; }
     .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; }
     .hidden { display: none !important; }
     .panel { background: rgba(18, 21, 30, 0.94); border: 1px solid #2c3242; border-radius: 14px; padding: 28px 34px; box-shadow: 0 12px 40px rgba(0,0,0,.6); }
 
     /* name screen */
-    #name-screen .panel { text-align: center; width: 340px; }
+    #name-screen .panel { text-align: center; width: 360px; max-width: 94vw; }
     #name-screen h1 { font-size: 34px; letter-spacing: 2px; background: linear-gradient(90deg,#7ee787,#9ecbff); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 6px; }
-    #name-screen p { color: #8a8fa3; font-size: 13px; margin-bottom: 18px; line-height: 1.5; }
-    #name-input { width: 100%; padding: 10px 14px; font-size: 16px; border-radius: 8px; border: 1px solid #3a4156; background: #0d0f14; color: #fff; outline: none; margin-bottom: 14px; text-align: center; }
-    #name-input:focus { border-color: #7ee787; }
+    #name-screen p { color: #8a8fa3; font-size: 13px; margin-bottom: 14px; line-height: 1.5; }
+    .field { width: 100%; padding: 10px 14px; font-size: 16px; border-radius: 8px; border: 1px solid #3a4156; background: #0d0f14; color: #fff; outline: none; margin-bottom: 10px; text-align: center; }
+    .field:focus { border-color: #7ee787; }
     .btn { cursor: pointer; border: none; border-radius: 8px; padding: 10px 22px; font-size: 15px; font-weight: 600; background: linear-gradient(135deg,#2ea043,#238636); color: #fff; }
     .btn:hover { filter: brightness(1.15); }
+    .btn.alt { background: linear-gradient(135deg,#1f6feb,#1158c7); }
+    #btn-row { display: flex; gap: 8px; justify-content: center; }
     #conn-error { color: #ff7b72; font-size: 13px; margin-top: 10px; min-height: 16px; }
+    #acc-hint { font-size: 11px; color: #6a7085; margin-top: 10px; line-height: 1.5; }
 
     /* HUD */
     #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
-    #hp-wrap { position: fixed; left: 50%; transform: translateX(-50%); bottom: 86px; width: 320px; }
+    #hp-wrap { position: fixed; left: 50%; transform: translateX(-50%); bottom: 86px; width: min(320px, 60vw); }
     #hp-bar-bg { height: 14px; background: rgba(0,0,0,.55); border: 1px solid #2c3242; border-radius: 8px; overflow: hidden; }
     #hp-bar { height: 100%; width: 100%; background: linear-gradient(90deg,#2ea043,#7ee787); transition: width .15s; border-radius: 8px; }
     #hp-text { text-align: center; font-size: 11px; color: #bfc4d4; margin-top: 3px; text-shadow: 0 1px 2px #000; }
-    #money { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 700; color: #ffd76e; text-shadow: 0 1px 4px #000; }
-    #zone-label { position: fixed; top: 44px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #7ee787; text-shadow: 0 1px 3px #000; }
+    #money { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 700; color: #ffd76e; text-shadow: 0 1px 4px #000; }
+    #zone-label { position: fixed; top: 42px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #7ee787; text-shadow: 0 1px 3px #000; white-space: nowrap; }
     #hotbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; display: flex; gap: 8px; }
-    .slot { width: 56px; height: 56px; border-radius: 10px; background: rgba(14,17,25,.85); border: 2px solid #2c3242; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: #bfc4d4; position: relative; }
+    .slot { width: 56px; height: 56px; border-radius: 10px; background: rgba(14,17,25,.85); border: 2px solid #2c3242; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: #bfc4d4; position: relative; user-select: none; }
     .slot.active { border-color: #7ee787; box-shadow: 0 0 12px rgba(126,231,135,.35); }
+    .slot.dragover { border-color: #9ecbff; }
     .slot .key { position: absolute; top: 2px; left: 5px; font-size: 9px; color: #6a7085; }
     .slot .icon { font-size: 20px; }
-    #killfeed { position: fixed; top: 14px; right: 14px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; max-width: 320px; }
+    #food-slot { position: fixed; left: calc(50% + 150px); bottom: 20px; width: 56px; height: 56px; border-radius: 10px; background: rgba(25,20,10,.85); border: 2px solid #7a5c2e; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; user-select: none; overflow: hidden; }
+    #food-slot .icon { font-size: 22px; }
+    #food-slot .cnt { font-size: 11px; color: #ffd76e; font-weight: 700; }
+    #food-slot .key { position: absolute; top: 2px; left: 5px; font-size: 9px; color: #6a7085; }
+    #food-cd { position: absolute; inset: 0; background: rgba(0,0,0,.65); transform-origin: bottom; transform: scaleY(0); }
+    #killfeed { position: fixed; top: 12px; right: 56px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; max-width: 320px; }
     .kf { background: rgba(14,17,25,.8); border-radius: 6px; padding: 4px 10px; font-size: 12px; color: #cfd4e4; border: 1px solid #262b38; }
     .kf b { color: #ff7b72; }
-    #boss-banner { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: rgba(60,10,60,.85); border: 1px solid #b565d8; color: #f0c8ff; padding: 8px 22px; border-radius: 10px; font-size: 15px; font-weight: 600; text-shadow: 0 1px 3px #000; }
+    #boss-banner { position: fixed; top: 68px; left: 50%; transform: translateX(-50%); background: rgba(60,10,60,.85); border: 1px solid #b565d8; color: #f0c8ff; padding: 8px 22px; border-radius: 10px; font-size: 15px; font-weight: 600; text-shadow: 0 1px 3px #000; max-width: 90vw; text-align: center; }
     #hint { position: fixed; bottom: 20px; left: 16px; font-size: 11px; color: #6a7085; line-height: 1.7; }
     #minimap { position: fixed; right: 14px; bottom: 14px; border: 1px solid #2c3242; border-radius: 8px; background: rgba(10,12,18,.85); }
 
+    /* settings */
+    #settings-btn { position: fixed; top: 10px; right: 12px; width: 38px; height: 38px; border-radius: 10px; background: rgba(14,17,25,.85); border: 1px solid #2c3242; color: #bfc4d4; font-size: 20px; cursor: pointer; pointer-events: auto; z-index: 12; }
+    #settings { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 18; width: 320px; max-width: 92vw; pointer-events: auto; }
+    #settings h2 { font-size: 17px; color: #9ecbff; margin-bottom: 14px; }
+    .set-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 14px; }
+    .set-row input { width: 20px; height: 20px; accent-color: #2ea043; }
+    #settings .btn { width: 100%; margin-top: 6px; }
+    #exit-btn { background: linear-gradient(135deg,#d4544a,#b03c33); }
+
     /* shop */
-    #shop { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 15; width: 560px; max-height: 80vh; overflow-y: auto; pointer-events: auto; }
+    #shop { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 15; width: 580px; max-width: 96vw; max-height: 84vh; overflow-y: auto; pointer-events: auto; }
     #shop h2 { font-size: 18px; margin-bottom: 4px; color: #9ecbff; }
     #shop .sub { font-size: 12px; color: #8a8fa3; margin-bottom: 12px; }
     .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+    @media (max-width: 600px) { .shop-grid { grid-template-columns: 1fr; } }
     .shop-item { background: #151926; border: 1px solid #2c3242; border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
     .shop-item .nm { font-size: 14px; font-weight: 600; }
     .shop-item .st { font-size: 11px; color: #8a8fa3; }
+    .shop-item .btns { display: flex; flex-direction: column; gap: 4px; }
     .shop-item button { cursor: pointer; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 700; background: #1f6feb; color: #fff; white-space: nowrap; }
     .shop-item button:disabled { background: #30363d; color: #6a7085; cursor: default; }
-    .shop-item.owned button { background: #238636; }
+    .shop-item button.sell { background: #7a5c2e; }
+    .shop-item.owned > div > .nm { color: #7ee787; }
     #shop-close { float: right; background: none; border: none; color: #8a8fa3; font-size: 18px; cursor: pointer; }
     #shop-msg { color: #ff7b72; font-size: 12px; min-height: 16px; }
 
@@ -62,7 +83,21 @@
     #death-screen p { color: #bfc4d4; font-size: 14px; margin-bottom: 6px; }
     #respawn-count { font-size: 30px; font-weight: 800; color: #fff; }
 
-    #place-hint { position: fixed; top: 100px; left: 50%; transform: translateX(-50%); background: rgba(20,40,20,.9); border: 1px solid #2ea043; padding: 6px 16px; border-radius: 8px; font-size: 13px; z-index: 16; }
+    #place-hint { position: fixed; top: 100px; left: 50%; transform: translateX(-50%); background: rgba(20,40,20,.9); border: 1px solid #2ea043; padding: 6px 16px; border-radius: 8px; font-size: 13px; z-index: 16; max-width: 90vw; text-align: center; }
+
+    /* mobile controls */
+    .joy-zone { position: fixed; bottom: 0; top: 40%; width: 45%; z-index: 11; pointer-events: auto; display: none; }
+    #joy-left { left: 0; }
+    #joy-right { right: 0; }
+    .joy-base { position: absolute; width: 110px; height: 110px; border-radius: 50%; background: rgba(255,255,255,.06); border: 2px solid rgba(255,255,255,.18); display: none; }
+    .joy-stick { position: absolute; width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,.25); border: 2px solid rgba(255,255,255,.4); }
+    #mob-buttons { position: fixed; right: 12px; top: 46%; display: none; flex-direction: column; gap: 10px; z-index: 12; pointer-events: auto; }
+    .mob-btn { width: 52px; height: 52px; border-radius: 14px; background: rgba(14,17,25,.85); border: 1px solid #2c3242; color: #e8e8ef; font-size: 22px; }
+    body.touch .joy-zone { display: block; }
+    body.touch #mob-buttons { display: flex; }
+    body.touch #hint { display: none; }
+    body.touch #hotbar { bottom: 12px; }
+    body.touch #food-slot { display: none; } /* mobile uses the side button */
   </style>
 </head>
 <body>
@@ -76,19 +111,37 @@
       <div id="hp-text">100 / 100</div>
     </div>
     <div id="hotbar"></div>
+    <div id="food-slot" title="Съесть еду (Q)">
+      <span class="key">Q</span>
+      <span class="icon">🍖</span>
+      <span class="cnt">0</span>
+      <div id="food-cd"></div>
+    </div>
     <div id="killfeed"></div>
     <div id="boss-banner" class="hidden"></div>
-    <div id="hint">WASD — движение · мышь — прицел · ЛКМ — атака<br>B — магазин · 1–4 — оружие · колесо — зум</div>
+    <div id="hint">WASD — движение · мышь — прицел · ЛКМ — атака<br>B — магазин · Q — еда · 1–4 — оружие · перетаскивай слоты</div>
     <canvas id="minimap" width="160" height="160"></canvas>
+    <button id="settings-btn" title="Настройки">⚙</button>
   </div>
 
   <div id="place-hint" class="hidden">Кликните на карте, чтобы поставить постройку · ПКМ/Esc — отмена</div>
 
+  <div id="settings" class="panel hidden">
+    <h2>⚙ Настройки</h2>
+    <div class="set-row"><span>Тряска экрана</span><input type="checkbox" id="set-shake" checked></div>
+    <div class="set-row"><span>Числа урона</span><input type="checkbox" id="set-dmg" checked></div>
+    <div class="set-row"><span>Лента убийств</span><input type="checkbox" id="set-feed" checked></div>
+    <button class="btn alt" id="settings-close">Продолжить игру</button>
+    <button class="btn" id="exit-btn">Выйти в меню</button>
+  </div>
+
   <div id="shop" class="panel hidden">
     <button id="shop-close">✕</button>
     <h2>Магазин</h2>
-    <div class="sub">Оружие покупается только в безопасной зоне. Постройки ставятся в мире (вне зоны).</div>
+    <div class="sub">Покупка и продажа — только в безопасной зоне. Постройки ставятся в мире (вне зоны). При смерти теряются купленное оружие и еда!</div>
     <div id="shop-msg"></div>
+    <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Еда</h3>
+    <div class="shop-grid" id="shop-food"></div>
     <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Оружие</h3>
     <div class="shop-grid" id="shop-weapons"></div>
     <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Постройки <span id="build-count" style="color:#8a8fa3;font-weight:400"></span></h3>
@@ -99,18 +152,31 @@
     <div class="panel">
       <h2>Вы погибли</h2>
       <p id="death-info"></p>
+      <p style="color:#ff9d8a;font-size:12px">Купленное оружие и еда потеряны!</p>
       <div id="respawn-count">4</div>
       <p style="color:#8a8fa3;font-size:12px">Возрождение в безопасной зоне…</p>
     </div>
+  </div>
+
+  <div id="joy-left" class="joy-zone"><div class="joy-base" id="joy-left-base"><div class="joy-stick" id="joy-left-stick"></div></div></div>
+  <div id="joy-right" class="joy-zone"><div class="joy-base" id="joy-right-base"><div class="joy-stick" id="joy-right-stick"></div></div></div>
+  <div id="mob-buttons">
+    <button class="mob-btn" id="mob-eat">🍖<div style="font-size:10px;color:#ffd76e" id="mob-eat-cnt">0</div></button>
+    <button class="mob-btn" id="mob-shop">🛒</button>
   </div>
 
   <div id="name-screen" class="overlay">
     <div class="panel">
       <h1>FARMILKA</h1>
       <p>Фарми мобов, строй фермы, покупай оружие,<br>охоться на боссов и других игроков.</p>
-      <input id="name-input" maxlength="16" placeholder="Ваше имя" autocomplete="off" />
-      <button id="play-btn" class="btn">Играть</button>
+      <input id="name-input" class="field" maxlength="16" placeholder="Ваше имя" autocomplete="username" />
+      <input id="pass-input" class="field" type="password" maxlength="64" placeholder="Пароль (нужен только для аккаунта)" autocomplete="current-password" />
+      <div id="btn-row">
+        <button id="play-btn" class="btn">Играть</button>
+        <button id="register-btn" class="btn alt">Создать аккаунт</button>
+      </div>
       <div id="conn-error"></div>
+      <div id="acc-hint">Без пароля — гостевой вход (прогресс не сохраняется).<br>С аккаунтом золото и оружие сохраняются между сеансами.</div>
     </div>
   </div>
 

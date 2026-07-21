@@ -6,10 +6,28 @@ const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 export class Hud {
   private lastMoney = -1;
+  private foodCooldownSec = 2;
+  killFeedEnabled = true;
   onEquip: (w: WeaponId) => void = () => {};
+  onEat: () => void = () => {};
+  onReorder: (weapons: WeaponId[]) => void = () => {};
+
+  private dragFrom: number | null = null;
+
+  constructor() {
+    $('food-slot').onclick = () => this.onEat();
+  }
+
+  setFoodCooldown(sec: number): void {
+    this.foodCooldownSec = sec;
+  }
 
   show(): void {
     $('hud').classList.remove('hidden');
+  }
+
+  hide(): void {
+    $('hud').classList.add('hidden');
   }
 
   update(self: SelfState): void {
@@ -22,11 +40,19 @@ export class Hud {
     }
     $('zone-label').classList.toggle('hidden', !self.inSafe);
     this.renderHotbar(self);
+
+    // food slot: count + radial-ish cooldown wipe
+    const cnt = $('food-slot').querySelector('.cnt') as HTMLElement;
+    cnt.textContent = String(self.food);
+    const cd = $('food-cd') as HTMLElement;
+    const frac = this.foodCooldownSec > 0 ? Math.min(1, self.foodIn / this.foodCooldownSec) : 0;
+    cd.style.transform = `scaleY(${frac})`;
+    ($('food-slot') as HTMLElement).style.opacity = self.food > 0 ? '1' : '0.45';
   }
 
   private renderHotbar(self: SelfState): void {
     const bar = $('hotbar');
-    const want = self.weapons.map((w, i) => `${w}${w === self.equipped ? '*' : ''}${i}`).join('|');
+    const want = self.weapons.map((w) => `${w}${w === self.equipped ? '*' : ''}`).join('|');
     if (bar.dataset.state === want) return;
     bar.dataset.state = want;
     bar.innerHTML = '';
@@ -35,12 +61,34 @@ export class Hud {
       slot.className = 'slot' + (w === self.equipped ? ' active' : '');
       slot.innerHTML = `<span class="key">${i + 1}</span><span class="icon">${WEAPON_ICONS[w] ?? ''}</span><span>${w}</span>`;
       slot.style.pointerEvents = 'auto';
+      slot.draggable = true;
       slot.onclick = () => this.onEquip(w);
+      slot.ondragstart = (e) => {
+        this.dragFrom = i;
+        e.dataTransfer?.setData('text/plain', String(i));
+      };
+      slot.ondragover = (e) => {
+        e.preventDefault();
+        slot.classList.add('dragover');
+      };
+      slot.ondragleave = () => slot.classList.remove('dragover');
+      slot.ondrop = (e) => {
+        e.preventDefault();
+        slot.classList.remove('dragover');
+        const from = this.dragFrom;
+        this.dragFrom = null;
+        if (from === null || from === i) return;
+        const order = [...self.weapons];
+        const [moved] = order.splice(from, 1);
+        order.splice(i, 0, moved);
+        this.onReorder(order);
+      };
       bar.appendChild(slot);
     });
   }
 
   killFeed(html: string, ms = 6000): void {
+    if (!this.killFeedEnabled) return;
     const el = document.createElement('div');
     el.className = 'kf';
     el.innerHTML = html;
@@ -48,6 +96,14 @@ export class Hud {
     feed.prepend(el);
     while (feed.children.length > 6) feed.lastChild?.remove();
     setTimeout(() => el.remove(), ms);
+  }
+
+  /** Important notices bypass the kill-feed setting. */
+  notice(html: string, ms = 6000): void {
+    const was = this.killFeedEnabled;
+    this.killFeedEnabled = true;
+    this.killFeed(html, ms);
+    this.killFeedEnabled = was;
   }
 
   bossBanner(text: string | null): void {

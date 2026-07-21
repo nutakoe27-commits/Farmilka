@@ -41,6 +41,9 @@ export interface SelfState {
   equipped: WeaponId;
   buildings: number;
   inSafe: boolean;
+  food: number;
+  /** seconds until food can be eaten again (0 = ready) */
+  foodIn: number;
   respawnIn?: number;
 }
 
@@ -59,6 +62,7 @@ export type GameEvent =
   | { e: 'buildingDestroyed'; id: string; byName: string; own: boolean }
   | { e: 'purchase'; ok: boolean; item: string; reason?: string }
   | { e: 'placed'; ok: boolean; reason?: string }
+  | { e: 'heal'; amount: number }
   | { e: 'notice'; text: string };
 
 // ---------- Client -> Server ----------
@@ -73,10 +77,13 @@ export interface InputMsg {
 }
 
 export type ClientMsg =
-  | { t: 'join'; name: string }
+  | { t: 'join'; name: string; password?: string; register?: boolean }
   | InputMsg
-  | { t: 'buy'; item: WeaponId | BuildingId }
+  | { t: 'buy'; item: WeaponId | BuildingId | 'food' }
   | { t: 'equip'; weapon: WeaponId }
+  | { t: 'sell'; weapon: WeaponId }
+  | { t: 'reorder'; weapons: WeaponId[] }
+  | { t: 'eat' }
   | { t: 'place'; building: BuildingId; x: number; y: number }
   | { t: 'ping'; ts: number };
 
@@ -86,10 +93,13 @@ export interface WelcomeMsg {
   t: 'welcome';
   id: string;
   time: number;
+  registered: boolean;
   world: { size: number; safeZoneRadius: number; viewRadius: number };
   player: { speed: number; radius: number };
   weapons: Record<WeaponId, WeaponCfg>;
   buildings: Record<BuildingId, BuildingCfg>;
+  food: { heal: number; cooldownSec: number; maxCarry: number; price: number };
+  economy: { sellFrac: number };
   maxBuildings: number;
 }
 

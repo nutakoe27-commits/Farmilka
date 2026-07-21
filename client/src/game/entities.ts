@@ -110,6 +110,13 @@ export class EntityView {
         g.circle(-3, -3, s.radius * 0.3).fill({ color: 0xffffff, alpha: 0.7 });
         break;
       }
+      case 'food': {
+        g.circle(0, 0, s.radius + 4).fill({ color: 0xff9d5c, alpha: 0.18 });
+        const icon = new Text({ text: '🍖', style: { fontSize: 20 } });
+        icon.anchor.set(0.5);
+        this.top.addChild(icon);
+        break;
+      }
       case 'projectile': {
         const isBoss = s.name === 'boss-burst';
         const c = isBoss ? 0xff7b72 : 0xffe08a;
@@ -160,6 +167,8 @@ export class EntityView {
       this.body.scale.set(w);
     } else if (s.kind === 'coin') {
       this.body.scale.set(1 + Math.sin(now / 250 + x) * 0.12);
+    } else if (s.kind === 'food') {
+      this.top.scale.set(1 + Math.sin(now / 300 + y) * 0.1);
     }
 
     if (this.weaponText && s.weapon !== this.lastWeapon) {

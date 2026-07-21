@@ -8,16 +8,17 @@ import { clamp } from '@shared/math.js';
 import { getBalance } from '../game/balance.js';
 import type { World } from '../game/world.js';
 import type { Player } from '../game/entities.js';
-import { tryBuyWeapon, tryEquip } from '../game/economy.js';
-import { tryPlaceBuilding } from '../game/buildings.js';
+import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip } from '../game/economy.js';
+import { tryPlaceBuilding, removePlayerBuildings } from '../game/buildings.js';
 import { telemetry } from '../db/telemetry.js';
+import { accountExists, login, register, saveProgress } from '../db/accounts.js';
 import { adminRouter } from '../admin/stats.js';
 
 const sessionIds = new WeakMap<Player, number>();
 
 export function startServer(world: World): http.Server {
   const app = express();
-  app.use('/admin', adminRouter());
+  app.use('/admin', adminRouter(world));
 
   // serve built client in production
   const clientDist = process.env.CLIENT_DIST ?? path.resolve(process.cwd(), '../client/dist');
@@ -48,7 +49,35 @@ export function startServer(world: World): http.Server {
           return;
         }
         const name = String(msg.name ?? '').trim().slice(0, 16) || 'Безымянный';
-        player = world.spawnPlayer(name, ws);
+        const password = typeof msg.password === 'string' ? msg.password.slice(0, 64) : '';
+
+        let account: { name: string; money: number; weapons: never[] } | undefined;
+        try {
+          if (password) {
+            const res = msg.register ? register(name, password, bal.player.startMoney) : login(name, password);
+            if (!res.ok) {
+              ws.send(encode({ t: 'reject', reason: res.reason ?? 'Ошибка авторизации' }));
+              return;
+            }
+            // one live session per account
+            for (const other of world.players.values()) {
+              if (other.ws && other.account && other.account.toLowerCase() === res.account!.name.toLowerCase()) {
+                ws.send(encode({ t: 'reject', reason: 'Этот аккаунт уже в игре' }));
+                return;
+              }
+            }
+            account = res.account as never;
+          } else if (accountExists(name)) {
+            ws.send(encode({ t: 'reject', reason: 'Это имя зарегистрировано — введите пароль' }));
+            return;
+          }
+        } catch (err) {
+          console.error('[auth] failed', err);
+          ws.send(encode({ t: 'reject', reason: 'Ошибка сервера при авторизации' }));
+          return;
+        }
+
+        player = world.spawnPlayer(name, ws, account);
         try {
           sessionIds.set(player, telemetry.sessionStart(name));
         } catch (err) {
@@ -58,6 +87,7 @@ export function startServer(world: World): http.Server {
           t: 'welcome',
           id: player.id,
           time: Date.now(),
+          registered: !!account,
           world: {
             size: bal.world.size,
             safeZoneRadius: bal.world.safeZoneRadius,
@@ -66,10 +96,17 @@ export function startServer(world: World): http.Server {
           player: { speed: bal.player.speed, radius: bal.player.radius },
           weapons: bal.weapons,
           buildings: bal.buildings,
+          food: {
+            heal: bal.food.heal,
+            cooldownSec: bal.food.cooldownSec,
+            maxCarry: bal.food.maxCarry,
+            price: bal.food.price,
+          },
+          economy: { sellFrac: bal.economy.sellFrac },
           maxBuildings: bal.economy.maxBuildingsPerPlayer,
         };
         ws.send(encode(welcome));
-        console.log(`[ws] ${name} joined (${world.connectedPlayers().length} online)`);
+        console.log(`[ws] ${name}${account ? ' (аккаунт)' : ''} joined (${world.connectedPlayers().length} online)`);
         return;
       }
 
@@ -86,8 +123,21 @@ export function startServer(world: World): http.Server {
           break;
         }
         case 'buy': {
-          const res = tryBuyWeapon(world, player, msg.item as never);
+          const res = msg.item === 'food' ? tryBuyFood(world, player) : tryBuyWeapon(world, player, msg.item as never);
           world.sendEvent(player, { e: 'purchase', ok: res.ok, item: String(msg.item), reason: res.reason });
+          break;
+        }
+        case 'sell': {
+          const res = trySellWeapon(world, player, msg.weapon);
+          world.sendEvent(player, { e: 'purchase', ok: res.ok, item: `sell:${msg.weapon}`, reason: res.reason });
+          break;
+        }
+        case 'reorder': {
+          tryReorder(world, player, msg.weapons);
+          break;
+        }
+        case 'eat': {
+          tryEat(world, player, Date.now());
           break;
         }
         case 'equip': {
@@ -116,9 +166,19 @@ export function startServer(world: World): http.Server {
           console.error('[telemetry] session end failed', err);
         }
       }
+      // account progress (gold + weapons) survives the session
+      if (player.account) {
+        try {
+          saveProgress(player.account, player.money, player.weapons);
+        } catch (err) {
+          console.error('[auth] progress save failed', err);
+        }
+      }
+      // buildings only live while their owner is online
+      removePlayerBuildings(world, player);
       if (!player.dead) world.removeEntity(player);
       player.ws = null;
-      world.maybeForgetPlayer(player);
+      world.players.delete(player.id);
       console.log(`[ws] ${player.name} left (${world.connectedPlayers().length} online)`);
       player = null;
     });

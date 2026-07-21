@@ -1,5 +1,5 @@
 import { Application, Container, Graphics } from 'pixi.js';
-import { clamp, lerp } from '@shared/math.js';
+import { lerp } from '@shared/math.js';
 
 export class Scene {
   app: Application;
@@ -18,8 +18,11 @@ export class Scene {
   camX = 0;
   camY = 0;
   zoom = 1;
-  targetZoom = 1;
   shake = 0;
+
+  /** Everyone sees the same world area regardless of screen size (fair play). */
+  static readonly VIEW_W = 1600;
+  static readonly VIEW_H = 900;
 
   constructor(app: Application) {
     this.app = app;
@@ -49,23 +52,21 @@ export class Scene {
     this.layers.ground.addChild(g);
   }
 
-  /** Camera follow with lerp + zoom + shake, applied to the world container. */
+  /** Camera follow with lerp + fixed fair-play zoom + shake. */
   update(targetX: number, targetY: number, dt: number): void {
     this.camX = lerp(this.camX, targetX, Math.min(1, dt * 7));
     this.camY = lerp(this.camY, targetY, Math.min(1, dt * 7));
-    this.zoom = lerp(this.zoom, this.targetZoom, Math.min(1, dt * 8));
     this.shake = Math.max(0, this.shake - dt * 30);
+
+    const w = this.app.renderer.width;
+    const h = this.app.renderer.height;
+    // cover-fit the design viewport: nobody sees more than VIEW_W x VIEW_H world units
+    this.zoom = Math.max(w / Scene.VIEW_W, h / Scene.VIEW_H);
 
     const sx = (Math.random() - 0.5) * this.shake;
     const sy = (Math.random() - 0.5) * this.shake;
-    const w = this.app.renderer.width;
-    const h = this.app.renderer.height;
     this.world.scale.set(this.zoom);
     this.world.position.set(w / 2 - (this.camX + sx) * this.zoom, h / 2 - (this.camY + sy) * this.zoom);
-  }
-
-  addZoom(delta: number): void {
-    this.targetZoom = clamp(this.targetZoom * (delta > 0 ? 0.9 : 1.1), 0.55, 1.6);
   }
 
   screenToWorld(sx: number, sy: number): { x: number; y: number } {

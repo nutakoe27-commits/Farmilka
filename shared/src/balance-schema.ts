@@ -74,14 +74,23 @@ export interface Balance {
     burst: { damage: number; count: number; projSpeed: number; projRange: number; telegraphSec: number; cooldownSec: number };
   };
   buildings: Record<BuildingId, BuildingCfg>;
+  food: {
+    heal: number;
+    cooldownSec: number;
+    maxCarry: number;
+    price: number;
+    dropChance: number;
+    pickupRadius: number;
+    despawnSec: number;
+  };
   economy: {
     maxBuildingsPerPlayer: number;
     buildingMinDist: number;
     buildingSafeZoneDist: number;
     raidLootFrac: number;
+    sellFrac: number;
     coinDespawnSec: number;
     coinPickupRadius: number;
-    ownerOfflineDespawnSec: number;
   };
 }
 
@@ -153,8 +162,13 @@ export function validateBalance(raw: unknown): Balance {
     for (const k of ['price', 'hp', 'income', 'incomeIntervalSec', 'radius']) num(b, k, `buildings.${id}`);
   }
 
+  const food = section(root, 'food');
+  for (const k of ['heal', 'cooldownSec', 'maxCarry', 'price', 'dropChance', 'pickupRadius', 'despawnSec']) {
+    num(food, k, 'food');
+  }
+
   const economy = section(root, 'economy');
-  for (const k of ['maxBuildingsPerPlayer', 'buildingMinDist', 'buildingSafeZoneDist', 'raidLootFrac', 'coinDespawnSec', 'coinPickupRadius', 'ownerOfflineDespawnSec']) {
+  for (const k of ['maxBuildingsPerPlayer', 'buildingMinDist', 'buildingSafeZoneDist', 'raidLootFrac', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
     num(economy, k, 'economy');
   }
 

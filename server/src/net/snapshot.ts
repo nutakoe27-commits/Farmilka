@@ -38,6 +38,8 @@ function fullState(e: Entity): EntityState {
     case 'coin':
       s.value = e.value;
       break;
+    case 'food':
+      break;
     case 'projectile':
       s.owner = e.ownerId;
       s.name = e.weapon;
@@ -91,6 +93,8 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     equipped: p.equipped,
     buildings: p.buildingIds.size,
     inSafe: world.inSafeZone(p.x, p.y),
+    food: p.food,
+    foodIn: Math.max(0, Math.round((p.foodReadyAt - world.time) / 100) / 10),
   };
   if (p.dead && p.respawnAt) {
     self.respawnIn = Math.max(0, (p.respawnAt - world.time) / 1000);

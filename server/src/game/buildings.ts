@@ -61,27 +61,21 @@ export function tryPlaceBuilding(world: World, p: Player, type: BuildingId, x: n
   return { ok: true };
 }
 
+/** Removes every building the player owns — called when they disconnect. */
+export function removePlayerBuildings(world: World, p: Player): void {
+  for (const id of [...p.buildingIds]) {
+    const b = world.buildings.get(id);
+    if (b) world.removeEntity(b);
+  }
+  p.buildingIds.clear();
+}
+
 export function updateBuildings(world: World, dt: number, now: number): void {
   const bal = getBalance();
   for (const b of [...world.buildings.values()]) {
     const cfg = bal.buildings[b.buildingType];
     const owner = world.players.get(b.ownerId);
     const online = !!(owner && owner.ws);
-
-    // despawn long-abandoned buildings
-    if (!online) {
-      if (b.ownerOfflineAt === 0) b.ownerOfflineAt = now;
-      if (now - b.ownerOfflineAt > bal.economy.ownerOfflineDespawnSec * 1000) {
-        world.removeEntity(b);
-        if (owner) {
-          owner.buildingIds.delete(b.id);
-          world.maybeForgetPlayer(owner);
-        }
-        continue;
-      }
-    } else {
-      b.ownerOfflineAt = 0;
-    }
 
     // passive income (owner must be online)
     if (cfg.income > 0 && online && now >= b.incomeAt) {

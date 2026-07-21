@@ -15,7 +15,8 @@ export class Shop {
   visible = false;
   placing: BuildingId | null = null;
 
-  onBuy: (item: WeaponId) => void = () => {};
+  onBuy: (item: WeaponId | 'food') => void = () => {};
+  onSell: (item: WeaponId) => void = () => {};
   onStartPlace: (b: BuildingId) => void = () => {};
 
   constructor(private welcome: WelcomeMsg) {
@@ -24,6 +25,18 @@ export class Shop {
   }
 
   private buildItems(): void {
+    // food
+    const fg = $('shop-food');
+    fg.innerHTML = '';
+    const f = this.welcome.food;
+    const fel = document.createElement('div');
+    fel.className = 'shop-item';
+    fel.dataset.item = 'food';
+    fel.innerHTML = `<div><div class="nm">🍖 Еда</div><div class="st">+${f.heal} HP · перезарядка ${f.cooldownSec}с · макс. ${f.maxCarry} шт<br>жми Q вовремя — и выживешь в PvP</div></div><div class="btns"><button>💰 ${f.price}</button></div>`;
+    fel.querySelector('button')!.onclick = () => this.onBuy('food');
+    fg.appendChild(fel);
+
+    // weapons
     const wg = $('shop-weapons');
     wg.innerHTML = '';
     const weapons = Object.entries(this.welcome.weapons)
@@ -36,11 +49,13 @@ export class Shop {
       const stats = cfg.type === 'melee'
         ? `урон ${cfg.damage} · дальн. ${cfg.range} · ${cfg.attackRate}/с`
         : `урон ${cfg.damage} · дальн. ${cfg.range} · ${cfg.attackRate}/с · снаряд`;
-      el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${WEAPON_NOTES[id] ?? ''}</div></div><button>💰 ${cfg.price}</button>`;
-      el.querySelector('button')!.onclick = () => this.onBuy(id as WeaponId);
+      el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${WEAPON_NOTES[id] ?? ''}</div></div><div class="btns"><button class="buy">💰 ${cfg.price}</button><button class="sell hidden">Продать</button></div>`;
+      (el.querySelector('.buy') as HTMLButtonElement).onclick = () => this.onBuy(id as WeaponId);
+      (el.querySelector('.sell') as HTMLButtonElement).onclick = () => this.onSell(id as WeaponId);
       wg.appendChild(el);
     }
 
+    // buildings
     const bg = $('shop-buildings');
     bg.innerHTML = '';
     for (const [id, cfg] of Object.entries(this.welcome.buildings)) {
@@ -50,7 +65,7 @@ export class Shop {
       const stats = cfg.income > 0
         ? `+${cfg.income} монет / ${cfg.incomeIntervalSec}с · HP ${cfg.hp}`
         : `урон ${cfg.damage}/выстрел · дальн. ${cfg.range} · HP ${cfg.hp}`;
-      el.innerHTML = `<div><div class="nm">${BUILDING_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${BUILDING_NOTES[id] ?? ''}</div></div><button>💰 ${cfg.price}</button>`;
+      el.innerHTML = `<div><div class="nm">${BUILDING_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${BUILDING_NOTES[id] ?? ''}<br>исчезает при выходе из игры</div></div><div class="btns"><button>💰 ${cfg.price}</button></div>`;
       el.querySelector('button')!.onclick = () => {
         this.hide();
         this.onStartPlace(id as BuildingId);
@@ -61,24 +76,35 @@ export class Shop {
 
   refresh(self: SelfState): void {
     if (!this.visible) return;
+    const sellFrac = this.welcome.economy.sellFrac;
+
+    const foodBtn = $('shop-food').querySelector('button') as HTMLButtonElement;
+    foodBtn.disabled = !self.inSafe || self.money < this.welcome.food.price || self.food >= this.welcome.food.maxCarry;
+    foodBtn.textContent = self.food >= this.welcome.food.maxCarry ? 'Максимум' : `💰 ${this.welcome.food.price}`;
+
     for (const el of document.querySelectorAll<HTMLElement>('#shop-weapons .shop-item')) {
       const id = el.dataset.item as WeaponId;
       const cfg = this.welcome.weapons[id];
-      const btn = el.querySelector('button')!;
+      const buy = el.querySelector('.buy') as HTMLButtonElement;
+      const sell = el.querySelector('.sell') as HTMLButtonElement;
       const owned = self.weapons.includes(id);
       el.classList.toggle('owned', owned);
       if (owned) {
-        btn.textContent = 'Куплено';
-        btn.disabled = true;
+        buy.textContent = 'Куплено';
+        buy.disabled = true;
+        sell.classList.remove('hidden');
+        sell.textContent = `Продать +${Math.floor(cfg.price * sellFrac)}`;
+        sell.disabled = !self.inSafe;
       } else {
-        btn.textContent = `💰 ${cfg.price}`;
-        btn.disabled = !self.inSafe || self.money < cfg.price;
+        buy.textContent = `💰 ${cfg.price}`;
+        buy.disabled = !self.inSafe || self.money < cfg.price || self.weapons.length >= 4;
+        sell.classList.add('hidden');
       }
     }
     for (const el of document.querySelectorAll<HTMLElement>('#shop-buildings .shop-item')) {
       const id = el.dataset.item as BuildingId;
       const cfg = this.welcome.buildings[id];
-      const btn = el.querySelector('button')!;
+      const btn = el.querySelector('button') as HTMLButtonElement;
       btn.disabled = self.money < cfg.price || self.buildings >= this.welcome.maxBuildings;
     }
     $('build-count').textContent = `(${self.buildings}/${this.welcome.maxBuildings})`;

@@ -1,4 +1,4 @@
-export type EntityKind = 'player' | 'mob' | 'boss' | 'projectile' | 'coin' | 'building';
+export type EntityKind = 'player' | 'mob' | 'boss' | 'projectile' | 'coin' | 'building' | 'food';
 
 export type WeaponId = 'fists' | 'sword' | 'spear' | 'hammer' | 'bow' | 'crossbow';
 export type MobId = 'slime' | 'wolf' | 'golem';

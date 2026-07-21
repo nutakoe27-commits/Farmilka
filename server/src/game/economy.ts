@@ -24,6 +24,57 @@ export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boo
   return { ok: true };
 }
 
+export function tryBuyFood(world: World, p: Player): { ok: boolean; reason?: string } {
+  const bal = getBalance();
+  if (p.dead) return { ok: false, reason: 'Вы мертвы' };
+  if (!world.inSafeZone(p.x, p.y)) return { ok: false, reason: 'Покупки только в безопасной зоне' };
+  if (p.food >= bal.food.maxCarry) return { ok: false, reason: `Максимум еды: ${bal.food.maxCarry}` };
+  if (p.money < bal.food.price) return { ok: false, reason: 'Недостаточно денег' };
+  p.money -= bal.food.price;
+  p.food++;
+  telemetry.purchase(p.name, 'food', bal.food.price);
+  return { ok: true };
+}
+
+export function trySellWeapon(world: World, p: Player, weapon: WeaponId): { ok: boolean; reason?: string } {
+  const bal = getBalance();
+  if (p.dead) return { ok: false, reason: 'Вы мертвы' };
+  if (weapon === 'fists') return { ok: false, reason: 'Кулаки не продаются' };
+  if (!world.inSafeZone(p.x, p.y)) return { ok: false, reason: 'Продажа только в безопасной зоне' };
+  const idx = p.weapons.indexOf(weapon);
+  if (idx < 0) return { ok: false, reason: 'У вас нет этого оружия' };
+  const refund = Math.floor(bal.weapons[weapon].price * bal.economy.sellFrac);
+  p.weapons.splice(idx, 1);
+  if (p.equipped === weapon) p.equipped = 'fists';
+  p.money += refund;
+  p.dirtyTick = world.tickNo;
+  telemetry.purchase(p.name, `sell:${weapon}`, -refund);
+  return { ok: true };
+}
+
+/** Reorders the hotbar; the new order must be a permutation of currently owned weapons. */
+export function tryReorder(world: World, p: Player, order: WeaponId[]): void {
+  if (!Array.isArray(order) || order.length !== p.weapons.length) return;
+  const owned = [...p.weapons].sort();
+  const proposed = [...order].sort();
+  for (let i = 0; i < owned.length; i++) {
+    if (owned[i] !== proposed[i]) return;
+  }
+  p.weapons = [...order];
+}
+
+export function tryEat(world: World, p: Player, now: number): void {
+  const bal = getBalance();
+  if (p.dead || p.food <= 0 || now < p.foodReadyAt || p.hp >= p.maxHp) return;
+  p.food--;
+  p.foodReadyAt = now + bal.food.cooldownSec * 1000;
+  const healed = Math.min(bal.food.heal, p.maxHp - p.hp);
+  p.hp += healed;
+  p.dirtyTick = world.tickNo;
+  telemetry.heal(p.name, healed);
+  world.sendEvent(p, { e: 'heal', amount: Math.round(healed) });
+}
+
 export function tryEquip(world: World, p: Player, weapon: WeaponId): void {
   if (p.weapons.includes(weapon) && p.equipped !== weapon) {
     p.equipped = weapon;
@@ -31,26 +82,35 @@ export function tryEquip(world: World, p: Player, weapon: WeaponId): void {
   }
 }
 
-/** Coin despawn + pickup by nearby players. */
+/** Coin/food despawn + pickup by nearby players. */
 export function updateCoins(world: World, now: number): void {
   const bal = getBalance();
   for (const coin of [...world.coins.values()]) {
-    if (now >= coin.despawnAt) {
-      world.removeEntity(coin);
-      continue;
-    }
+    if (now >= coin.despawnAt) world.removeEntity(coin);
   }
+  for (const food of [...world.foods.values()]) {
+    if (now >= food.despawnAt) world.removeEntity(food);
+  }
+  const pickupR = Math.max(bal.economy.coinPickupRadius, bal.food.pickupRadius);
   for (const p of world.players.values()) {
     if (p.dead || !p.ws) continue;
-    const near = world.grid.queryCircle(p.x, p.y, bal.economy.coinPickupRadius + 20);
+    const near = world.grid.queryCircle(p.x, p.y, pickupR + 20);
     for (const e of near) {
-      if (e.kind !== 'coin' || e.dead) continue;
-      if (dist(p.x, p.y, e.x, e.y) > bal.economy.coinPickupRadius + p.radius) continue;
-      e.dead = true;
-      world.removeEntity(e);
-      p.money += e.value;
-      p.session.moneyEarned += e.value;
-      telemetry.income(p.name, 'loot', e.value);
+      if (e.dead) continue;
+      if (e.kind === 'coin') {
+        if (dist(p.x, p.y, e.x, e.y) > bal.economy.coinPickupRadius + p.radius) continue;
+        world.removeEntity(e);
+        e.dead = true;
+        p.money += e.value;
+        p.session.moneyEarned += e.value;
+        telemetry.income(p.name, 'loot', e.value);
+      } else if (e.kind === 'food') {
+        if (p.food >= bal.food.maxCarry) continue;
+        if (dist(p.x, p.y, e.x, e.y) > bal.food.pickupRadius + p.radius) continue;
+        world.removeEntity(e);
+        e.dead = true;
+        p.food++;
+      }
     }
   }
 }

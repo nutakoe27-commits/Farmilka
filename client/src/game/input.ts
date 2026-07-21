@@ -4,9 +4,9 @@ export class InputManager {
   mouseY = 0;
   attackHeld = false;
 
-  onZoom: (delta: number) => void = () => {};
   onHotbar: (slot: number) => void = () => {};
   onToggleShop: () => void = () => {};
+  onEat: () => void = () => {};
   onWorldClick: (sx: number, sy: number) => boolean = () => false; // return true to consume (placement mode)
   onCancel: () => void = () => {};
 
@@ -16,6 +16,7 @@ export class InputManager {
       const k = e.key.toLowerCase();
       this.keys.add(e.code);
       if (k === 'b' || k === 'и') this.onToggleShop();
+      if (e.code === 'KeyQ') this.onEat();
       if (e.code === 'Escape') this.onCancel();
       if (e.code.startsWith('Digit')) {
         const n = Number(e.code.slice(5));
@@ -43,7 +44,6 @@ export class InputManager {
       if (e.button === 0) this.attackHeld = false;
     });
     window.addEventListener('contextmenu', (e) => e.preventDefault());
-    window.addEventListener('wheel', (e) => this.onZoom(e.deltaY), { passive: true });
   }
 
   moveVector(): { mx: number; my: number } {

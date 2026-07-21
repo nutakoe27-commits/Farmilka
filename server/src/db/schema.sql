@@ -53,6 +53,24 @@ CREATE TABLE IF NOT EXISTS sessions (
   money_earned REAL NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS accounts (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  pass_hash TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  money REAL NOT NULL DEFAULT 0,
+  weapons TEXT NOT NULL DEFAULT '["fists"]',
+  created_ts INTEGER NOT NULL,
+  last_seen_ts INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS heals (
+  id INTEGER PRIMARY KEY,
+  ts INTEGER NOT NULL,
+  player TEXT NOT NULL,
+  amount REAL NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_kills_ts ON kills(ts);
 CREATE INDEX IF NOT EXISTS idx_damage_ts ON damage(ts);
 CREATE INDEX IF NOT EXISTS idx_income_ts ON income(ts);

@@ -128,11 +128,16 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       const dropped = Math.floor(target.money * bal.player.dropMoneyFrac);
       target.money -= dropped;
       world.spawnCoinPiles(target.x, target.y, dropped);
+      // death is harsh: purchased weapons and carried food are lost too
+      const equippedAtDeath = target.equipped;
+      target.weapons = ['fists'];
+      target.equipped = 'fists';
+      target.food = 0;
       target.dead = true;
       target.respawnAt = now + bal.player.respawnSec * 1000;
       target.session.deaths++;
       world.removeEntity(target);
-      telemetry.death(target.name, src.cause, src.weapon, target.equipped, dropped);
+      telemetry.death(target.name, src.cause, src.weapon, equippedAtDeath, dropped);
       world.sendEvent(target, { e: 'death', dropped, respawnIn: bal.player.respawnSec, cause: src.cause });
       world.broadcast({ e: 'kill', killer: src.name, victim: target.name, weapon: src.weapon });
       if (killerPlayer) killerPlayer.session.kills++;
@@ -148,6 +153,9 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
         killerPlayer.money += cfg.reward;
         killerPlayer.session.moneyEarned += cfg.reward;
         telemetry.income(killerPlayer.name, 'mob', cfg.reward);
+      }
+      if (Math.random() < bal.food.dropChance) {
+        world.spawnFood(target.x, target.y);
       }
       telemetry.kill(src.name, target.mobType, src.weapon, distance, 'mob');
       break;
@@ -165,7 +173,6 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       if (owner) {
         owner.buildingIds.delete(target.id);
         world.sendEvent(owner, { e: 'buildingDestroyed', id: target.id, byName: src.name, own: true });
-        world.maybeForgetPlayer(owner);
       }
       const cfg = bal.buildings[target.buildingType];
       const loot = Math.floor(cfg.price * bal.economy.raidLootFrac);

@@ -4,7 +4,7 @@ import type { MobId, WeaponId } from '@shared/types.js';
 import { clamp, dist } from '@shared/math.js';
 import { getBalance } from './balance.js';
 import { SpatialGrid } from './grid.js';
-import type { Entity, Player, Mob, Boss, Projectile, Coin, Building } from './entities.js';
+import type { Entity, Player, Mob, Boss, Projectile, Coin, Food, Building } from './entities.js';
 import { updatePlayers } from './player.js';
 import { updateMobs, populateMobs } from './mobs.js';
 import { updateBoss, updateBossTimer } from './boss.js';
@@ -21,6 +21,7 @@ export class World {
   mobs = new Map<string, Mob>();
   projectiles = new Map<string, Projectile>();
   coins = new Map<string, Coin>();
+  foods = new Map<string, Food>();
   buildings = new Map<string, Building>();
   boss: Boss | null = null;
 
@@ -61,6 +62,7 @@ export class World {
       case 'mob': this.mobs.set(e.id, e); break;
       case 'projectile': this.projectiles.set(e.id, e); break;
       case 'coin': this.coins.set(e.id, e); break;
+      case 'food': this.foods.set(e.id, e); break;
       case 'building': this.buildings.set(e.id, e); break;
       case 'boss': this.boss = e; break;
     }
@@ -74,6 +76,7 @@ export class World {
       case 'mob': this.mobs.delete(e.id); break;
       case 'projectile': this.projectiles.delete(e.id); break;
       case 'coin': this.coins.delete(e.id); break;
+      case 'food': this.foods.delete(e.id); break;
       case 'building': this.buildings.delete(e.id); break;
       case 'boss': if (this.boss === e) this.boss = null; break;
     }
@@ -122,11 +125,13 @@ export class World {
 
   // ---------- spawning ----------
 
-  spawnPlayer(name: string, ws: WebSocket): Player {
+  spawnPlayer(name: string, ws: WebSocket, account?: { name: string; money: number; weapons: WeaponId[] }): Player {
     const bal = getBalance();
     const c = this.center;
     const a = Math.random() * Math.PI * 2;
     const r = Math.random() * bal.world.safeZoneRadius * 0.6;
+    const weapons: WeaponId[] = account ? [...account.weapons] : ['fists'];
+    if (!weapons.includes('fists')) weapons.unshift('fists');
     const p: Player = {
       id: this.id('p'),
       kind: 'player',
@@ -143,9 +148,12 @@ export class World {
       name,
       ws,
       input: { seq: 0, mx: 0, my: 0, aim: 0, attack: false },
-      money: bal.player.startMoney,
-      weapons: ['fists'],
+      money: account ? account.money : bal.player.startMoney,
+      weapons,
       equipped: 'fists',
+      food: 0,
+      foodReadyAt: 0,
+      account: account ? account.name : null,
       attackReadyAt: 0,
       lastDamagedAt: 0,
       lastBossContactAt: 0,
@@ -173,6 +181,28 @@ export class World {
     p.movedTick = this.tickNo;
     p.dirtyTick = this.tickNo;
     this.addEntity(p);
+  }
+
+  spawnFood(x: number, y: number): Food {
+    const bal = getBalance();
+    const size = bal.world.size;
+    const food: Food = {
+      id: this.id('f'),
+      kind: 'food',
+      x: clamp(x, 10, size - 10),
+      y: clamp(y, 10, size - 10),
+      angle: 0,
+      radius: 14,
+      hp: 1,
+      maxHp: 1,
+      dead: false,
+      cell: -1,
+      movedTick: this.tickNo,
+      dirtyTick: this.tickNo,
+      despawnAt: Date.now() + bal.food.despawnSec * 1000,
+    };
+    this.addEntity(food);
+    return food;
   }
 
   spawnCoin(x: number, y: number, value: number): Coin {
@@ -270,11 +300,6 @@ export class World {
       if (p.ws && p.ws.readyState === WebSocket.OPEN) res.push(p);
     }
     return res;
-  }
-
-  /** Fully forgets a player once nothing in the world references them. */
-  maybeForgetPlayer(p: Player): void {
-    if (!p.ws && p.buildingIds.size === 0) this.players.delete(p.id);
   }
 }
 

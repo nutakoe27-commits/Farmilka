@@ -1,15 +1,16 @@
 import { Router } from 'express';
 import { getDb } from '../db/db.js';
 import { reloadBalance } from '../game/balance.js';
+import type { World } from '../game/world.js';
 
 function esc(v: unknown): string {
   return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function table(title: string, headers: string[], rows: unknown[][]): string {
+function table(title: string, headers: string[], rows: (string | number)[][], rawHtml = false): string {
   const head = headers.map((h) => `<th>${esc(h)}</th>`).join('');
   const body = rows.length
-    ? rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')
+    ? rows.map((r) => `<tr>${r.map((c) => `<td>${rawHtml ? c : esc(c)}</td>`).join('')}</tr>`).join('')
     : `<tr><td colspan="${headers.length}" class="empty">нет данных</td></tr>`;
   return `<section><h2>${esc(title)}</h2><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></section>`;
 }
@@ -18,7 +19,31 @@ function fmt(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-export function adminRouter(): Router {
+function fmtDur(ms: number): string {
+  const m = Math.floor(ms / 60000);
+  if (m < 60) return `${m} мин`;
+  return `${Math.floor(m / 60)} ч ${m % 60} мин`;
+}
+
+function fmtDate(ts: number): string {
+  return new Date(ts).toISOString().replace('T', ' ').slice(0, 16);
+}
+
+const STYLE = `<style>
+body{font-family:system-ui,sans-serif;background:#12141a;color:#e8e8ef;max-width:1100px;margin:24px auto;padding:0 16px}
+h1{font-size:22px} h2{font-size:16px;margin:24px 0 8px;color:#9ecbff}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border:1px solid #2a2e3a;padding:5px 10px;text-align:left}
+th{background:#1b1f2a} tr:nth-child(even){background:#171a22} .empty{color:#666;text-align:center}
+.note{color:#8a8fa3;font-size:12px} a{color:#9ecbff} .tag{font-size:11px;padding:1px 6px;border-radius:6px;background:#1f6feb;color:#fff}
+.tag.guest{background:#30363d}
+</style>`;
+
+function playerLink(name: string, token: string): string {
+  return `<a href="/admin/player?token=${encodeURIComponent(token)}&name=${encodeURIComponent(name)}">${esc(name)}</a>`;
+}
+
+export function adminRouter(world: World): Router {
   const router = Router();
   const token = process.env.ADMIN_TOKEN ?? 'dev';
 
@@ -34,10 +59,75 @@ export function adminRouter(): Router {
     res.json(reloadBalance());
   });
 
+  // ---------- player profile ----------
+  router.get('/player', (req, res) => {
+    const db = getDb();
+    const name = String(req.query.name ?? '');
+    const now = Date.now();
+
+    const acc = db.prepare('SELECT created_ts, last_seen_ts, money, weapons FROM accounts WHERE name = ? COLLATE NOCASE').get(name) as
+      | { created_ts: number; last_seen_ts: number; money: number; weapons: string }
+      | undefined;
+    const sess = db.prepare('SELECT COUNT(*) n, SUM(COALESCE(left_ts, ?) - joined_ts) total, SUM(kills) kills, SUM(deaths) deaths, SUM(money_earned) earned FROM sessions WHERE player = ? COLLATE NOCASE').get(now, name) as { n: number; total: number | null; kills: number | null; deaths: number | null; earned: number | null };
+    const online = [...world.players.values()].some((p) => p.ws && p.name.toLowerCase() === name.toLowerCase());
+
+    const killsByWeapon = db.prepare(`SELECT weapon, COUNT(*) n FROM kills WHERE killer = ? COLLATE NOCASE GROUP BY weapon ORDER BY n DESC`).all(name) as { weapon: string; n: number }[];
+    const killsByKind = db.prepare(`SELECT victim_kind, COUNT(*) n FROM kills WHERE killer = ? COLLATE NOCASE GROUP BY victim_kind`).all(name) as { victim_kind: string; n: number }[];
+    const deathsByCause = db.prepare(`SELECT cause, COUNT(*) n FROM deaths WHERE player = ? COLLATE NOCASE GROUP BY cause ORDER BY n DESC`).all(name) as { cause: string; n: number }[];
+    const incomeBySource = db.prepare(`SELECT source, SUM(amount) s FROM income WHERE player = ? COLLATE NOCASE GROUP BY source ORDER BY s DESC`).all(name) as { source: string; s: number }[];
+    const purchases = db.prepare(`SELECT item, COUNT(*) n, SUM(price) total FROM purchases WHERE player = ? COLLATE NOCASE GROUP BY item ORDER BY n DESC`).all(name) as { item: string; n: number; total: number }[];
+    const healsRow = db.prepare(`SELECT COUNT(*) n, SUM(amount) total FROM heals WHERE player = ? COLLATE NOCASE`).get(name) as { n: number; total: number | null };
+    const lastSessions = db.prepare(`SELECT joined_ts, left_ts, kills, deaths, money_earned FROM sessions WHERE player = ? COLLATE NOCASE ORDER BY joined_ts DESC LIMIT 15`).all(name) as { joined_ts: number; left_ts: number | null; kills: number; deaths: number; money_earned: number }[];
+
+    const kills = sess.kills ?? 0;
+    const deaths = sess.deaths ?? 0;
+
+    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${esc(name)} — Farmilka</title>${STYLE}</head><body>
+<p><a href="/admin/stats?token=${encodeURIComponent(token)}">← ко всей статистике</a></p>
+<h1>Профиль: ${esc(name)} ${online ? '<span class="tag">онлайн</span>' : ''} ${acc ? '<span class="tag">аккаунт</span>' : '<span class="tag guest">гость</span>'}</h1>
+${acc ? `<p class="note">Зарегистрирован: ${fmtDate(acc.created_ts)} · был в сети: ${fmtDate(acc.last_seen_ts)} · золото на счету: ${fmt(acc.money)} · оружие: ${esc(acc.weapons)}</p>` : '<p class="note">Играет без аккаунта (имя может использоваться разными людьми).</p>'}
+${table('Сводка', ['Сессий', 'Время в игре', 'Убийств', 'Смертей', 'K/D', 'Заработано денег', 'Съедено еды', 'Отхилено HP'], [[
+  sess.n, fmtDur(sess.total ?? 0), kills, deaths, fmt(deaths > 0 ? kills / deaths : kills), fmt(sess.earned ?? 0), healsRow.n, fmt(healsRow.total ?? 0),
+]])}
+${table('Убийства по оружию', ['Оружие', 'Убийств'], killsByWeapon.map((r) => [r.weapon, r.n]))}
+${table('Убийства по типу жертв', ['Тип', 'Убийств'], killsByKind.map((r) => [r.victim_kind, r.n]))}
+${table('Смерти по причинам', ['Причина', 'Смертей'], deathsByCause.map((r) => [r.cause, r.n]))}
+${table('Доход по источникам', ['Источник', 'Всего'], incomeBySource.map((r) => [r.source, fmt(r.s)]))}
+${table('Покупки', ['Предмет', 'Раз', 'Сумма'], purchases.map((r) => [r.item, r.n, fmt(r.total)]))}
+${table('Последние сессии', ['Вход', 'Длительность', 'Убийств', 'Смертей', 'Заработано'], lastSessions.map((s) => [
+  fmtDate(s.joined_ts), fmtDur((s.left_ts ?? now) - s.joined_ts), s.kills, s.deaths, fmt(s.money_earned),
+]))}
+</body></html>`;
+    res.type('html').send(html);
+  });
+
+  // ---------- main dashboard ----------
   router.get('/stats', (req, res) => {
     const db = getDb();
     const hours = Math.max(1, Math.min(24 * 30, Number(req.query.hours) || 24));
     const since = Date.now() - hours * 3600_000;
+    const now = Date.now();
+
+    // --- live online ---
+    const online = world.connectedPlayers();
+    const onlineRows = online.map((p) => [
+      playerLink(p.name, token),
+      p.account ? '<span class="tag">аккаунт</span>' : '<span class="tag guest">гость</span>',
+      fmt(p.money),
+      String(p.session.kills),
+      String(p.session.deaths),
+      esc(p.equipped),
+      String(p.buildingIds.size),
+      esc(fmtDur(now - p.session.joinedAt)),
+    ]);
+
+    // --- totals ---
+    const totalPlayers = (db.prepare('SELECT COUNT(DISTINCT player COLLATE NOCASE) n FROM sessions').get() as { n: number }).n;
+    const totalAccounts = (db.prepare('SELECT COUNT(*) n FROM accounts').get() as { n: number }).n;
+    const totalSessions = (db.prepare('SELECT COUNT(*) n FROM sessions').get() as { n: number }).n;
+    const totalPlayMs = (db.prepare('SELECT SUM(COALESCE(left_ts, ?) - joined_ts) t FROM sessions').get(now) as { t: number | null }).t ?? 0;
+    const newAccounts = (db.prepare('SELECT COUNT(*) n FROM accounts WHERE created_ts >= ?').get(since) as { n: number }).n;
+    const periodPlayers = (db.prepare('SELECT COUNT(DISTINCT player COLLATE NOCASE) n FROM sessions WHERE joined_ts >= ?').get(since) as { n: number }).n;
 
     // --- weapon balance ---
     const pvpKills = db.prepare(`SELECT weapon, COUNT(*) n, AVG(distance) avgDist FROM kills WHERE victim_kind='player' AND ts>=? GROUP BY weapon`).all(since) as { weapon: string; n: number; avgDist: number }[];
@@ -61,10 +151,14 @@ export function adminRouter(): Router {
     });
 
     // --- income by source ---
-    const playerMs = db.prepare(`SELECT SUM(COALESCE(left_ts, ?) - joined_ts) total FROM sessions WHERE joined_ts>=?`).get(Date.now(), since) as { total: number | null };
+    const playerMs = db.prepare(`SELECT SUM(COALESCE(left_ts, ?) - joined_ts) total FROM sessions WHERE joined_ts>=?`).get(now, since) as { total: number | null };
     const playerHours = Math.max((playerMs.total ?? 0) / 3600_000, 0.001);
     const income = db.prepare(`SELECT source, SUM(amount) total, COUNT(*) n FROM income WHERE ts>=? GROUP BY source ORDER BY total DESC`).all(since) as { source: string; total: number; n: number }[];
     const incomeRows = income.map((r) => [r.source, fmt(r.total), r.n, fmt(r.total / playerHours)]);
+
+    // --- food/heals ---
+    const healsAgg = db.prepare(`SELECT COUNT(*) n, SUM(amount) total, COUNT(DISTINCT player) players FROM heals WHERE ts>=?`).get(since) as { n: number; total: number | null; players: number };
+    const topHealers = db.prepare(`SELECT player, COUNT(*) n, SUM(amount) total FROM heals WHERE ts>=? GROUP BY player ORDER BY n DESC LIMIT 8`).all(since) as { player: string; n: number; total: number }[];
 
     // --- boss ---
     const bossKills = db.prepare(`SELECT COUNT(*) n FROM kills WHERE victim_kind='boss' AND ts>=?`).get(since) as { n: number };
@@ -77,8 +171,12 @@ export function adminRouter(): Router {
     // --- purchases ---
     const purchaseRows = (db.prepare(`SELECT item, COUNT(*) n, SUM(price) total FROM purchases WHERE ts>=? GROUP BY item ORDER BY n DESC`).all(since) as { item: string; n: number; total: number }[]).map((r) => [r.item, r.n, fmt(r.total)]);
 
+    // --- top players over the period ---
+    const topPlayers = db.prepare(`SELECT player, SUM(kills) k, SUM(deaths) d, SUM(money_earned) e, SUM(COALESCE(left_ts, ?) - joined_ts) t FROM sessions WHERE joined_ts>=? GROUP BY player COLLATE NOCASE ORDER BY k DESC LIMIT 10`).all(now, since) as { player: string; k: number; d: number; e: number; t: number }[];
+    const topRows = topPlayers.map((r) => [playerLink(r.player, token), String(r.k), String(r.d), fmt(r.k / Math.max(1, r.d)), fmt(r.e), esc(fmtDur(r.t))]);
+
     // --- session histogram ---
-    const sessions = db.prepare(`SELECT COALESCE(left_ts, ?) - joined_ts dur FROM sessions WHERE joined_ts>=?`).all(Date.now(), since) as { dur: number }[];
+    const sessions = db.prepare(`SELECT COALESCE(left_ts, ?) - joined_ts dur FROM sessions WHERE joined_ts>=?`).all(now, since) as { dur: number }[];
     const buckets = [0, 0, 0, 0, 0];
     for (const s of sessions) {
       const m = s.dur / 60000;
@@ -86,25 +184,24 @@ export function adminRouter(): Router {
     }
     const sessionRows = [['< 5 мин', buckets[0]], ['5–15 мин', buckets[1]], ['15–30 мин', buckets[2]], ['30–60 мин', buckets[3]], ['> 60 мин', buckets[4]]];
 
-    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Farmilka — баланс</title>
-<style>
-body{font-family:system-ui,sans-serif;background:#12141a;color:#e8e8ef;max-width:1100px;margin:24px auto;padding:0 16px}
-h1{font-size:22px} h2{font-size:16px;margin:24px 0 8px;color:#9ecbff}
-table{border-collapse:collapse;width:100%;font-size:13px}
-th,td{border:1px solid #2a2e3a;padding:5px 10px;text-align:left}
-th{background:#1b1f2a} tr:nth-child(even){background:#171a22} .empty{color:#666;text-align:center}
-.note{color:#8a8fa3;font-size:12px} a{color:#9ecbff}
-</style></head><body>
-<h1>Farmilka — статистика баланса (за ${hours} ч)</h1>
-<p class="note">Период: <a href="?token=${esc(token)}&hours=1">1ч</a> · <a href="?token=${esc(token)}&hours=24">24ч</a> · <a href="?token=${esc(token)}&hours=168">неделя</a>.
-Игро-часов за период: ${fmt(playerHours)}. Выбросы K/D — кандидаты на нерф/бафф.</p>
-${table('Баланс оружия', ['Оружие', 'Убийств всего', 'PvP-убийств', 'Доля PvP-убийств', 'Смертей с ним в руках', 'K/D (PvP)', 'Урон всего', 'Игроков использовало', 'Ср. дистанция убийства'], weaponRows)}
+    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Farmilka — статистика</title>${STYLE}</head><body>
+<h1>Farmilka — статистика (период: ${hours} ч)</h1>
+<p class="note">Период: <a href="?token=${esc(token)}&hours=1">1ч</a> · <a href="?token=${esc(token)}&hours=24">24ч</a> · <a href="?token=${esc(token)}&hours=168">неделя</a> · <a href="?token=${esc(token)}&hours=720">месяц</a>.
+Кликните имя игрока — откроется его профиль.</p>
+${table(`Сейчас онлайн: ${online.length}`, ['Игрок', 'Тип', 'Деньги', 'Убийств', 'Смертей', 'Оружие', 'Построек', 'В игре'], onlineRows, true)}
+${table('Всего за всё время', ['Уникальных игроков', 'Зарегистрировано аккаунтов', 'Сессий', 'Суммарное время игры', `Новых аккаунтов за ${hours}ч`, `Игроков за ${hours}ч`], [[
+  totalPlayers, totalAccounts, totalSessions, fmtDur(totalPlayMs), newAccounts, periodPlayers,
+]])}
+${table('Топ игроков за период', ['Игрок', 'Убийств', 'Смертей', 'K/D', 'Заработано', 'Время'], topRows, true)}
+${table('Баланс оружия', ['Оружие', 'Убийств всего', 'PvP-убийств', 'Доля PvP', 'Смертей с ним', 'K/D (PvP)', 'Урон', 'Игроков', 'Ср. дистанция'], weaponRows)}
 ${table('Доход по источникам', ['Источник', 'Всего', 'Событий', 'Доход / игро-час'], incomeRows)}
-${table('Боссы', ['Убито боссов', 'Участников (получили награду)', 'Выплат', 'Роздано денег'], bossRows)}
+${table('Еда (скилловый фактор)', ['Съедено', 'Отхилено HP', 'Игроков ело'], [[healsAgg.n, fmt(healsAgg.total ?? 0), healsAgg.players]])}
+${table('Топ по еде', ['Игрок', 'Съедено', 'Отхилено'], topHealers.map((r) => [playerLink(r.player, token), String(r.n), fmt(r.total)]), true)}
+${table('Боссы', ['Убито', 'Участников', 'Выплат', 'Роздано'], bossRows)}
 ${table('Смерти по причинам', ['Причина', 'Смертей', 'Потеряно денег'], deathRows)}
-${table('Покупки', ['Предмет', 'Куплено', 'Потрачено'], purchaseRows)}
+${table('Покупки', ['Предмет', 'Раз', 'Сумма'], purchaseRows)}
 ${table('Длина сессий', ['Длительность', 'Сессий'], sessionRows)}
-<p class="note">Горячая правка баланса: отредактируйте balance/balance.json — применится автоматически, или POST /admin/reload?token=…</p>
+<p class="note">Правка баланса: balance/balance.json на хосте — применяется на лету, или POST /admin/reload?token=…</p>
 </body></html>`;
     res.type('html').send(html);
   });

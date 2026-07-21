@@ -34,14 +34,16 @@ export class Connection {
   onRemove: (id: string, state: EntityState) => void = () => {};
   onClose: (reason: string) => void = () => {};
 
-  constructor(name: string) {
+  constructor(name: string, password = '', register = false) {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     this.ws = new WebSocket(`${proto}://${location.host}/ws`);
-    this.ws.onopen = () => this.send({ t: 'join', name });
-    this.ws.onclose = () => this.onClose('Соединение потеряно');
+    this.ws.onopen = () => this.send({ t: 'join', name, password: password || undefined, register: register || undefined });
+    this.ws.onclose = () => this.onClose(this.closeReason ?? 'Соединение потеряно');
     this.ws.onerror = () => this.onClose('Ошибка соединения');
     this.ws.onmessage = (e) => this.handle(String(e.data));
   }
+
+  private closeReason: string | null = null;
 
   send(msg: ClientMsg): void {
     if (this.ws.readyState === WebSocket.OPEN) this.ws.send(encode(msg));
@@ -64,6 +66,7 @@ export class Connection {
         this.onEvent(msg.ev);
         break;
       case 'reject':
+        this.closeReason = msg.reason;
         this.onClose(msg.reason);
         this.ws.close();
         break;

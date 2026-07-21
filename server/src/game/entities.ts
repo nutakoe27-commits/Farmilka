@@ -42,6 +42,10 @@ export interface Player extends BaseEntity {
   money: number;
   weapons: WeaponId[];
   equipped: WeaponId;
+  food: number;
+  foodReadyAt: number;
+  /** account name when logged in, null for guests */
+  account: string | null;
   attackReadyAt: number;
   lastDamagedAt: number;
   lastBossContactAt: number;
@@ -93,6 +97,11 @@ export interface Coin extends BaseEntity {
   despawnAt: number;
 }
 
+export interface Food extends BaseEntity {
+  kind: 'food';
+  despawnAt: number;
+}
+
 export interface Building extends BaseEntity {
   kind: 'building';
   buildingType: BuildingId;
@@ -104,4 +113,4 @@ export interface Building extends BaseEntity {
   ownerOfflineAt: number; // 0 while owner online
 }
 
-export type Entity = Player | Mob | Boss | Projectile | Coin | Building;
+export type Entity = Player | Mob | Boss | Projectile | Coin | Food | Building;
