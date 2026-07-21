@@ -1,5 +1,14 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import type { EntityState } from '@shared/protocol.js';
+import { prestigeTier, type PrestigeCfg } from '@shared/prestige.js';
+
+let PRESTIGE_CFG: PrestigeCfg | null = null;
+export function setPrestigeCfg(cfg: PrestigeCfg): void {
+  PRESTIGE_CFG = cfg;
+}
+function hexColor(css: string): number {
+  return parseInt(css.replace('#', ''), 16);
+}
 
 export const WEAPON_ICONS: Record<string, string> = {
   fists: '👊', sword: '🗡️', spear: '🔱', hammer: '🔨', bow: '🏹', crossbow: '🎯',
@@ -59,13 +68,21 @@ export class EntityView {
   protRing: Graphics | null = null;
   weaponText: Text | null = null;
   hatText: Text | null = null;
+  nameText: Text | null = null;
+  aura: Graphics | null = null;
+  isSelf = false;
   lastHp = -1;
   lastWeapon = '';
   lastHat: string | null = 'no';
+  lastPrestige = -1;
   color = 0xffffff;
   spawnTime = performance.now();
 
   constructor(public state: EntityState, isSelf: boolean) {
+    this.isSelf = isSelf;
+    // aura sits behind everything (prestige glow)
+    this.aura = new Graphics();
+    this.root.addChild(this.aura);
     this.root.addChild(this.body);
     this.root.addChild(this.top);
     this.color = state.kind === 'player' ? playerColor(state.id) : 0xffffff;
@@ -90,6 +107,7 @@ export class EntityView {
         name.anchor.set(0.5);
         name.position.set(0, -r - 24);
         this.top.addChild(name);
+        this.nameText = name;
         this.weaponText = new Text({ text: WEAPON_ICONS[s.weapon ?? 'fists'] ?? '', style: { fontSize: 13 } });
         this.weaponText.anchor.set(0.5);
         this.weaponText.position.set(0, r + 14);
@@ -248,6 +266,28 @@ export class EntityView {
     if (this.hatText && (s.hat ?? null) !== this.lastHat) {
       this.lastHat = s.hat ?? null;
       this.hatText.text = this.lastHat ? HAT_EMOJI[this.lastHat] ?? '🎩' : '';
+    }
+
+    // prestige: name colour, badge prefix, and a pulsing aura ring
+    if (s.kind === 'player' && (s.prestige ?? 0) !== this.lastPrestige) {
+      this.lastPrestige = s.prestige ?? 0;
+      const tier = PRESTIGE_CFG ? prestigeTier(this.lastPrestige, PRESTIGE_CFG) : null;
+      if (this.nameText) {
+        const badge = this.lastPrestige > 0 ? `✦${this.lastPrestige} ` : '';
+        this.nameText.text = `${badge}${s.name ?? ''}`;
+        this.nameText.style.fill = tier ? hexColor(tier.color) : this.isSelf ? 0x7ee787 : 0xe8e8ef;
+      }
+      if (this.aura) {
+        this.aura.clear();
+        if (tier) {
+          const c = hexColor(tier.aura);
+          this.aura.circle(0, 0, s.radius + 16).fill({ color: c, alpha: 0.14 });
+          this.aura.circle(0, 0, s.radius + 9).stroke({ width: 3, color: c, alpha: 0.55 });
+        }
+      }
+    }
+    if (this.aura && this.lastPrestige > 0) {
+      this.aura.alpha = 0.7 + 0.3 * Math.sin(now / 260);
     }
 
     if (s.hp !== undefined && s.maxHp !== undefined && s.hp !== this.lastHp) {

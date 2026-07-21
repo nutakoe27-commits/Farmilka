@@ -1,6 +1,7 @@
 import type { SelfState, WelcomeMsg } from '@shared/protocol.js';
 import type { WeaponId, BuildingId } from '@shared/types.js';
 import { WEAPON_ICONS, BUILDING_ICONS, HAT_EMOJI, TIER_NAMES, TIER_COLORS } from '../game/entities.js';
+import { prestigeTier } from '@shared/prestige.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -31,9 +32,11 @@ export class Shop {
   onStartPlace: (b: BuildingId) => void = () => {};
   onLootbox: () => void = () => {};
   onEquipHat: (hat: string | null) => void = () => {};
+  onPrestige: () => void = () => {};
 
   constructor(private welcome: WelcomeMsg) {
     $('shop-close').onclick = () => this.hide();
+    ($('prestige-btn') as HTMLButtonElement).onclick = () => this.onPrestige();
     this.buildItems();
   }
 
@@ -152,6 +155,28 @@ export class Shop {
       btn.disabled = self.money < cfg.price || self.buildings >= this.welcome.maxBuildings;
     }
     $('build-count').textContent = `(${self.buildings}/${this.welcome.maxBuildings})`;
+
+    // prestige
+    const pcfg = this.welcome.prestige;
+    const tier = prestigeTier(self.prestige, pcfg);
+    $('prestige-level').textContent = String(self.prestige);
+    const tierBadge = $('prestige-tier');
+    if (tier) {
+      tierBadge.textContent = tier.name;
+      tierBadge.style.background = tier.color;
+      tierBadge.style.color = '#0d0f14';
+      tierBadge.style.display = '';
+    } else {
+      tierBadge.style.display = 'none';
+    }
+    const pBtn = $('prestige-btn') as HTMLButtonElement;
+    if (self.prestigeCost <= 0) {
+      pBtn.textContent = 'Максимум';
+      pBtn.disabled = true;
+    } else {
+      pBtn.textContent = `💰 ${self.prestigeCost}`;
+      pBtn.disabled = self.money < self.prestigeCost;
+    }
 
     // hats
     ($('lootbox-btn') as HTMLButtonElement).disabled = self.money < this.welcome.hats.lootboxPrice;

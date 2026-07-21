@@ -5,7 +5,8 @@ import type { WelcomeMsg } from '@shared/protocol.js';
 import { Connection } from './net/connection.js';
 import { sample, type Sampled } from './net/interpolation.js';
 import { Scene } from './game/scene.js';
-import { EntityView, WEAPON_ICONS } from './game/entities.js';
+import { EntityView, WEAPON_ICONS, setPrestigeCfg } from './game/entities.js';
+import { prestigeTier } from '@shared/prestige.js';
 import { Effects } from './game/effects.js';
 import { InputManager } from './game/input.js';
 import { MobileControls, isTouchDevice } from './game/mobile.js';
@@ -96,6 +97,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
 
   const scene = new Scene(app);
   scene.drawGround(welcome.world.size);
+  setPrestigeCfg(welcome.prestige);
   const effects = new Effects(scene.layers.effects, scene.layers.telegraphs);
   const settings = new Settings();
   settings.currentServer = welcome.server;
@@ -155,6 +157,19 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     }
     if (!best) return null;
     return Math.atan2(best.y - dispY, best.x - dispX);
+  }
+
+  /** Kill-feed prestige badge for a player found by name among visible entities. */
+  function prestigeBadge(name: string): string {
+    let prestige = 0;
+    if (conn.self && welcome.id && name === (views.get(welcome.id)?.state.name ?? '')) prestige = conn.self.prestige;
+    for (const r of conn.entities.values()) {
+      if (r.state.kind === 'player' && r.state.name === name) { prestige = Math.max(prestige, r.state.prestige ?? 0); }
+    }
+    if (prestige <= 0) return '';
+    const tier = prestigeTier(prestige, welcome.prestige);
+    const color = tier ? tier.color : '#d88bff';
+    return `<span style="color:${color};font-weight:700">✦${prestige}</span> `;
   }
 
   function moveSpeed(attack: boolean): number {
@@ -219,9 +234,11 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
 
   conn.onEvent = (ev) => {
     switch (ev.e) {
-      case 'kill':
-        hud.killFeed(`<b>${escapeHtml(ev.killer)}</b> ⚔ ${escapeHtml(ev.victim)} <span style="color:#6a7085">(${ev.weapon})</span>`);
+      case 'kill': {
+        const badge = prestigeBadge(ev.killer);
+        hud.killFeed(`${badge}<b>${escapeHtml(ev.killer)}</b> ⚔ ${escapeHtml(ev.victim)} <span style="color:#6a7085">(${ev.weapon})</span>`);
         break;
+      }
       case 'damage': {
         if (settings.values.damageNumbers) effects.damageNumber(ev.x, ev.y, ev.amount);
         if (ev.target === conn.welcome!.id && settings.values.shake) scene.shake = 7;
@@ -243,6 +260,11 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       case 'lootbox': {
         if (ev.result === 'gold') hud.notice(`🎁 Лутбокс: <b style="color:#ffd76e">+${ev.gold} золота!</b>`);
         else if (ev.result === 'nothing') hud.notice('🎁 Лутбокс: пусто… не повезло');
+        break;
+      }
+      case 'prestige': {
+        hud.bossBanner(`✦ Престиж ${ev.level}${ev.tier ? ` — ${ev.tier}!` : '!'}`);
+        setTimeout(() => hud.bossBanner(null), 5000);
         break;
       }
       case 'death':
@@ -307,6 +329,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   shop.onSell = (item) => conn.send({ t: 'sell', weapon: item });
   shop.onLootbox = () => conn.send({ t: 'lootbox' });
   shop.onEquipHat = (hat) => conn.send({ t: 'equipHat', hat });
+  shop.onPrestige = () => conn.send({ t: 'prestige' });
   settings.onExit = () => conn.ws.close();
   if (mobile) {
     mobile.onEat = () => conn.send({ t: 'eat' });

@@ -1,5 +1,6 @@
 import type { EntityKind, WeaponId, MobId, BossId, BuildingId, DeathCause } from './types.js';
 import type { WeaponCfg, BuildingCfg, HatCfg, HatTier } from './balance-schema.js';
+import type { PrestigeCfg } from './prestige.js';
 
 // ---------- Entity state as seen by clients ----------
 
@@ -24,6 +25,8 @@ export interface EntityState {
   prot?: boolean;
   /** equipped hat id (players) */
   hat?: string | null;
+  /** account prestige level (players) */
+  prestige?: number;
 }
 
 export interface EntityDelta {
@@ -36,6 +39,7 @@ export interface EntityDelta {
   dead?: boolean;
   prot?: boolean;
   hat?: string | null;
+  prestige?: number;
 }
 
 export interface SelfState {
@@ -49,6 +53,8 @@ export interface SelfState {
   buildings: number;
   hats: string[];
   hat: string | null;
+  prestige: number;
+  prestigeCost: number;
   food: number;
   /** seconds until food can be eaten again (0 = ready) */
   foodIn: number;
@@ -75,6 +81,7 @@ export type GameEvent =
   | { e: 'heal'; amount: number }
   | { e: 'hat'; hat: string; name: string; tier: HatTier; source: 'mob' | 'boss' | 'lootbox'; dup: boolean; gold: number }
   | { e: 'lootbox'; result: 'hat' | 'gold' | 'nothing'; gold: number }
+  | { e: 'prestige'; level: number; tier: string | null }
   | { e: 'notice'; text: string };
 
 // ---------- Client -> Server ----------
@@ -97,6 +104,7 @@ export type ClientMsg =
   | { t: 'reorder'; weapons: WeaponId[] }
   | { t: 'eat' }
   | { t: 'lootbox' }
+  | { t: 'prestige' }
   | { t: 'equipHat'; hat: string | null }
   | { t: 'place'; building: BuildingId; x: number; y: number }
   | { t: 'ping'; ts: number };
@@ -116,6 +124,7 @@ export interface WelcomeMsg {
   buildings: Record<BuildingId, BuildingCfg>;
   food: { heal: number; cooldownSec: number; maxCarry: number; price: number };
   hats: { items: Record<string, HatCfg>; lootboxPrice: number; dupGold: Record<HatTier, number> };
+  prestige: PrestigeCfg;
   economy: { sellFrac: number };
   maxBuildings: number;
 }

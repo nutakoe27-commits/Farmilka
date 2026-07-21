@@ -48,6 +48,8 @@ export interface Player extends BaseEntity {
   hats: string[];
   /** equipped hat id */
   hat: string | null;
+  /** account prestige level (0 = none) */
+  prestige: number;
   /** spawn protection: damage-immune until this time; broken by attacking */
   invulnUntil: number;
   /** account name when logged in, null for guests */

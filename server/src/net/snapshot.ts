@@ -2,6 +2,7 @@ import type { EntityState, EntityDelta, SnapshotMsg, SelfState } from '@shared/p
 import { getBalance } from '../game/balance.js';
 import type { World } from '../game/world.js';
 import type { Entity, Player } from '../game/entities.js';
+import { nextPrestigeCost } from '../game/prestige.js';
 
 function fullState(e: Entity): EntityState {
   const s: EntityState = {
@@ -19,6 +20,7 @@ function fullState(e: Entity): EntityState {
       s.name = e.name;
       s.weapon = e.equipped;
       s.hat = e.hat;
+      s.prestige = e.prestige;
       if (e.invulnUntil > Date.now()) s.prot = true;
       break;
     case 'mob':
@@ -76,6 +78,7 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
           d.weapon = e.equipped;
           d.prot = e.invulnUntil > world.time;
           d.hat = e.hat;
+          d.prestige = e.prestige;
         }
       }
       upd.push(d);
@@ -101,6 +104,8 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     buildings: p.buildingIds.size,
     hats: p.hats,
     hat: p.hat,
+    prestige: p.prestige,
+    prestigeCost: nextPrestigeCost(p),
     food: p.food,
     foodIn: Math.max(0, Math.round((p.foodReadyAt - world.time) / 100) / 10),
     protIn: Math.max(0, Math.round((p.invulnUntil - world.time) / 100) / 10),

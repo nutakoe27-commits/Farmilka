@@ -1,5 +1,6 @@
 import type { WeaponId, MobId, BossId, BuildingId } from './types.js';
 import type { BiomeId } from './biomes.js';
+import type { PrestigeCfg } from './prestige.js';
 
 export interface WeaponCfg {
   type: 'melee' | 'ranged';
@@ -131,6 +132,7 @@ export interface Balance {
     despawnSec: number;
   };
   hats: HatsCfg;
+  prestige: PrestigeCfg;
   economy: {
     maxBuildingsPerPlayer: number;
     buildingMinDist: number;
@@ -240,6 +242,16 @@ export function validateBalance(raw: unknown): Balance {
     if (typeof h.effect !== 'object' || h.effect === null) throw new Error(`balance: hats.items.${id}.effect must be an object`);
     for (const [ek, ev] of Object.entries(h.effect as Record<string, unknown>)) {
       if (typeof ev !== 'number' || !Number.isFinite(ev)) throw new Error(`balance: hats.items.${id}.effect.${ek} must be a number`);
+    }
+  }
+
+  const prestige = section(root, 'prestige');
+  for (const k of ['baseCost', 'growth', 'maxLevel']) num(prestige, k, 'prestige', k === 'growth' ? 1.01 : 1);
+  if (!Array.isArray(prestige.tiers) || prestige.tiers.length === 0) throw new Error('balance: prestige.tiers must be a non-empty array');
+  for (const t of prestige.tiers as Record<string, unknown>[]) {
+    num(t, 'atLevel', 'prestige.tier', 1);
+    for (const k of ['name', 'color', 'aura']) {
+      if (typeof t[k] !== 'string' || !t[k]) throw new Error(`balance: prestige.tier.${k} must be a string`);
     }
   }
 

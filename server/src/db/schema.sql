@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   weapons TEXT NOT NULL DEFAULT '["fists"]',
   hats TEXT NOT NULL DEFAULT '[]',
   hat TEXT,
+  prestige INTEGER NOT NULL DEFAULT 0,
   created_ts INTEGER NOT NULL,
   last_seen_ts INTEGER NOT NULL
 );

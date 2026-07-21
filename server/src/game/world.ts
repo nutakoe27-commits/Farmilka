@@ -131,7 +131,7 @@ export class World {
     return { x: (pos.x + c) / 2, y: (pos.y + c) / 2 };
   }
 
-  spawnPlayer(name: string, ws: WebSocket, account?: { name: string; money: number; weapons: WeaponId[]; hats: string[]; hat: string | null }): Player {
+  spawnPlayer(name: string, ws: WebSocket, account?: { name: string; money: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number }): Player {
     const bal = getBalance();
     const pos = this.spawnPoint();
     const weapons: WeaponId[] = account ? [...account.weapons] : ['fists'];
@@ -159,6 +159,7 @@ export class World {
       foodReadyAt: 0,
       hats: account ? [...account.hats] : [],
       hat: account ? account.hat : null,
+      prestige: account ? account.prestige : 0,
       invulnUntil: Date.now() + bal.player.spawnProtectSec * 1000,
       account: account ? account.name : null,
       attackReadyAt: 0,
@@ -286,11 +287,24 @@ export class World {
     return proj;
   }
 
+  /**
+   * Marks an entity's state as changed so the next snapshot emits a delta with
+   * its stateful fields. Changes made OUTSIDE the tick (WebSocket message
+   * handlers: buy/equip/eat/prestige) must target the NEXT tick, otherwise the
+   * delta condition (dirtyTick === tickNo) would miss them by one tick.
+   */
+  markDirty(e: { dirtyTick: number }): void {
+    e.dirtyTick = this.inTick ? this.tickNo : this.tickNo + 1;
+  }
+
   // ---------- tick ----------
+
+  private inTick = false;
 
   tick(now: number, dt: number): void {
     this.tickNo++;
     this.time = now;
+    this.inTick = true;
     updatePlayers(this, dt, now);
     updateMobs(this, dt, now);
     updateBossTimers(this, now);
@@ -298,6 +312,7 @@ export class World {
     updateProjectiles(this, dt, now);
     updateBuildings(this, dt, now);
     updateCoins(this, now);
+    this.inTick = false;
   }
 
   connectedPlayers(): Player[] {

@@ -11,6 +11,7 @@ import type { Player } from '../game/entities.js';
 import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip } from '../game/economy.js';
 import { tryPlaceBuilding, removePlayerBuildings } from '../game/buildings.js';
 import { tryLootbox, tryEquipHat, applyHatMaxHp } from '../game/hats.js';
+import { tryPrestige } from '../game/prestige.js';
 import { telemetry } from '../db/telemetry.js';
 import { accountExists, login, register, saveProgress, type Account } from '../db/accounts.js';
 import { adminRouter } from '../admin/stats.js';
@@ -131,6 +132,7 @@ export function startServer(worlds: World[]): http.Server {
             price: bal.food.price,
           },
           hats: { items: bal.hats.items, lootboxPrice: bal.hats.lootboxPrice, dupGold: bal.hats.dupGold },
+          prestige: bal.prestige,
           economy: { sellFrac: bal.economy.sellFrac },
           maxBuildings: bal.economy.maxBuildingsPerPlayer,
         };
@@ -174,6 +176,11 @@ export function startServer(worlds: World[]): http.Server {
           if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'lootbox', reason: res.reason });
           break;
         }
+        case 'prestige': {
+          const res = tryPrestige(world, player);
+          if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'prestige', reason: res.reason });
+          break;
+        }
         case 'equipHat': {
           tryEquipHat(world, player, typeof msg.hat === 'string' ? msg.hat : null);
           break;
@@ -207,7 +214,7 @@ export function startServer(worlds: World[]): http.Server {
       // account progress (gold + weapons + hats) survives the session
       if (player.account) {
         try {
-          saveProgress(player.account, player.money, player.weapons, player.hats, player.hat);
+          saveProgress(player.account, player.money, player.weapons, player.hats, player.hat, player.prestige);
         } catch (err) {
           console.error('[auth] progress save failed', err);
         }

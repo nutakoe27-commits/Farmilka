@@ -431,6 +431,49 @@
       }
     }
   },
+  "prestige": {
+    "baseCost": 3000,
+    "growth": 1.5,
+    "maxLevel": 60,
+    "tiers": [
+      {
+        "atLevel": 1,
+        "name": "Бронза",
+        "color": "#c88a4a",
+        "aura": "#c88a4a"
+      },
+      {
+        "atLevel": 5,
+        "name": "Серебро",
+        "color": "#c4cdd8",
+        "aura": "#c4cdd8"
+      },
+      {
+        "atLevel": 10,
+        "name": "Золото",
+        "color": "#ffd76e",
+        "aura": "#ffd76e"
+      },
+      {
+        "atLevel": 20,
+        "name": "Платина",
+        "color": "#6ee8e0",
+        "aura": "#6ee8e0"
+      },
+      {
+        "atLevel": 35,
+        "name": "Алмаз",
+        "color": "#9ecbff",
+        "aura": "#9ecbff"
+      },
+      {
+        "atLevel": 50,
+        "name": "Легенда",
+        "color": "#d88bff",
+        "aura": "#e0a0ff"
+      }
+    ]
+  },
   "economy": {
     "maxBuildingsPerPlayer": 5,
     "buildingMinDist": 100,

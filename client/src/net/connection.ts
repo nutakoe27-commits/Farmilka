@@ -98,6 +98,7 @@ export class Connection {
       if (d.weapon !== undefined) r.state.weapon = d.weapon;
       if (d.prot !== undefined) r.state.prot = d.prot;
       if (d.hat !== undefined) r.state.hat = d.hat;
+      if (d.prestige !== undefined) r.state.prestige = d.prestige;
       r.buf.push({ t: s.time, x: d.x, y: d.y, angle: d.angle ?? r.state.angle });
       if (r.buf.length > 12) r.buf.shift();
     }

@@ -44,7 +44,7 @@ export function applyHatMaxHp(world: World, p: Player): void {
   if (newMax !== p.maxHp) {
     p.maxHp = newMax;
     p.hp = Math.min(p.hp, p.maxHp);
-    p.dirtyTick = world.tickNo;
+    world.markDirty(p);
   }
 }
 
@@ -74,7 +74,7 @@ export function tryEquipHat(world: World, p: Player, hatId: string | null): void
   if (p.hat === hatId) return;
   p.hat = hatId;
   applyHatMaxHp(world, p);
-  p.dirtyTick = world.tickNo;
+  world.markDirty(p);
 }
 
 export function tryLootbox(world: World, p: Player): { ok: boolean; reason?: string } {

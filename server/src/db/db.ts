@@ -18,6 +18,7 @@ export function openDb(): Database.Database {
   for (const ddl of [
     "ALTER TABLE accounts ADD COLUMN hats TEXT NOT NULL DEFAULT '[]'",
     'ALTER TABLE accounts ADD COLUMN hat TEXT',
+    'ALTER TABLE accounts ADD COLUMN prestige INTEGER NOT NULL DEFAULT 0',
   ]) {
     try {
       db.exec(ddl);

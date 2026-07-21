@@ -19,7 +19,7 @@ export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boo
   p.money -= cfg.price;
   p.weapons.push(item);
   p.equipped = item;
-  p.dirtyTick = world.tickNo;
+  world.markDirty(p);
   telemetry.purchase(p.name, item, cfg.price);
   return { ok: true };
 }
@@ -45,7 +45,7 @@ export function trySellWeapon(world: World, p: Player, weapon: WeaponId): { ok: 
   p.weapons.splice(idx, 1);
   if (p.equipped === weapon) p.equipped = 'fists';
   p.money += refund;
-  p.dirtyTick = world.tickNo;
+  world.markDirty(p);
   telemetry.purchase(p.name, `sell:${weapon}`, -refund);
   return { ok: true };
 }
@@ -68,7 +68,7 @@ export function tryEat(world: World, p: Player, now: number): void {
   p.foodReadyAt = now + bal.food.cooldownSec * 1000;
   const healed = Math.min(bal.food.heal * hatEffects(p.hat).foodHealMult, p.maxHp - p.hp);
   p.hp += healed;
-  p.dirtyTick = world.tickNo;
+  world.markDirty(p);
   telemetry.heal(p.name, healed);
   world.sendEvent(p, { e: 'heal', amount: Math.round(healed) });
 }
@@ -76,7 +76,7 @@ export function tryEat(world: World, p: Player, now: number): void {
 export function tryEquip(world: World, p: Player, weapon: WeaponId): void {
   if (p.weapons.includes(weapon) && p.equipped !== weapon) {
     p.equipped = weapon;
-    p.dirtyTick = world.tickNo;
+    world.markDirty(p);
   }
 }
 
