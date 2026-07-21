@@ -29,7 +29,12 @@ export function performAttack(world: World, p: Player, w: WeaponCfg, now: number
     const speed = w.projSpeed ?? 600;
     const sx = p.x + Math.cos(p.angle) * (p.radius + 10);
     const sy = p.y + Math.sin(p.angle) * (p.radius + 10);
-    world.spawnProjectile(p.id, 'player', p.equipped, sx, sy, p.angle, speed, w.damage * dmgMult, w.range);
+    const count = Math.max(1, Math.floor(w.projectiles ?? 1));
+    const spread = ((w.spreadDeg ?? 0) * Math.PI) / 180;
+    for (let i = 0; i < count; i++) {
+      const offset = count > 1 ? (i / (count - 1) - 0.5) * spread : 0;
+      world.spawnProjectile(p.id, 'player', p.equipped, sx, sy, p.angle + offset, speed, w.damage * dmgMult, w.range);
+    }
     return;
   }
   // melee: arc in front of the player
@@ -41,14 +46,72 @@ export function performAttack(world: World, p: Player, w: WeaponCfg, now: number
     if (d > w.range + t.radius) continue;
     const ang = Math.atan2(t.y - p.y, t.x - p.x);
     if (Math.abs(angleDiff(ang, p.angle)) > arcRad / 2) continue;
+    let dmg = w.damage * dmgMult;
+    // backstab: the hit direction roughly matches the victim's own facing
+    if (w.backstabMult && (t.kind === 'player' || t.kind === 'mob') && Math.abs(angleDiff(ang, t.angle)) < Math.PI * 0.42) {
+      dmg *= w.backstabMult;
+    }
     const src: DamageSource = { id: p.id, name: p.name, weapon: p.equipped, cause: 'player' };
-    const hit = applyDamage(world, t, w.damage * dmgMult, src, now, d);
+    const hit = applyDamage(world, t, dmg, src, now, d);
+    if (hit) applyWeaponOnHit(world, p, t, w, dmg, now);
     // Knockback only a still-living target — a dead one has already been removed
     // from the world, and moveEntity would re-insert it into the grid as a 0-HP ghost.
     if (hit && !t.dead && w.knockback && t.kind !== 'building' && t.kind !== 'boss') {
       world.moveEntity(t, t.x + Math.cos(ang) * w.knockback, t.y + Math.sin(ang) * w.knockback);
     }
   }
+}
+
+/**
+ * Weapon side-effects that trigger on a successful hit: poison DoT, chill slow
+ * and lifesteal. Bosses are immune to chill; buildings take none of these.
+ */
+export function applyWeaponOnHit(world: World, attacker: Player | null, target: Entity, w: WeaponCfg, dealt: number, now: number): void {
+  if (attacker && w.lifestealFrac && !attacker.dead && attacker.hp < attacker.maxHp) {
+    attacker.hp = Math.min(attacker.maxHp, attacker.hp + dealt * w.lifestealFrac);
+    world.markDirty(attacker);
+  }
+  if (target.dead) return;
+  if (target.kind === 'player' || target.kind === 'mob') {
+    if (w.poison && attacker) {
+      target.poisonUntil = now + w.poison.durationSec * 1000;
+      target.poisonDps = Math.max(target.poisonDps, w.poison.dps);
+      if (target.poisonNextAt < now) target.poisonNextAt = now + 1000;
+      target.poisonSrc = { id: attacker.id, name: attacker.name, weapon: attacker.equipped };
+      world.markDirty(target);
+    }
+    if (w.chill) {
+      target.chillUntil = now + w.chill.durationSec * 1000;
+      target.chillFactor = w.chill.slowFactor;
+      world.markDirty(target);
+    }
+  }
+}
+
+/** Ticks poison (1 hit/sec) and expires statuses; shared by players and mobs. */
+export function tickStatus(world: World, e: Player | Mob, now: number): void {
+  if (e.poisonUntil !== 0) {
+    if (now >= e.poisonNextAt && e.poisonSrc) {
+      e.poisonNextAt = now + 1000;
+      applyDamage(world, e, e.poisonDps, { ...e.poisonSrc, cause: 'player' }, now, 0);
+    }
+    if (now >= e.poisonUntil) {
+      e.poisonUntil = 0;
+      e.poisonDps = 0;
+      e.poisonSrc = null;
+      world.markDirty(e);
+    }
+  }
+  if (e.chillUntil !== 0 && now >= e.chillUntil) {
+    e.chillUntil = 0;
+    e.chillFactor = 1;
+    world.markDirty(e);
+  }
+}
+
+/** Movement slow multiplier from an active chill. */
+export function chillSpeedFactor(e: Player | Mob, now: number): number {
+  return e.chillUntil > now ? e.chillFactor : 1;
 }
 
 /**
@@ -75,6 +138,12 @@ export function applyDamage(
     if (target.ownerId === src.id) return false; // cannot damage own buildings
   }
   if (target.kind === 'mob' && src.cause !== 'player') return false;
+
+  // hat bonus that only applies against bosses (PvE, PvP-safe)
+  if (target.kind === 'boss' && src.cause === 'player') {
+    const attacker = world.players.get(src.id);
+    if (attacker) amount *= hatEffects(attacker.hat).bossDmgMult;
+  }
 
   target.hp -= amount;
   target.dirtyTick = world.tickNo;
@@ -125,7 +194,8 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
 
   switch (target.kind) {
     case 'player': {
-      const dropped = Math.floor(target.money * bal.player.dropMoneyFrac);
+      const victimFx = hatEffects(target.hat);
+      const dropped = Math.floor(target.money * bal.player.dropMoneyFrac * (1 - victimFx.dropSaveFrac));
       target.money -= dropped;
       world.spawnCoinPiles(target.x, target.y, dropped);
       // death is harsh: purchased weapons and carried food are lost too
@@ -134,7 +204,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       target.equipped = 'fists';
       target.food = 0;
       target.dead = true;
-      target.respawnAt = now + bal.player.respawnSec * 1000;
+      target.respawnAt = now + bal.player.respawnSec * 1000 * victimFx.respawnMult;
       target.session.deaths++;
       world.removeEntity(target);
       telemetry.death(target.name, src.cause, src.weapon, equippedAtDeath, dropped);
@@ -149,12 +219,14 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       target.dead = true;
       world.removeEntity(target);
       world.mobRespawnQueue.push({ mobType: target.mobType, at: now + 10_000 });
-      if (killerPlayer && !killerPlayer.dead) {
-        killerPlayer.money += cfg.reward;
-        killerPlayer.session.moneyEarned += cfg.reward;
-        telemetry.income(killerPlayer.name, 'mob', cfg.reward);
+      const killerFx = killerPlayer ? hatEffects(killerPlayer.hat) : null;
+      if (killerPlayer && !killerPlayer.dead && killerFx) {
+        const reward = Math.round(cfg.reward * killerFx.mobRewardMult);
+        killerPlayer.money += reward;
+        killerPlayer.session.moneyEarned += reward;
+        telemetry.income(killerPlayer.name, 'mob', reward);
       }
-      if (Math.random() < bal.food.dropChance) {
+      if (Math.random() < bal.food.dropChance * (killerFx ? killerFx.foodFindMult : 1)) {
         world.spawnFood(target.x, target.y);
       }
       // common hats drop from mobs with a small chance
@@ -214,6 +286,13 @@ export function updateProjectiles(world: World, dt: number, now: number): void {
         proj.ownerKind === 'boss' ? 'Boss' : world.players.get(proj.ownerId)?.name ?? proj.weapon;
       const src: DamageSource = { id: proj.ownerId, name: ownerName, weapon: proj.weapon, cause };
       if (applyDamage(world, t, proj.damage, src, now, proj.traveled)) {
+        if (proj.ownerKind === 'player') {
+          const wcfg = (getBalance().weapons as Record<string, WeaponCfg | undefined>)[proj.weapon];
+          if (wcfg) {
+            const owner = world.players.get(proj.ownerId) ?? null;
+            applyWeaponOnHit(world, owner, t, wcfg, proj.damage, now);
+          }
+        }
         hit = true;
         break;
       }

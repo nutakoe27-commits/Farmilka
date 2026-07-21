@@ -12,6 +12,18 @@ export interface WeaponCfg {
   knockback?: number;
   projSpeed?: number;
   slowFactor?: number;
+  /** melee: damage multiplier when hitting a target from behind */
+  backstabMult?: number;
+  /** fraction of dealt damage returned as HP to the attacker */
+  lifestealFrac?: number;
+  /** ranged: number of projectiles per shot (default 1) */
+  projectiles?: number;
+  /** ranged: total fan spread in degrees for multi-projectile shots */
+  spreadDeg?: number;
+  /** damage-over-time applied on hit (refreshes, does not stack) */
+  poison?: { dps: number; durationSec: number };
+  /** movement slow applied on hit (bosses are immune) */
+  chill?: { slowFactor: number; durationSec: number };
 }
 
 export interface MobCfg {
@@ -87,6 +99,18 @@ export interface HatCfg {
     foodHealMult?: number;
     incomeMult?: number;
     regenMult?: number;
+    /** extra coin pickup radius */
+    coinMagnetAdd?: number;
+    /** multiplier on mob food-drop chance */
+    foodFindMult?: number;
+    /** multiplier on mob kill rewards (PvE only) */
+    mobRewardMult?: number;
+    /** multiplier on respawn time (0.5 = twice as fast) */
+    respawnMult?: number;
+    /** fraction of the death money-drop that is kept instead */
+    dropSaveFrac?: number;
+    /** damage multiplier against bosses only (PvE) */
+    bossDmgMult?: number;
   };
 }
 
@@ -143,7 +167,10 @@ export interface Balance {
   };
 }
 
-const WEAPON_IDS: WeaponId[] = ['fists', 'sword', 'spear', 'hammer', 'bow', 'crossbow'];
+export const WEAPON_IDS: WeaponId[] = [
+  'fists', 'sword', 'spear', 'hammer', 'bow', 'crossbow',
+  'daggers', 'scythe', 'venom_blade', 'vampire_blade', 'triple_bow', 'ice_staff',
+];
 export const MOB_IDS: MobId[] = ['slime', 'wolf', 'ice_slime', 'yeti', 'scorpion', 'sand_golem', 'shade', 'treant', 'wisp', 'crystal_golem'];
 export const BOSS_IDS: BossId[] = ['champion', 'shadow_lord', 'crystal_queen'];
 const BUILDING_IDS: BuildingId[] = ['farm', 'mine', 'turret'];
@@ -187,6 +214,16 @@ export function validateBalance(raw: unknown): Balance {
     for (const k of ['damage', 'range', 'attackRate', 'price']) num(w, k, `weapons.${id}`);
     if (w.type === 'melee') num(w, 'arc', `weapons.${id}`, 1);
     if (w.type === 'ranged') num(w, 'projSpeed', `weapons.${id}`, 1);
+    if (w.poison !== undefined) {
+      const po = section(w, 'poison');
+      num(po, 'dps', `weapons.${id}.poison`);
+      num(po, 'durationSec', `weapons.${id}.poison`);
+    }
+    if (w.chill !== undefined) {
+      const ch = section(w, 'chill');
+      num(ch, 'slowFactor', `weapons.${id}.chill`, 0.05);
+      num(ch, 'durationSec', `weapons.${id}.chill`);
+    }
   }
 
   const mobs = section(root, 'mobs');

@@ -4,6 +4,11 @@ import type { World } from '../game/world.js';
 import type { Entity, Player } from '../game/entities.js';
 import { nextPrestigeCost } from '../game/prestige.js';
 
+function statusFx(e: { poisonUntil: number; chillUntil: number }): number {
+  const now = Date.now();
+  return (e.poisonUntil > now ? 1 : 0) | (e.chillUntil > now ? 2 : 0);
+}
+
 function fullState(e: Entity): EntityState {
   const s: EntityState = {
     id: e.id,
@@ -21,12 +26,14 @@ function fullState(e: Entity): EntityState {
       s.weapon = e.equipped;
       s.hat = e.hat;
       s.prestige = e.prestige;
+      s.fx = statusFx(e);
       if (e.invulnUntil > Date.now()) s.prot = true;
       break;
     case 'mob':
       s.hp = Math.round(e.hp);
       s.maxHp = e.maxHp;
       s.mobType = e.mobType;
+      s.fx = statusFx(e);
       break;
     case 'boss':
       s.hp = Math.round(e.hp);
@@ -79,6 +86,9 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
           d.prot = e.invulnUntil > world.time;
           d.hat = e.hat;
           d.prestige = e.prestige;
+          d.fx = statusFx(e);
+        } else if (e.kind === 'mob') {
+          d.fx = statusFx(e);
         }
       }
       upd.push(d);
@@ -109,6 +119,7 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     food: p.food,
     foodIn: Math.max(0, Math.round((p.foodReadyAt - world.time) / 100) / 10),
     protIn: Math.max(0, Math.round((p.invulnUntil - world.time) / 100) / 10),
+    chill: p.chillUntil > world.time ? p.chillFactor : 1,
   };
   if (p.dead && p.respawnAt) {
     self.respawnIn = Math.max(0, (p.respawnAt - world.time) / 1000);

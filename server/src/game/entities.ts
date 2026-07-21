@@ -19,6 +19,20 @@ export interface BaseEntity {
   dirtyTick: number;
 }
 
+/** Poison/chill status shared by players and mobs. */
+export interface StatusEffects {
+  poisonUntil: number;
+  poisonDps: number;
+  poisonNextAt: number;
+  poisonSrc: { id: string; name: string; weapon: string } | null;
+  chillUntil: number;
+  chillFactor: number;
+}
+
+export function freshStatus(): StatusEffects {
+  return { poisonUntil: 0, poisonDps: 0, poisonNextAt: 0, poisonSrc: null, chillUntil: 0, chillFactor: 1 };
+}
+
 export interface PlayerInput {
   seq: number;
   mx: number;
@@ -34,7 +48,7 @@ export interface SessionStats {
   moneyEarned: number;
 }
 
-export interface Player extends BaseEntity {
+export interface Player extends BaseEntity, StatusEffects {
   kind: 'player';
   name: string;
   ws: WebSocket | null;
@@ -65,7 +79,7 @@ export interface Player extends BaseEntity {
 
 export type MobState = 'idle' | 'wander' | 'chase' | 'return' | 'flee';
 
-export interface Mob extends BaseEntity {
+export interface Mob extends BaseEntity, StatusEffects {
   kind: 'mob';
   mobType: MobId;
   state: MobState;

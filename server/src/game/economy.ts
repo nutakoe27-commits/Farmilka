@@ -1,12 +1,11 @@
 import { dist } from '@shared/math.js';
 import type { WeaponId, BuildingId } from '@shared/types.js';
+import { WEAPON_IDS } from '@shared/balance-schema.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Player } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { hatEffects } from './hats.js';
-
-const WEAPON_IDS: WeaponId[] = ['fists', 'sword', 'spear', 'hammer', 'bow', 'crossbow'];
 
 export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boolean; reason?: string } {
   const bal = getBalance();
@@ -89,14 +88,15 @@ export function updateCoins(world: World, now: number): void {
   for (const food of [...world.foods.values()]) {
     if (now >= food.despawnAt) world.removeEntity(food);
   }
-  const pickupR = Math.max(bal.economy.coinPickupRadius, bal.food.pickupRadius);
   for (const p of world.players.values()) {
     if (p.dead || !p.ws) continue;
+    const magnet = hatEffects(p.hat).coinMagnetAdd;
+    const pickupR = Math.max(bal.economy.coinPickupRadius + magnet, bal.food.pickupRadius);
     const near = world.grid.queryCircle(p.x, p.y, pickupR + 20);
     for (const e of near) {
       if (e.dead) continue;
       if (e.kind === 'coin') {
-        if (dist(p.x, p.y, e.x, e.y) > bal.economy.coinPickupRadius + p.radius) continue;
+        if (dist(p.x, p.y, e.x, e.y) > bal.economy.coinPickupRadius + magnet + p.radius) continue;
         world.removeEntity(e);
         e.dead = true;
         p.money += e.value;

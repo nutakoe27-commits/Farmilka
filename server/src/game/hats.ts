@@ -11,9 +11,18 @@ export interface HatEffects {
   foodHealMult: number;
   incomeMult: number;
   regenMult: number;
+  coinMagnetAdd: number;
+  foodFindMult: number;
+  mobRewardMult: number;
+  respawnMult: number;
+  dropSaveFrac: number;
+  bossDmgMult: number;
 }
 
-const NO_EFFECTS: HatEffects = { speedMult: 1, maxHpAdd: 0, damageMult: 1, foodHealMult: 1, incomeMult: 1, regenMult: 1 };
+const NO_EFFECTS: HatEffects = {
+  speedMult: 1, maxHpAdd: 0, damageMult: 1, foodHealMult: 1, incomeMult: 1, regenMult: 1,
+  coinMagnetAdd: 0, foodFindMult: 1, mobRewardMult: 1, respawnMult: 1, dropSaveFrac: 0, bossDmgMult: 1,
+};
 
 export function hatEffects(hatId: string | null): HatEffects {
   if (!hatId) return NO_EFFECTS;
@@ -26,6 +35,12 @@ export function hatEffects(hatId: string | null): HatEffects {
     foodHealMult: cfg.effect.foodHealMult ?? 1,
     incomeMult: cfg.effect.incomeMult ?? 1,
     regenMult: cfg.effect.regenMult ?? 1,
+    coinMagnetAdd: cfg.effect.coinMagnetAdd ?? 0,
+    foodFindMult: cfg.effect.foodFindMult ?? 1,
+    mobRewardMult: cfg.effect.mobRewardMult ?? 1,
+    respawnMult: cfg.effect.respawnMult ?? 1,
+    dropSaveFrac: cfg.effect.dropSaveFrac ?? 0,
+    bossDmgMult: cfg.effect.bossDmgMult ?? 1,
   };
 }
 

@@ -1,6 +1,8 @@
 export type EntityKind = 'player' | 'mob' | 'boss' | 'projectile' | 'coin' | 'building' | 'food';
 
-export type WeaponId = 'fists' | 'sword' | 'spear' | 'hammer' | 'bow' | 'crossbow';
+export type WeaponId =
+  | 'fists' | 'sword' | 'spear' | 'hammer' | 'bow' | 'crossbow'
+  | 'daggers' | 'scythe' | 'venom_blade' | 'vampire_blade' | 'triple_bow' | 'ice_staff';
 export type MobId =
   | 'slime' | 'wolf'                 // normal
   | 'ice_slime' | 'yeti'             // snow

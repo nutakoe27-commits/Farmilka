@@ -4,8 +4,9 @@ import { MOB_IDS } from '@shared/balance-schema.js';
 import { biomeRect, randomPointInBiome } from '@shared/biomes.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
+import { freshStatus } from './entities.js';
 import type { Mob, Player } from './entities.js';
-import { applyDamage } from './combat.js';
+import { applyDamage, tickStatus, chillSpeedFactor } from './combat.js';
 
 export function spawnMob(world: World, mobType: MobId): Mob {
   const bal = getBalance();
@@ -33,6 +34,7 @@ export function spawnMob(world: World, mobType: MobId): Mob {
     nextThinkAt: 0,
     attackReadyAt: 0,
     fleeUntil: 0,
+    ...freshStatus(),
   };
   world.addEntity(mob);
   return mob;
@@ -61,8 +63,11 @@ export function updateMobs(world: World, dt: number, now: number): void {
     spawnMob(world, item.mobType);
   }
 
-  for (const mob of world.mobs.values()) {
+  for (const mob of [...world.mobs.values()]) {
     const cfg = bal.mobs[mob.mobType];
+
+    tickStatus(world, mob, now);
+    if (mob.dead) continue; // poison kill
 
     // slow "think" pass: state transitions & aggro scans
     if (now >= mob.nextThinkAt) {
@@ -112,6 +117,9 @@ export function updateMobs(world: World, dt: number, now: number): void {
     }
 
     if (vx !== 0 || vy !== 0) {
+      const chill = chillSpeedFactor(mob, now);
+      vx *= chill;
+      vy *= chill;
       // mobs stay inside their home biome — keeps biome identity crisp
       const rect = biomeRect(cfg.biome, bal.world.size);
       const nx = clamp(mob.x + vx * dt, rect.x0 + mob.radius, rect.x1 - mob.radius);

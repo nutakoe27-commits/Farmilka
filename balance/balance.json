@@ -71,6 +71,72 @@
       "attackRate": 0.45,
       "price": 800,
       "slowFactor": 0.85
+    },
+    "daggers": {
+      "type": "melee",
+      "damage": 10,
+      "range": 55,
+      "arc": 80,
+      "attackRate": 2.5,
+      "price": 150,
+      "knockback": 0,
+      "backstabMult": 2.5
+    },
+    "venom_blade": {
+      "type": "melee",
+      "damage": 10,
+      "range": 70,
+      "arc": 90,
+      "attackRate": 1.4,
+      "price": 450,
+      "knockback": 0,
+      "poison": {
+        "dps": 6,
+        "durationSec": 4
+      }
+    },
+    "scythe": {
+      "type": "melee",
+      "damage": 24,
+      "range": 85,
+      "arc": 360,
+      "attackRate": 0.8,
+      "price": 550,
+      "knockback": 0
+    },
+    "triple_bow": {
+      "type": "ranged",
+      "damage": 10,
+      "range": 600,
+      "projSpeed": 550,
+      "attackRate": 0.9,
+      "price": 600,
+      "slowFactor": 0.75,
+      "projectiles": 3,
+      "spreadDeg": 18
+    },
+    "vampire_blade": {
+      "type": "melee",
+      "damage": 20,
+      "range": 75,
+      "arc": 90,
+      "attackRate": 1.3,
+      "price": 700,
+      "knockback": 0,
+      "lifestealFrac": 0.2
+    },
+    "ice_staff": {
+      "type": "ranged",
+      "damage": 12,
+      "range": 650,
+      "projSpeed": 500,
+      "attackRate": 0.8,
+      "price": 750,
+      "slowFactor": 0.8,
+      "chill": {
+        "slowFactor": 0.65,
+        "durationSec": 1.5
+      }
     }
   },
   "mobs": {
@@ -427,6 +493,50 @@
         "effect": {
           "regenMult": 3.0,
           "maxHpAdd": 25
+        }
+      },
+      "bandana": {
+        "name": "Бандана",
+        "tier": "common",
+        "effect": {
+          "coinMagnetAdd": 45
+        }
+      },
+      "chef_hat": {
+        "name": "Поварской колпак",
+        "tier": "common",
+        "effect": {
+          "foodFindMult": 1.6
+        }
+      },
+      "hunter_hood": {
+        "name": "Капюшон охотника",
+        "tier": "rare",
+        "effect": {
+          "mobRewardMult": 1.2
+        }
+      },
+      "skull_mask": {
+        "name": "Череп-маска",
+        "tier": "rare",
+        "effect": {
+          "respawnMult": 0.5
+        }
+      },
+      "titan_guard": {
+        "name": "Шлем титана",
+        "tier": "epic",
+        "effect": {
+          "dropSaveFrac": 0.2,
+          "maxHpAdd": 15
+        }
+      },
+      "slayer_crown": {
+        "name": "Венец истребителя",
+        "tier": "legendary",
+        "effect": {
+          "bossDmgMult": 1.3,
+          "mobRewardMult": 1.2
         }
       }
     }

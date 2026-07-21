@@ -7,6 +7,8 @@ const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 const WEAPON_NOTES: Record<string, string> = {
   sword: 'база', spear: 'длинный укол', hammer: 'медленный, AoE + отброс', bow: 'дальний бой', crossbow: 'снайпер',
+  daggers: 'быстрые · удар в спину ×2.5', scythe: 'бьёт вокруг на 360°', venom_blade: 'отравляет: урон со временем',
+  vampire_blade: 'вампиризм: лечит за урон', triple_bow: '3 стрелы веером', ice_staff: 'замораживает: замедляет цель',
 };
 const BUILDING_NOTES: Record<string, string> = {
   farm: 'пассивный доход', mine: 'больше дохода', turret: 'стреляет по врагам',
@@ -20,6 +22,12 @@ function describeEffect(effect: Record<string, number | undefined>): string {
   if (effect.foodHealMult) parts.push(`+${Math.round((effect.foodHealMult - 1) * 100)}% лечение едой`);
   if (effect.incomeMult) parts.push(`+${Math.round((effect.incomeMult - 1) * 100)}% доход построек`);
   if (effect.regenMult) parts.push(`×${effect.regenMult} реген`);
+  if (effect.coinMagnetAdd) parts.push(`+${effect.coinMagnetAdd} радиус сбора монет`);
+  if (effect.foodFindMult) parts.push(`+${Math.round((effect.foodFindMult - 1) * 100)}% шанс еды с мобов`);
+  if (effect.mobRewardMult) parts.push(`+${Math.round((effect.mobRewardMult - 1) * 100)}% награда с мобов`);
+  if (effect.respawnMult) parts.push(`×${effect.respawnMult} время возрождения`);
+  if (effect.dropSaveFrac) parts.push(`−${Math.round(effect.dropSaveFrac * 100)}% потеря денег при смерти`);
+  if (effect.bossDmgMult) parts.push(`+${Math.round((effect.bossDmgMult - 1) * 100)}% урон боссам`);
   return parts.join(' · ') || 'без эффекта';
 }
 

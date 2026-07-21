@@ -5,6 +5,7 @@ import { clamp, dist } from '@shared/math.js';
 import { randomPointInBiome } from '@shared/biomes.js';
 import { getBalance } from './balance.js';
 import { SpatialGrid } from './grid.js';
+import { freshStatus } from './entities.js';
 import type { Entity, Player, Mob, Boss, Projectile, Coin, Food, Building } from './entities.js';
 import { updatePlayers } from './player.js';
 import { updateMobs, populateMobs } from './mobs.js';
@@ -160,6 +161,7 @@ export class World {
       hats: account ? [...account.hats] : [],
       hat: account ? account.hat : null,
       prestige: account ? account.prestige : 0,
+      ...freshStatus(),
       invulnUntil: Date.now() + bal.player.spawnProtectSec * 1000,
       account: account ? account.name : null,
       attackReadyAt: 0,
@@ -179,6 +181,7 @@ export class World {
     const pos = this.spawnPoint();
     p.x = pos.x;
     p.y = pos.y;
+    Object.assign(p, freshStatus());
     p.hp = bal.player.hp;
     p.maxHp = bal.player.hp;
     p.dead = false;

@@ -1,7 +1,7 @@
 import { clamp } from '@shared/math.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
-import { performAttack } from './combat.js';
+import { performAttack, tickStatus, chillSpeedFactor } from './combat.js';
 import { hatEffects } from './hats.js';
 
 export function updatePlayers(world: World, dt: number, now: number): void {
@@ -21,9 +21,12 @@ export function updatePlayers(world: World, dt: number, now: number): void {
       mx /= len;
       my /= len;
     }
+    tickStatus(world, p, now);
+    if (p.dead) continue; // poison may have just killed them
+
     const w = bal.weapons[p.equipped];
     const hat = hatEffects(p.hat);
-    let speed = bal.player.speed * hat.speedMult;
+    let speed = bal.player.speed * hat.speedMult * chillSpeedFactor(p, now);
     if (w.type === 'ranged' && p.input.attack && w.slowFactor) speed *= w.slowFactor;
     if (mx !== 0 || my !== 0) {
       world.moveEntity(p, p.x + mx * speed * dt, p.y + my * speed * dt);

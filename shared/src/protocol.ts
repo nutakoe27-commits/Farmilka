@@ -27,6 +27,8 @@ export interface EntityState {
   hat?: string | null;
   /** account prestige level (players) */
   prestige?: number;
+  /** status effect bitmask: 1 = poison, 2 = chill (players & mobs) */
+  fx?: number;
 }
 
 export interface EntityDelta {
@@ -40,6 +42,7 @@ export interface EntityDelta {
   prot?: boolean;
   hat?: string | null;
   prestige?: number;
+  fx?: number;
 }
 
 export interface SelfState {
@@ -60,6 +63,8 @@ export interface SelfState {
   foodIn: number;
   /** seconds of spawn protection remaining */
   protIn: number;
+  /** movement slow factor from chill (1 = no slow) — used by client prediction */
+  chill: number;
   respawnIn?: number;
 }
 

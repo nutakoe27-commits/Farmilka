@@ -12,12 +12,14 @@ function hexColor(css: string): number {
 
 export const WEAPON_ICONS: Record<string, string> = {
   fists: '👊', sword: '🗡️', spear: '🔱', hammer: '🔨', bow: '🏹', crossbow: '🎯',
+  daggers: '🔪', scythe: '🌪️', venom_blade: '🐍', vampire_blade: '🩸', triple_bow: '🪃', ice_staff: '❄️',
 };
 export const BUILDING_ICONS: Record<string, string> = { farm: '🌾', mine: '⛏️', turret: '🗼' };
 
 export const HAT_EMOJI: Record<string, string> = {
   straw_hat: '👒', cap: '🧢', miner_helmet: '⛑️', champion_crown: '👑', shadow_hood: '🎩',
   crystal_circlet: '💠', dragon_helm: '🐲', wizard_hat: '🧙', golden_crown: '👑', phoenix_plume: '🪶',
+  bandana: '🧣', chef_hat: '🍳', hunter_hood: '🐺', skull_mask: '💀', titan_guard: '🛡️', slayer_crown: '⚜️',
 };
 export const TIER_NAMES: Record<string, string> = { common: 'обычная', rare: 'редкая', epic: 'эпическая', legendary: 'легендарная' };
 export const TIER_COLORS: Record<string, string> = { common: '#9aa5b8', rare: '#4d9fff', epic: '#b565d8', legendary: '#ffd76e' };
@@ -66,6 +68,8 @@ export class EntityView {
   top = new Container(); // non-rotating: label + hp bar
   hpBar = new Graphics();
   protRing: Graphics | null = null;
+  statusRing: Graphics | null = null;
+  lastFx = 0;
   weaponText: Text | null = null;
   hatText: Text | null = null;
   nameText: Text | null = null;
@@ -87,6 +91,10 @@ export class EntityView {
     this.root.addChild(this.top);
     this.color = state.kind === 'player' ? playerColor(state.id) : 0xffffff;
     this.build(isSelf);
+    if (state.kind === 'player' || state.kind === 'mob') {
+      this.statusRing = new Graphics();
+      this.top.addChild(this.statusRing);
+    }
   }
 
   private build(isSelf: boolean): void {
@@ -266,6 +274,14 @@ export class EntityView {
     if (this.hatText && (s.hat ?? null) !== this.lastHat) {
       this.lastHat = s.hat ?? null;
       this.hatText.text = this.lastHat ? HAT_EMOJI[this.lastHat] ?? '🎩' : '';
+    }
+
+    // poison (green) / chill (cyan) status rings
+    if (this.statusRing && (s.fx ?? 0) !== this.lastFx) {
+      this.lastFx = s.fx ?? 0;
+      this.statusRing.clear();
+      if (this.lastFx & 1) this.statusRing.circle(0, 0, s.radius + 4).stroke({ width: 3, color: 0x5fd068, alpha: 0.85 });
+      if (this.lastFx & 2) this.statusRing.circle(0, 0, s.radius + 8).stroke({ width: 3, color: 0x6ee8ff, alpha: 0.85 });
     }
 
     // prestige: name colour, badge prefix, and a pulsing aura ring

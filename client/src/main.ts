@@ -176,6 +176,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     let speed = welcome.player.speed;
     const hat = conn.self?.hat;
     if (hat) speed *= welcome.hats.items[hat]?.effect.speedMult ?? 1;
+    speed *= conn.self?.chill ?? 1; // chilled by an ice weapon
     const w = welcome.weapons[(conn.self?.equipped ?? 'fists') as WeaponId];
     if (w && w.type === 'ranged' && attack && w.slowFactor) speed *= w.slowFactor;
     return speed;

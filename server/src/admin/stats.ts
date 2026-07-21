@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { getDb } from '../db/db.js';
 import { reloadBalance } from '../game/balance.js';
+import { WEAPON_IDS } from '@shared/balance-schema.js';
 import type { World } from '../game/world.js';
 
 function esc(v: unknown): string {
@@ -43,7 +44,7 @@ function playerLink(name: string, token: string): string {
   return `<a href="/admin/player?token=${encodeURIComponent(token)}&name=${encodeURIComponent(name)}">${esc(name)}</a>`;
 }
 
-const PLAYER_WEAPONS = ['fists', 'sword', 'spear', 'hammer', 'bow', 'crossbow'];
+const PLAYER_WEAPONS: string[] = WEAPON_IDS;
 
 export function adminRouter(worlds: World[]): Router {
   const router = Router();
