@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   salt TEXT NOT NULL,
   money REAL NOT NULL DEFAULT 0,
   weapons TEXT NOT NULL DEFAULT '["fists"]',
+  hats TEXT NOT NULL DEFAULT '[]',
+  hat TEXT,
   created_ts INTEGER NOT NULL,
   last_seen_ts INTEGER NOT NULL
 );

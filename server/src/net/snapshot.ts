@@ -18,6 +18,7 @@ function fullState(e: Entity): EntityState {
       s.maxHp = e.maxHp;
       s.name = e.name;
       s.weapon = e.equipped;
+      s.hat = e.hat;
       if (e.invulnUntil > Date.now()) s.prot = true;
       break;
     case 'mob':
@@ -74,6 +75,7 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
         if (e.kind === 'player') {
           d.weapon = e.equipped;
           d.prot = e.invulnUntil > world.time;
+          d.hat = e.hat;
         }
       }
       upd.push(d);
@@ -97,6 +99,8 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     weapons: p.weapons,
     equipped: p.equipped,
     buildings: p.buildingIds.size,
+    hats: p.hats,
+    hat: p.hat,
     food: p.food,
     foodIn: Math.max(0, Math.round((p.foodReadyAt - world.time) / 100) / 10),
     protIn: Math.max(0, Math.round((p.invulnUntil - world.time) / 100) / 10),

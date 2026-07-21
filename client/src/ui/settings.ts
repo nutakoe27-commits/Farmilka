@@ -11,6 +11,8 @@ const KEY = 'farmilka-settings';
 export class Settings {
   values: GameSettings = { shake: true, damageNumbers: true, killFeed: true };
   onExit: () => void = () => {};
+  /** current game server id, set after welcome */
+  currentServer = 0;
 
   constructor() {
     try {
@@ -49,6 +51,38 @@ export class Settings {
 
   show(): void {
     $('settings').classList.remove('hidden');
+    this.renderServers().catch(() => {});
+  }
+
+  private async renderServers(): Promise<void> {
+    const list = $('server-list');
+    list.innerHTML = '<span style="color:#6a7085;font-size:12px">загрузка…</span>';
+    try {
+      const servers = (await (await fetch('/servers')).json()) as { id: number; online: number; max: number }[];
+      list.innerHTML = '';
+      const auto = document.createElement('button');
+      auto.className = 'srv-btn' + (localStorage.getItem('farmilka-server') ? '' : ' current');
+      auto.textContent = 'Авто';
+      auto.onclick = () => {
+        localStorage.removeItem('farmilka-server');
+        location.reload();
+      };
+      list.appendChild(auto);
+      for (const srv of servers) {
+        const b = document.createElement('button');
+        const full = srv.online >= srv.max;
+        b.className = 'srv-btn' + (srv.id === this.currentServer ? ' current' : '') + (full ? ' full' : '');
+        b.textContent = `Сервер ${srv.id} — ${srv.online}/${srv.max}`;
+        b.onclick = () => {
+          if (full || srv.id === this.currentServer) return;
+          localStorage.setItem('farmilka-server', String(srv.id));
+          location.reload();
+        };
+        list.appendChild(b);
+      }
+    } catch {
+      list.innerHTML = '<span style="color:#ff7b72;font-size:12px">не удалось получить список серверов</span>';
+    }
   }
 
   hide(): void {

@@ -1,6 +1,6 @@
 import type { SelfState, WelcomeMsg } from '@shared/protocol.js';
 import type { WeaponId, BuildingId } from '@shared/types.js';
-import { WEAPON_ICONS, BUILDING_ICONS } from '../game/entities.js';
+import { WEAPON_ICONS, BUILDING_ICONS, HAT_EMOJI, TIER_NAMES, TIER_COLORS } from '../game/entities.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -11,6 +11,17 @@ const BUILDING_NOTES: Record<string, string> = {
   farm: 'пассивный доход', mine: 'больше дохода', turret: 'стреляет по врагам',
 };
 
+function describeEffect(effect: Record<string, number | undefined>): string {
+  const parts: string[] = [];
+  if (effect.speedMult) parts.push(`+${Math.round((effect.speedMult - 1) * 100)}% скорость`);
+  if (effect.maxHpAdd) parts.push(`+${effect.maxHpAdd} HP`);
+  if (effect.damageMult) parts.push(`+${Math.round((effect.damageMult - 1) * 100)}% урон`);
+  if (effect.foodHealMult) parts.push(`+${Math.round((effect.foodHealMult - 1) * 100)}% лечение едой`);
+  if (effect.incomeMult) parts.push(`+${Math.round((effect.incomeMult - 1) * 100)}% доход построек`);
+  if (effect.regenMult) parts.push(`×${effect.regenMult} реген`);
+  return parts.join(' · ') || 'без эффекта';
+}
+
 export class Shop {
   visible = false;
   placing: BuildingId | null = null;
@@ -18,6 +29,8 @@ export class Shop {
   onBuy: (item: WeaponId | 'food') => void = () => {};
   onSell: (item: WeaponId) => void = () => {};
   onStartPlace: (b: BuildingId) => void = () => {};
+  onLootbox: () => void = () => {};
+  onEquipHat: (hat: string | null) => void = () => {};
 
   constructor(private welcome: WelcomeMsg) {
     $('shop-close').onclick = () => this.hide();
@@ -72,6 +85,37 @@ export class Shop {
       };
       bg.appendChild(el);
     }
+
+    // lootbox
+    const lb = $('shop-lootbox');
+    lb.innerHTML = '';
+    const lbe = document.createElement('div');
+    lbe.className = 'shop-item';
+    lbe.innerHTML = `<div><div class="nm">🎁 Лутбокс</div><div class="st">Шанс на эпическую или легендарную шляпу,<br>золото — или ничего. Дубликат = бонусное золото.</div></div><div class="btns"><button id="lootbox-btn">💰 ${this.welcome.hats.lootboxPrice}</button></div>`;
+    (lbe.querySelector('#lootbox-btn') as HTMLButtonElement).onclick = () => this.onLootbox();
+    lb.appendChild(lbe);
+
+    // hat collection
+    const hg = $('shop-hats');
+    hg.innerHTML = '';
+    const sourceText: Record<string, string> = {
+      common: 'падает с мобов', rare: 'падает с боссов', epic: 'только из лутбокса', legendary: 'только из лутбокса',
+    };
+    const tierOrder = ['common', 'rare', 'epic', 'legendary'];
+    const hats = Object.entries(this.welcome.hats.items)
+      .sort((a, b) => tierOrder.indexOf(a[1].tier) - tierOrder.indexOf(b[1].tier));
+    for (const [id, cfg] of hats) {
+      const el = document.createElement('div');
+      el.className = 'shop-item';
+      el.dataset.hat = id;
+      const fx = describeEffect(cfg.effect);
+      el.innerHTML = `<div><div class="nm">${HAT_EMOJI[id] ?? '🎩'} ${cfg.name} <span class="tier-badge" style="background:${TIER_COLORS[cfg.tier]};color:#0d0f14">${TIER_NAMES[cfg.tier]}</span></div><div class="st">${fx}<br>${sourceText[cfg.tier]}</div></div><div class="btns"><button class="hat-btn"></button></div>`;
+      (el.querySelector('.hat-btn') as HTMLButtonElement).onclick = () => {
+        const btn = el.querySelector('.hat-btn') as HTMLButtonElement;
+        this.onEquipHat(btn.dataset.equipped === '1' ? null : id);
+      };
+      hg.appendChild(el);
+    }
   }
 
   refresh(self: SelfState): void {
@@ -108,6 +152,26 @@ export class Shop {
       btn.disabled = self.money < cfg.price || self.buildings >= this.welcome.maxBuildings;
     }
     $('build-count').textContent = `(${self.buildings}/${this.welcome.maxBuildings})`;
+
+    // hats
+    ($('lootbox-btn') as HTMLButtonElement).disabled = self.money < this.welcome.hats.lootboxPrice;
+    $('hat-count').textContent = `(собрано ${self.hats.length}/${Object.keys(this.welcome.hats.items).length})`;
+    for (const el of document.querySelectorAll<HTMLElement>('#shop-hats .shop-item')) {
+      const id = el.dataset.hat!;
+      const btn = el.querySelector('.hat-btn') as HTMLButtonElement;
+      const owned = self.hats.includes(id);
+      const equipped = self.hat === id;
+      el.style.opacity = owned ? '1' : '0.55';
+      btn.dataset.equipped = equipped ? '1' : '0';
+      if (!owned) {
+        btn.textContent = 'Нет';
+        btn.disabled = true;
+      } else {
+        btn.disabled = false;
+        btn.textContent = equipped ? 'Снять' : 'Надеть';
+        btn.style.background = equipped ? '#238636' : '#1f6feb';
+      }
+    }
   }
 
   message(text: string): void {

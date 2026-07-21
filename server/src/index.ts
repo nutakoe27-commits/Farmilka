@@ -1,4 +1,4 @@
-import { loadBalance, watchBalance } from './game/balance.js';
+import { loadBalance, watchBalance, getBalance } from './game/balance.js';
 import { openDb } from './db/db.js';
 import { startTelemetryFlusher } from './db/telemetry.js';
 import { World } from './game/world.js';
@@ -10,8 +10,10 @@ watchBalance();
 openDb();
 startTelemetryFlusher();
 
-const world = new World();
-startServer(world);
-startLoop(world);
+// number of worlds is fixed at boot (changing it in balance.json needs a restart)
+const count = Math.max(1, Math.floor(getBalance().world.servers));
+const worlds = Array.from({ length: count }, (_, i) => new World(i + 1));
+startServer(worlds);
+startLoop(worlds);
 
-console.log('[farmilka] server up');
+console.log(`[farmilka] up with ${count} game server(s)`);

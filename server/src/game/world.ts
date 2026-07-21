@@ -33,7 +33,7 @@ export class World {
 
   private nextId = 1;
 
-  constructor() {
+  constructor(public readonly serverId: number = 1) {
     const bal = getBalance();
     this.grid = new SpatialGrid<Entity>(bal.world.size, 200);
     const now = Date.now();
@@ -44,7 +44,7 @@ export class World {
   }
 
   id(prefix: string): string {
-    return `${prefix}${this.nextId++}`;
+    return `${prefix}${this.serverId}_${this.nextId++}`;
   }
 
   get center(): number {
@@ -131,7 +131,7 @@ export class World {
     return { x: (pos.x + c) / 2, y: (pos.y + c) / 2 };
   }
 
-  spawnPlayer(name: string, ws: WebSocket, account?: { name: string; money: number; weapons: WeaponId[] }): Player {
+  spawnPlayer(name: string, ws: WebSocket, account?: { name: string; money: number; weapons: WeaponId[]; hats: string[]; hat: string | null }): Player {
     const bal = getBalance();
     const pos = this.spawnPoint();
     const weapons: WeaponId[] = account ? [...account.weapons] : ['fists'];
@@ -157,6 +157,8 @@ export class World {
       equipped: 'fists',
       food: 0,
       foodReadyAt: 0,
+      hats: account ? [...account.hats] : [],
+      hat: account ? account.hat : null,
       invulnUntil: Date.now() + bal.player.spawnProtectSec * 1000,
       account: account ? account.name : null,
       attackReadyAt: 0,

@@ -74,12 +74,37 @@ export interface BuildingCfg {
   projSpeed?: number;
 }
 
+export type HatTier = 'common' | 'rare' | 'epic' | 'legendary';
+
+export interface HatCfg {
+  name: string;
+  tier: HatTier;
+  effect: {
+    speedMult?: number;
+    maxHpAdd?: number;
+    damageMult?: number;
+    foodHealMult?: number;
+    incomeMult?: number;
+    regenMult?: number;
+  };
+}
+
+export interface HatsCfg {
+  mobDropChance: number;
+  bossDropChance: number;
+  lootboxPrice: number;
+  lootbox: { legendaryChance: number; epicChance: number; goldChance: number; goldMin: number; goldMax: number };
+  dupGold: Record<HatTier, number>;
+  items: Record<string, HatCfg>;
+}
+
 export interface Balance {
   world: {
     size: number;
     viewRadius: number;
     maxPlayers: number;
     tickRate: number;
+    servers: number;
   };
   player: {
     hp: number;
@@ -105,6 +130,7 @@ export interface Balance {
     pickupRadius: number;
     despawnSec: number;
   };
+  hats: HatsCfg;
   economy: {
     maxBuildingsPerPlayer: number;
     buildingMinDist: number;
@@ -145,6 +171,7 @@ export function validateBalance(raw: unknown): Balance {
   num(world, 'viewRadius', 'world', 100);
   num(world, 'maxPlayers', 'world', 1);
   num(world, 'tickRate', 'world', 1);
+  num(world, 'servers', 'world', 1);
 
   const player = section(root, 'player');
   for (const k of ['hp', 'speed', 'radius', 'regenPerSec', 'regenDelaySec', 'respawnSec', 'startMoney', 'dropMoneyFrac', 'spawnProtectSec']) {
@@ -195,6 +222,25 @@ export function validateBalance(raw: unknown): Balance {
   const food = section(root, 'food');
   for (const k of ['heal', 'cooldownSec', 'maxCarry', 'price', 'dropChance', 'pickupRadius', 'despawnSec']) {
     num(food, k, 'food');
+  }
+
+  const hats = section(root, 'hats');
+  for (const k of ['mobDropChance', 'bossDropChance', 'lootboxPrice']) num(hats, k, 'hats');
+  const lootbox = section(hats, 'lootbox');
+  for (const k of ['legendaryChance', 'epicChance', 'goldChance', 'goldMin', 'goldMax']) num(lootbox, k, 'hats.lootbox');
+  const dupGold = section(hats, 'dupGold');
+  for (const k of ['common', 'rare', 'epic', 'legendary']) num(dupGold, k, 'hats.dupGold');
+  const items = section(hats, 'items');
+  const HAT_TIERS = ['common', 'rare', 'epic', 'legendary'];
+  for (const [id, item] of Object.entries(items)) {
+    if (typeof item !== 'object' || item === null) throw new Error(`balance: hats.items.${id} must be an object`);
+    const h = item as Record<string, unknown>;
+    if (typeof h.name !== 'string' || !h.name) throw new Error(`balance: hats.items.${id}.name must be a string`);
+    if (!HAT_TIERS.includes(String(h.tier))) throw new Error(`balance: hats.items.${id}.tier must be one of ${HAT_TIERS.join('|')}`);
+    if (typeof h.effect !== 'object' || h.effect === null) throw new Error(`balance: hats.items.${id}.effect must be an object`);
+    for (const [ek, ev] of Object.entries(h.effect as Record<string, unknown>)) {
+      if (typeof ev !== 'number' || !Number.isFinite(ev)) throw new Error(`balance: hats.items.${id}.effect.${ek} must be a number`);
+    }
   }
 
   const economy = section(root, 'economy');

@@ -13,6 +13,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 interface Ent { id: string; kind: string; x: number; y: number; hp?: number; mobType?: string }
 
+let SIZE = 7000; // updated from welcome
+
 class C {
   ws: WebSocket;
   seq = 0; x = 0; y = 0; money = 0; hp = 100; food = 0; id = '';
@@ -23,7 +25,7 @@ class C {
     this.ws.on('open', () => this.ws.send(JSON.stringify({ t: 'join', name, password: password || undefined, register: register || undefined })));
     this.ws.on('message', (d) => {
       const m = JSON.parse(d.toString());
-      if (m.t === 'welcome') { this.ready = true; this.id = m.id; }
+      if (m.t === 'welcome') { this.ready = true; this.id = m.id; SIZE = m.world.size; }
       else if (m.t === 'reject') this.rejected = m.reason;
       else if (m.t === 'snapshot') {
         for (const s of m.add) this.entities.set(s.id, s);
@@ -103,7 +105,7 @@ async function main() {
   check('food dropped and picked up', a1.food > 0, `food=${a1.food}`);
 
   // --- 6: shop — buy food, buy sword, reorder, sell ---
-  await a1.walkTo(2000, 2000);
+  await a1.walkTo(SIZE / 2, SIZE / 2);
   const foodBefore = a1.food;
   a1.send({ t: 'buy', item: 'food' });
   await sleep(400);
@@ -136,7 +138,7 @@ async function main() {
   // --- 8: eat heals after PvP damage ---
   const obs = new C('Observer');
   await obs.waitReady();
-  await a2.walkTo(2000, 1200); // outside safe zone
+  await a2.walkTo(SIZE / 2 - 600, SIZE / 2); // open field in the normal biome
   await obs.walkTo(a2.x + 30, a2.y);
   // punch a2 below 70 hp
   const tP = Date.now();
@@ -174,8 +176,8 @@ async function main() {
   check('eat heals after damage', a2.hp > hpBeforeEat && a2.food === foodBeforeEat - 1, `hp ${hpBeforeEat}->${a2.hp} (low was ${hpLow}), food ${foodBeforeEat}->${a2.food}`);
 
   // --- 9: building vanishes on disconnect ---
-  await a2.walkTo(2000, 1200);
-  await obs.walkTo(2000, 1100);
+  await a2.walkTo(SIZE / 2 - 600, SIZE / 2);
+  await obs.walkTo(SIZE / 2 - 600, SIZE / 2 - 100);
   a2.send({ t: 'place', building: 'farm', x: a2.x + 120, y: a2.y });
   await sleep(800);
   const placedEv = a2.events.filter((e) => e.e === 'placed').pop();
@@ -194,7 +196,7 @@ async function main() {
   victim.send({ t: 'buy', item: 'sword' }); // start money 50 >= test price 40
   await sleep(400);
   check('victim bought sword before death', victim.weapons.includes('sword'), `weapons=${victim.weapons}`);
-  await victim.walkTo(2000, 1500);
+  await victim.walkTo(SIZE / 2 + 500, SIZE / 2);
   await obs.walkTo(victim.x + 30, victim.y);
   const tK = Date.now();
   while (Date.now() - tK < 20000 && !victim.events.some((e) => e.e === 'death')) {

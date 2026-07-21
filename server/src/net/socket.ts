@@ -10,15 +10,22 @@ import type { World } from '../game/world.js';
 import type { Player } from '../game/entities.js';
 import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip } from '../game/economy.js';
 import { tryPlaceBuilding, removePlayerBuildings } from '../game/buildings.js';
+import { tryLootbox, tryEquipHat, applyHatMaxHp } from '../game/hats.js';
 import { telemetry } from '../db/telemetry.js';
-import { accountExists, login, register, saveProgress } from '../db/accounts.js';
+import { accountExists, login, register, saveProgress, type Account } from '../db/accounts.js';
 import { adminRouter } from '../admin/stats.js';
 
 const sessionIds = new WeakMap<Player, number>();
 
-export function startServer(world: World): http.Server {
+export function startServer(worlds: World[]): http.Server {
   const app = express();
-  app.use('/admin', adminRouter(world));
+  app.use('/admin', adminRouter(worlds));
+
+  // live server list for the client's server picker
+  app.get('/servers', (_req, res) => {
+    const max = getBalance().world.maxPlayers;
+    res.json(worlds.map((w) => ({ id: w.serverId, online: w.connectedPlayers().length, max })));
+  });
 
   // serve built client in production
   const clientDist = process.env.CLIENT_DIST ?? path.resolve(process.cwd(), '../client/dist');
@@ -35,23 +42,40 @@ export function startServer(world: World): http.Server {
 
   wss.on('connection', (ws: WebSocket) => {
     let player: Player | null = null;
+    let world: World | null = null;
 
     ws.on('message', (data) => {
       const msg = decode<ClientMsg>(data.toString());
       if (!msg || typeof msg.t !== 'string') return;
 
-      if (!player) {
+      if (!player || !world) {
         if (msg.t !== 'join') return;
         const bal = getBalance();
-        if (world.connectedPlayers().length >= bal.world.maxPlayers) {
-          ws.send(encode({ t: 'reject', reason: 'Сервер заполнен' }));
-          ws.close();
-          return;
+
+        // pick a world: explicit choice or first with a free slot
+        if (typeof msg.server === 'number' && Number.isInteger(msg.server)) {
+          const chosen = worlds[msg.server - 1];
+          if (!chosen) {
+            ws.send(encode({ t: 'reject', reason: `Сервера ${msg.server} не существует` }));
+            return;
+          }
+          if (chosen.connectedPlayers().length >= bal.world.maxPlayers) {
+            ws.send(encode({ t: 'reject', reason: `Сервер ${msg.server} заполнен — выберите другой` }));
+            return;
+          }
+          world = chosen;
+        } else {
+          world = worlds.find((w) => w.connectedPlayers().length < bal.world.maxPlayers) ?? null;
+          if (!world) {
+            ws.send(encode({ t: 'reject', reason: 'Все серверы заполнены' }));
+            ws.close();
+            return;
+          }
         }
         const name = String(msg.name ?? '').trim().slice(0, 16) || 'Безымянный';
         const password = typeof msg.password === 'string' ? msg.password.slice(0, 64) : '';
 
-        let account: { name: string; money: number; weapons: never[] } | undefined;
+        let account: Account | undefined;
         try {
           if (password) {
             const res = msg.register ? register(name, password, bal.player.startMoney) : login(name, password);
@@ -59,14 +83,16 @@ export function startServer(world: World): http.Server {
               ws.send(encode({ t: 'reject', reason: res.reason ?? 'Ошибка авторизации' }));
               return;
             }
-            // one live session per account
-            for (const other of world.players.values()) {
-              if (other.ws && other.account && other.account.toLowerCase() === res.account!.name.toLowerCase()) {
-                ws.send(encode({ t: 'reject', reason: 'Этот аккаунт уже в игре' }));
-                return;
+            // one live session per account — across all game servers
+            for (const w of worlds) {
+              for (const other of w.players.values()) {
+                if (other.ws && other.account && other.account.toLowerCase() === res.account!.name.toLowerCase()) {
+                  ws.send(encode({ t: 'reject', reason: 'Этот аккаунт уже в игре' }));
+                  return;
+                }
               }
             }
-            account = res.account as never;
+            account = res.account;
           } else if (accountExists(name)) {
             ws.send(encode({ t: 'reject', reason: 'Это имя зарегистрировано — введите пароль' }));
             return;
@@ -78,6 +104,7 @@ export function startServer(world: World): http.Server {
         }
 
         player = world.spawnPlayer(name, ws, account);
+        applyHatMaxHp(world, player);
         try {
           sessionIds.set(player, telemetry.sessionStart(name));
         } catch (err) {
@@ -88,6 +115,8 @@ export function startServer(world: World): http.Server {
           id: player.id,
           time: Date.now(),
           registered: !!account,
+          server: world.serverId,
+          servers: worlds.map((w) => ({ id: w.serverId, online: w.connectedPlayers().length, max: bal.world.maxPlayers })),
           world: {
             size: bal.world.size,
             viewRadius: bal.world.viewRadius,
@@ -101,11 +130,12 @@ export function startServer(world: World): http.Server {
             maxCarry: bal.food.maxCarry,
             price: bal.food.price,
           },
+          hats: { items: bal.hats.items, lootboxPrice: bal.hats.lootboxPrice, dupGold: bal.hats.dupGold },
           economy: { sellFrac: bal.economy.sellFrac },
           maxBuildings: bal.economy.maxBuildingsPerPlayer,
         };
         ws.send(encode(welcome));
-        console.log(`[ws] ${name}${account ? ' (аккаунт)' : ''} joined (${world.connectedPlayers().length} online)`);
+        console.log(`[ws] ${name}${account ? ' (аккаунт)' : ''} joined server ${world.serverId} (${world.connectedPlayers().length} online)`);
         return;
       }
 
@@ -139,6 +169,15 @@ export function startServer(world: World): http.Server {
           tryEat(world, player, Date.now());
           break;
         }
+        case 'lootbox': {
+          const res = tryLootbox(world, player);
+          if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'lootbox', reason: res.reason });
+          break;
+        }
+        case 'equipHat': {
+          tryEquipHat(world, player, typeof msg.hat === 'string' ? msg.hat : null);
+          break;
+        }
         case 'equip': {
           tryEquip(world, player, msg.weapon);
           break;
@@ -165,21 +204,24 @@ export function startServer(world: World): http.Server {
           console.error('[telemetry] session end failed', err);
         }
       }
-      // account progress (gold + weapons) survives the session
+      // account progress (gold + weapons + hats) survives the session
       if (player.account) {
         try {
-          saveProgress(player.account, player.money, player.weapons);
+          saveProgress(player.account, player.money, player.weapons, player.hats, player.hat);
         } catch (err) {
           console.error('[auth] progress save failed', err);
         }
       }
       // buildings only live while their owner is online
-      removePlayerBuildings(world, player);
-      if (!player.dead) world.removeEntity(player);
-      player.ws = null;
-      world.players.delete(player.id);
-      console.log(`[ws] ${player.name} left (${world.connectedPlayers().length} online)`);
+      if (world) {
+        removePlayerBuildings(world, player);
+        if (!player.dead) world.removeEntity(player);
+        player.ws = null;
+        world.players.delete(player.id);
+        console.log(`[ws] ${player.name} left server ${world.serverId} (${world.connectedPlayers().length} online)`);
+      }
       player = null;
+      world = null;
     });
 
     ws.on('error', () => ws.close());

@@ -6,6 +6,7 @@ import type { World } from './world.js';
 import type { Entity, Player, Mob, Building } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { onBossDamaged, onBossKilled } from './boss.js';
+import { grantHat, hatEffects, randomHatOfTier } from './hats.js';
 
 export interface DamageSource {
   /** entity id of the attacker (player/boss/turret-owner) */
@@ -23,11 +24,12 @@ export function performAttack(world: World, p: Player, w: WeaponCfg, now: number
     p.invulnUntil = 0;
     p.dirtyTick = world.tickNo;
   }
+  const dmgMult = hatEffects(p.hat).damageMult;
   if (w.type === 'ranged') {
     const speed = w.projSpeed ?? 600;
     const sx = p.x + Math.cos(p.angle) * (p.radius + 10);
     const sy = p.y + Math.sin(p.angle) * (p.radius + 10);
-    world.spawnProjectile(p.id, 'player', p.equipped, sx, sy, p.angle, speed, w.damage, w.range);
+    world.spawnProjectile(p.id, 'player', p.equipped, sx, sy, p.angle, speed, w.damage * dmgMult, w.range);
     return;
   }
   // melee: arc in front of the player
@@ -40,7 +42,7 @@ export function performAttack(world: World, p: Player, w: WeaponCfg, now: number
     const ang = Math.atan2(t.y - p.y, t.x - p.x);
     if (Math.abs(angleDiff(ang, p.angle)) > arcRad / 2) continue;
     const src: DamageSource = { id: p.id, name: p.name, weapon: p.equipped, cause: 'player' };
-    const hit = applyDamage(world, t, w.damage, src, now, d);
+    const hit = applyDamage(world, t, w.damage * dmgMult, src, now, d);
     // Knockback only a still-living target — a dead one has already been removed
     // from the world, and moveEntity would re-insert it into the grid as a 0-HP ghost.
     if (hit && !t.dead && w.knockback && t.kind !== 'building' && t.kind !== 'boss') {
@@ -154,6 +156,11 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       }
       if (Math.random() < bal.food.dropChance) {
         world.spawnFood(target.x, target.y);
+      }
+      // common hats drop from mobs with a small chance
+      if (killerPlayer && !killerPlayer.dead && Math.random() < bal.hats.mobDropChance) {
+        const hat = randomHatOfTier('common');
+        if (hat) grantHat(world, killerPlayer, hat, 'mob');
       }
       telemetry.kill(src.name, target.mobType, src.weapon, distance, 'mob');
       break;

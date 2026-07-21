@@ -6,6 +6,8 @@ export interface Account {
   name: string;
   money: number;
   weapons: WeaponId[];
+  hats: string[];
+  hat: string | null;
   createdTs: number;
 }
 
@@ -26,13 +28,13 @@ export function register(name: string, password: string, startMoney = 0): { ok: 
   getDb()
     .prepare('INSERT INTO accounts (name, pass_hash, salt, money, weapons, created_ts, last_seen_ts) VALUES (?,?,?,?,?,?,?)')
     .run(name, hash(password, salt), salt, startMoney, JSON.stringify(['fists']), now, now);
-  return { ok: true, account: { name, money: startMoney, weapons: ['fists'], createdTs: now } };
+  return { ok: true, account: { name, money: startMoney, weapons: ['fists'], hats: [], hat: null, createdTs: now } };
 }
 
 export function login(name: string, password: string): { ok: boolean; reason?: string; account?: Account } {
   const row = getDb()
-    .prepare('SELECT name, pass_hash, salt, money, weapons, created_ts FROM accounts WHERE name = ? COLLATE NOCASE')
-    .get(name) as { name: string; pass_hash: string; salt: string; money: number; weapons: string; created_ts: number } | undefined;
+    .prepare('SELECT name, pass_hash, salt, money, weapons, hats, hat, created_ts FROM accounts WHERE name = ? COLLATE NOCASE')
+    .get(name) as { name: string; pass_hash: string; salt: string; money: number; weapons: string; hats: string | null; hat: string | null; created_ts: number } | undefined;
   if (!row) return { ok: false, reason: 'Аккаунт не найден — отметьте «Создать аккаунт»' };
   const attempt = hash(password, row.salt);
   if (!crypto.timingSafeEqual(Buffer.from(attempt), Buffer.from(row.pass_hash))) {
@@ -45,12 +47,20 @@ export function login(name: string, password: string): { ok: boolean; reason?: s
   } catch {
     weapons = ['fists'];
   }
-  return { ok: true, account: { name: row.name, money: row.money, weapons, createdTs: row.created_ts } };
+  let hats: string[] = [];
+  try {
+    const parsed = JSON.parse(row.hats ?? '[]');
+    if (Array.isArray(parsed)) hats = parsed.filter((h) => typeof h === 'string');
+  } catch {
+    hats = [];
+  }
+  const hat = row.hat && hats.includes(row.hat) ? row.hat : null;
+  return { ok: true, account: { name: row.name, money: row.money, weapons, hats, hat, createdTs: row.created_ts } };
 }
 
-/** Persists gold and owned weapons at logout. */
-export function saveProgress(name: string, money: number, weapons: WeaponId[]): void {
+/** Persists gold, weapons and the hat collection at logout. */
+export function saveProgress(name: string, money: number, weapons: WeaponId[], hats: string[], hat: string | null): void {
   getDb()
-    .prepare('UPDATE accounts SET money = ?, weapons = ?, last_seen_ts = ? WHERE name = ? COLLATE NOCASE')
-    .run(money, JSON.stringify(weapons), Date.now(), name);
+    .prepare('UPDATE accounts SET money = ?, weapons = ?, hats = ?, hat = ?, last_seen_ts = ? WHERE name = ? COLLATE NOCASE')
+    .run(money, JSON.stringify(weapons), JSON.stringify(hats), hat, Date.now(), name);
 }

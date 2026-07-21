@@ -39,7 +39,8 @@ function tryStart(register: boolean): void {
   localStorage.setItem('farmilka-name', name);
   $('conn-error').textContent = '';
   $('name-screen').classList.add('hidden');
-  startGame(name, password, register).catch((err) => {
+  const serverPref = Number(localStorage.getItem('farmilka-server')) || undefined;
+  startGame(name, password, register, serverPref).catch((err) => {
     console.error(err);
     showError('Не удалось запустить игру');
   });
@@ -61,8 +62,8 @@ function showError(text: string): void {
 
 // ---------- game ----------
 
-async function startGame(name: string, password: string, register: boolean): Promise<void> {
-  const conn = new Connection(name, password, register);
+async function startGame(name: string, password: string, register: boolean, server?: number): Promise<void> {
+  const conn = new Connection(name, password, register, server);
   conn.onClose = (reason) => {
     if (inGame) {
       // hard reload keeps state clean after a real session
@@ -97,6 +98,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   scene.drawGround(welcome.world.size);
   const effects = new Effects(scene.layers.effects, scene.layers.telegraphs);
   const settings = new Settings();
+  settings.currentServer = welcome.server;
   const hud = new Hud();
   hud.setFoodCooldown(welcome.food.cooldownSec);
   hud.killFeedEnabled = settings.values.killFeed;
@@ -157,6 +159,8 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
 
   function moveSpeed(attack: boolean): number {
     let speed = welcome.player.speed;
+    const hat = conn.self?.hat;
+    if (hat) speed *= welcome.hats.items[hat]?.effect.speedMult ?? 1;
     const w = welcome.weapons[(conn.self?.equipped ?? 'fists') as WeaponId];
     if (w && w.type === 'ranged' && attack && w.slowFactor) speed *= w.slowFactor;
     return speed;
@@ -225,6 +229,21 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       case 'heal':
         effects.incomeNumber(dispX, dispY, ev.amount);
         break;
+      case 'hat': {
+        if (ev.dup) {
+          hud.notice(`🎩 Дубликат «${escapeHtml(ev.name)}» → <b style="color:#ffd76e">+${ev.gold} золота</b>`);
+        } else {
+          hud.bossBanner(`🎩 Новая шляпа: ${ev.name}!`);
+          setTimeout(() => hud.bossBanner(null), 5000);
+          hud.notice(`🎩 Выпала шляпа: <b>${escapeHtml(ev.name)}</b> — надень её в магазине (B)`);
+        }
+        break;
+      }
+      case 'lootbox': {
+        if (ev.result === 'gold') hud.notice(`🎁 Лутбокс: <b style="color:#ffd76e">+${ev.gold} золота!</b>`);
+        else if (ev.result === 'nothing') hud.notice('🎁 Лутбокс: пусто… не повезло');
+        break;
+      }
       case 'death':
         selfDead = true;
         hud.showDeath(ev.dropped, ev.cause);
@@ -285,6 +304,8 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   hud.onReorder = (weapons) => conn.send({ t: 'reorder', weapons });
   shop.onBuy = (item) => conn.send({ t: 'buy', item });
   shop.onSell = (item) => conn.send({ t: 'sell', weapon: item });
+  shop.onLootbox = () => conn.send({ t: 'lootbox' });
+  shop.onEquipHat = (hat) => conn.send({ t: 'equipHat', hat });
   settings.onExit = () => conn.ws.close();
   if (mobile) {
     mobile.onEat = () => conn.send({ t: 'eat' });

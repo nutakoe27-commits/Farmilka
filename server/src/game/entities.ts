@@ -44,6 +44,10 @@ export interface Player extends BaseEntity {
   equipped: WeaponId;
   food: number;
   foodReadyAt: number;
+  /** owned hat collection (permanent, not lost on death) */
+  hats: string[];
+  /** equipped hat id */
+  hat: string | null;
   /** spawn protection: damage-immune until this time; broken by attacking */
   invulnUntil: number;
   /** account name when logged in, null for guests */

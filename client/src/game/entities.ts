@@ -6,6 +6,13 @@ export const WEAPON_ICONS: Record<string, string> = {
 };
 export const BUILDING_ICONS: Record<string, string> = { farm: '🌾', mine: '⛏️', turret: '🗼' };
 
+export const HAT_EMOJI: Record<string, string> = {
+  straw_hat: '👒', cap: '🧢', miner_helmet: '⛑️', champion_crown: '👑', shadow_hood: '🎩',
+  crystal_circlet: '💠', dragon_helm: '🐲', wizard_hat: '🧙', golden_crown: '👑', phoenix_plume: '🪶',
+};
+export const TIER_NAMES: Record<string, string> = { common: 'обычная', rare: 'редкая', epic: 'эпическая', legendary: 'легендарная' };
+export const TIER_COLORS: Record<string, string> = { common: '#9aa5b8', rare: '#4d9fff', epic: '#b565d8', legendary: '#ffd76e' };
+
 /** Visual style per mob type: base shape + palette. Mystic mobs get a glow. */
 const MOB_STYLE: Record<string, { color: number; shape: 'blob' | 'beast' | 'golem' | 'ghost' | 'tree'; glow?: number }> = {
   slime: { color: 0x5fd068, shape: 'blob' },
@@ -51,8 +58,10 @@ export class EntityView {
   hpBar = new Graphics();
   protRing: Graphics | null = null;
   weaponText: Text | null = null;
+  hatText: Text | null = null;
   lastHp = -1;
   lastWeapon = '';
+  lastHat: string | null = 'no';
   color = 0xffffff;
   spawnTime = performance.now();
 
@@ -89,6 +98,10 @@ export class EntityView {
         this.protRing.circle(0, 0, r + 12).stroke({ width: 3, color: 0xffffff, alpha: 0.8 });
         this.protRing.visible = false;
         this.top.addChild(this.protRing);
+        this.hatText = new Text({ text: '', style: { fontSize: 18 } });
+        this.hatText.anchor.set(0.5);
+        this.hatText.position.set(0, -r - 44);
+        this.top.addChild(this.hatText);
         break;
       }
       case 'mob': {
@@ -230,6 +243,11 @@ export class EntityView {
     if (this.protRing) {
       this.protRing.visible = !!s.prot;
       if (s.prot) this.protRing.alpha = 0.5 + 0.5 * Math.sin(now / 120);
+    }
+
+    if (this.hatText && (s.hat ?? null) !== this.lastHat) {
+      this.lastHat = s.hat ?? null;
+      this.hatText.text = this.lastHat ? HAT_EMOJI[this.lastHat] ?? '🎩' : '';
     }
 
     if (s.hp !== undefined && s.maxHp !== undefined && s.hp !== this.lastHp) {

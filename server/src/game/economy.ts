@@ -4,6 +4,7 @@ import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Player } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
+import { hatEffects } from './hats.js';
 
 const WEAPON_IDS: WeaponId[] = ['fists', 'sword', 'spear', 'hammer', 'bow', 'crossbow'];
 
@@ -65,7 +66,7 @@ export function tryEat(world: World, p: Player, now: number): void {
   if (p.dead || p.food <= 0 || now < p.foodReadyAt || p.hp >= p.maxHp) return;
   p.food--;
   p.foodReadyAt = now + bal.food.cooldownSec * 1000;
-  const healed = Math.min(bal.food.heal, p.maxHp - p.hp);
+  const healed = Math.min(bal.food.heal * hatEffects(p.hat).foodHealMult, p.maxHp - p.hp);
   p.hp += healed;
   p.dirtyTick = world.tickNo;
   telemetry.heal(p.name, healed);

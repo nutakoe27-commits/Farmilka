@@ -59,6 +59,10 @@
     .set-row input { width: 20px; height: 20px; accent-color: #2ea043; }
     #settings .btn { width: 100%; margin-top: 6px; }
     #exit-btn { background: linear-gradient(135deg,#d4544a,#b03c33); }
+    .srv-btn { cursor: pointer; border: 1px solid #2c3242; border-radius: 8px; padding: 8px 12px; font-size: 13px; background: #151926; color: #bfc4d4; }
+    .srv-btn.current { border-color: #7ee787; color: #7ee787; font-weight: 700; }
+    .srv-btn.full { opacity: .5; cursor: default; }
+    .tier-badge { font-size: 10px; padding: 1px 6px; border-radius: 6px; font-weight: 700; }
 
     /* shop */
     #shop { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 15; width: 580px; max-width: 96vw; max-height: 84vh; overflow-y: auto; pointer-events: auto; }
@@ -135,6 +139,10 @@
 
   <div id="settings" class="panel hidden">
     <h2>⚙ Настройки</h2>
+    <div style="margin-bottom:14px">
+      <div style="font-size:13px;color:#8a8fa3;margin-bottom:6px">Игровой сервер (смена переподключит):</div>
+      <div id="server-list" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+    </div>
     <div class="set-row"><span>Тряска экрана</span><input type="checkbox" id="set-shake" checked></div>
     <div class="set-row"><span>Числа урона</span><input type="checkbox" id="set-dmg" checked></div>
     <div class="set-row"><span>Лента убийств</span><input type="checkbox" id="set-feed" checked></div>
@@ -153,6 +161,9 @@
     <div class="shop-grid" id="shop-weapons"></div>
     <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Постройки <span id="build-count" style="color:#8a8fa3;font-weight:400"></span></h3>
     <div class="shop-grid" id="shop-buildings"></div>
+    <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">🎩 Шляпы <span id="hat-count" style="color:#8a8fa3;font-weight:400"></span></h3>
+    <div class="shop-grid" id="shop-lootbox"></div>
+    <div class="shop-grid" id="shop-hats"></div>
   </div>
 
   <div id="death-screen" class="overlay hidden">

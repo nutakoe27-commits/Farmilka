@@ -7,6 +7,7 @@ import type { World } from './world.js';
 import type { Boss, Player } from './entities.js';
 import { applyDamage, type DamageSource } from './combat.js';
 import { telemetry } from '../db/telemetry.js';
+import { grantHat, randomHatOfTier } from './hats.js';
 
 const CENTRAL: BiomeId[] = ['snow', 'normal', 'desert'];
 
@@ -94,6 +95,7 @@ export function onBossKilled(world: World, boss: Boss, src: DamageSource, now: n
     }
   }
 
+  const bal = getBalance();
   const rewards: { name: string; amount: number }[] = [];
   for (const { name, dmg } of eligible) {
     const amount = Math.round((cfg.reward * dmg) / totalDmg);
@@ -103,6 +105,11 @@ export function onBossKilled(world: World, boss: Boss, src: DamageSource, now: n
         p.money += amount;
         p.session.moneyEarned += amount;
         telemetry.income(p.name, 'boss', amount);
+        // rare hats drop from bosses for everyone who earned a reward
+        if (Math.random() < bal.hats.bossDropChance) {
+          const hat = randomHatOfTier('rare');
+          if (hat) grantHat(world, p, hat, 'boss');
+        }
         break;
       }
     }

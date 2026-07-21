@@ -34,10 +34,10 @@ export class Connection {
   onRemove: (id: string, state: EntityState) => void = () => {};
   onClose: (reason: string) => void = () => {};
 
-  constructor(name: string, password = '', register = false) {
+  constructor(name: string, password = '', register = false, server?: number) {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     this.ws = new WebSocket(`${proto}://${location.host}/ws`);
-    this.ws.onopen = () => this.send({ t: 'join', name, password: password || undefined, register: register || undefined });
+    this.ws.onopen = () => this.send({ t: 'join', name, password: password || undefined, register: register || undefined, server });
     this.ws.onclose = () => this.onClose(this.closeReason ?? 'Соединение потеряно');
     this.ws.onerror = () => this.onClose('Ошибка соединения');
     this.ws.onmessage = (e) => this.handle(String(e.data));
@@ -97,6 +97,7 @@ export class Connection {
       if (d.hp !== undefined) r.state.hp = d.hp;
       if (d.weapon !== undefined) r.state.weapon = d.weapon;
       if (d.prot !== undefined) r.state.prot = d.prot;
+      if (d.hat !== undefined) r.state.hat = d.hat;
       r.buf.push({ t: s.time, x: d.x, y: d.y, angle: d.angle ?? r.state.angle });
       if (r.buf.length > 12) r.buf.shift();
     }

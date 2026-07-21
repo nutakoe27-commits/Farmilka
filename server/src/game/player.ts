@@ -2,6 +2,7 @@ import { clamp } from '@shared/math.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import { performAttack } from './combat.js';
+import { hatEffects } from './hats.js';
 
 export function updatePlayers(world: World, dt: number, now: number): void {
   const bal = getBalance();
@@ -21,7 +22,8 @@ export function updatePlayers(world: World, dt: number, now: number): void {
       my /= len;
     }
     const w = bal.weapons[p.equipped];
-    let speed = bal.player.speed;
+    const hat = hatEffects(p.hat);
+    let speed = bal.player.speed * hat.speedMult;
     if (w.type === 'ranged' && p.input.attack && w.slowFactor) speed *= w.slowFactor;
     if (mx !== 0 || my !== 0) {
       world.moveEntity(p, p.x + mx * speed * dt, p.y + my * speed * dt);
@@ -44,7 +46,7 @@ export function updatePlayers(world: World, dt: number, now: number): void {
 
     // out-of-combat regen
     if (p.hp < p.maxHp && now - p.lastDamagedAt > bal.player.regenDelaySec * 1000) {
-      p.hp = Math.min(p.maxHp, p.hp + bal.player.regenPerSec * dt);
+      p.hp = Math.min(p.maxHp, p.hp + bal.player.regenPerSec * hat.regenMult * dt);
       p.dirtyTick = world.tickNo;
     }
   }

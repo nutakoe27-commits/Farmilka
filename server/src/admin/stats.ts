@@ -43,7 +43,7 @@ function playerLink(name: string, token: string): string {
   return `<a href="/admin/player?token=${encodeURIComponent(token)}&name=${encodeURIComponent(name)}">${esc(name)}</a>`;
 }
 
-export function adminRouter(world: World): Router {
+export function adminRouter(worlds: World[]): Router {
   const router = Router();
   const token = process.env.ADMIN_TOKEN ?? 'dev';
 
@@ -69,7 +69,7 @@ export function adminRouter(world: World): Router {
       | { created_ts: number; last_seen_ts: number; money: number; weapons: string }
       | undefined;
     const sess = db.prepare('SELECT COUNT(*) n, SUM(COALESCE(left_ts, ?) - joined_ts) total, SUM(kills) kills, SUM(deaths) deaths, SUM(money_earned) earned FROM sessions WHERE player = ? COLLATE NOCASE').get(now, name) as { n: number; total: number | null; kills: number | null; deaths: number | null; earned: number | null };
-    const online = [...world.players.values()].some((p) => p.ws && p.name.toLowerCase() === name.toLowerCase());
+    const online = worlds.some((w) => [...w.players.values()].some((p) => p.ws && p.name.toLowerCase() === name.toLowerCase()));
 
     const killsByWeapon = db.prepare(`SELECT weapon, COUNT(*) n FROM kills WHERE killer = ? COLLATE NOCASE GROUP BY weapon ORDER BY n DESC`).all(name) as { weapon: string; n: number }[];
     const killsByKind = db.prepare(`SELECT victim_kind, COUNT(*) n FROM kills WHERE killer = ? COLLATE NOCASE GROUP BY victim_kind`).all(name) as { victim_kind: string; n: number }[];
@@ -108,18 +108,26 @@ ${table('Последние сессии', ['Вход', 'Длительност�
     const since = Date.now() - hours * 3600_000;
     const now = Date.now();
 
-    // --- live online ---
-    const online = world.connectedPlayers();
-    const onlineRows = online.map((p) => [
-      playerLink(p.name, token),
-      p.account ? '<span class="tag">аккаунт</span>' : '<span class="tag guest">гость</span>',
-      fmt(p.money),
-      String(p.session.kills),
-      String(p.session.deaths),
-      esc(p.equipped),
-      String(p.buildingIds.size),
-      esc(fmtDur(now - p.session.joinedAt)),
-    ]);
+    // --- live online (all game servers) ---
+    const onlineRows: string[][] = [];
+    let onlineTotal = 0;
+    for (const w of worlds) {
+      for (const p of w.connectedPlayers()) {
+        onlineTotal++;
+        onlineRows.push([
+          String(w.serverId),
+          playerLink(p.name, token),
+          p.account ? '<span class="tag">аккаунт</span>' : '<span class="tag guest">гость</span>',
+          fmt(p.money),
+          String(p.session.kills),
+          String(p.session.deaths),
+          esc(p.equipped),
+          esc(p.hat ?? '—'),
+          String(p.buildingIds.size),
+          esc(fmtDur(now - p.session.joinedAt)),
+        ]);
+      }
+    }
 
     // --- totals ---
     const totalPlayers = (db.prepare('SELECT COUNT(DISTINCT player COLLATE NOCASE) n FROM sessions').get() as { n: number }).n;
@@ -188,7 +196,7 @@ ${table('Последние сессии', ['Вход', 'Длительност�
 <h1>Farmilka — статистика (период: ${hours} ч)</h1>
 <p class="note">Период: <a href="?token=${esc(token)}&hours=1">1ч</a> · <a href="?token=${esc(token)}&hours=24">24ч</a> · <a href="?token=${esc(token)}&hours=168">неделя</a> · <a href="?token=${esc(token)}&hours=720">месяц</a>.
 Кликните имя игрока — откроется его профиль.</p>
-${table(`Сейчас онлайн: ${online.length}`, ['Игрок', 'Тип', 'Деньги', 'Убийств', 'Смертей', 'Оружие', 'Построек', 'В игре'], onlineRows, true)}
+${table(`Сейчас онлайн: ${onlineTotal} (${worlds.map((w) => `сервер ${w.serverId}: ${w.connectedPlayers().length}`).join(' · ')})`, ['Срв', 'Игрок', 'Тип', 'Деньги', 'Убийств', 'Смертей', 'Оружие', 'Шляпа', 'Построек', 'В игре'], onlineRows, true)}
 ${table('Всего за всё время', ['Уникальных игроков', 'Зарегистрировано аккаунтов', 'Сессий', 'Суммарное время игры', `Новых аккаунтов за ${hours}ч`, `Игроков за ${hours}ч`], [[
   totalPlayers, totalAccounts, totalSessions, fmtDur(totalPlayMs), newAccounts, periodPlayers,
 ]])}

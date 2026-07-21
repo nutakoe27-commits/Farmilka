@@ -4,6 +4,7 @@ import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Building, Player } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
+import { hatEffects } from './hats.js';
 
 const BUILDING_IDS: BuildingId[] = ['farm', 'mine', 'turret'];
 const PLACE_RANGE = 300;
@@ -76,9 +77,10 @@ export function updateBuildings(world: World, dt: number, now: number): void {
     // passive income (owner must be online)
     if (cfg.income > 0 && online && now >= b.incomeAt) {
       b.incomeAt = now + cfg.incomeIntervalSec * 1000;
-      owner!.money += cfg.income;
-      owner!.session.moneyEarned += cfg.income;
-      telemetry.income(owner!.name, 'building', cfg.income);
+      const income = Math.round(cfg.income * hatEffects(owner!.hat).incomeMult);
+      owner!.money += income;
+      owner!.session.moneyEarned += income;
+      telemetry.income(owner!.name, 'building', income);
     }
 
     // turret AI

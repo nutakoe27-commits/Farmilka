@@ -6,12 +6,12 @@ import WebSocket from 'ws';
 
 const URL = 'ws://localhost:3999/ws';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const SIZE = 4000;
-const STRIP = SIZE * 0.2;
+let SIZE = 7000; // updated from welcome
 
 function biomeAt(x: number, y: number): string {
-  if (x < STRIP) return 'mystic_west';
-  if (x > SIZE - STRIP) return 'mystic_east';
+  const strip = SIZE * 0.2;
+  if (x < strip) return 'mystic_west';
+  if (x > SIZE - strip) return 'mystic_east';
   if (y < SIZE / 3) return 'snow';
   if (y > (SIZE * 2) / 3) return 'desert';
   return 'normal';
@@ -31,7 +31,7 @@ class C {
     this.ws.on('open', () => this.ws.send(JSON.stringify({ t: 'join', name })));
     this.ws.on('message', (d) => {
       const m = JSON.parse(d.toString());
-      if (m.t === 'welcome') { this.ready = true; this.id = m.id; }
+      if (m.t === 'welcome') { this.ready = true; this.id = m.id; SIZE = m.world.size; }
       else if (m.t === 'snapshot') {
         for (const s of m.add) this.entities.set(s.id, s);
         for (const u of m.upd) { const e = this.entities.get(u.id); if (e) { e.x = u.x; e.y = u.y; if (u.hp !== undefined) e.hp = u.hp; } }
@@ -108,7 +108,11 @@ async function main() {
     }
   };
   const tourist = b;
-  for (const [tx, ty] of [[2000, 2000], [2000, 600], [2000, 3400], [400, 2000], [3600, 2000]] as const) {
+  const tour: [number, number][] = [
+    [SIZE / 2, SIZE / 2], [SIZE / 2, SIZE * 0.15], [SIZE / 2, SIZE * 0.85],
+    [SIZE * 0.1, SIZE / 2], [SIZE * 0.9, SIZE / 2],
+  ];
+  for (const [tx, ty] of tour) {
     await tourist.walkTo(tx, ty, 25000);
     await sleep(500);
     record(tourist);

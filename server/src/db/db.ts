@@ -14,6 +14,17 @@ export function openDb(): Database.Database {
   db.pragma('synchronous = NORMAL');
   const schemaPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'schema.sql');
   db.exec(fs.readFileSync(schemaPath, 'utf-8'));
+  // lightweight migrations for databases created before these columns existed
+  for (const ddl of [
+    "ALTER TABLE accounts ADD COLUMN hats TEXT NOT NULL DEFAULT '[]'",
+    'ALTER TABLE accounts ADD COLUMN hat TEXT',
+  ]) {
+    try {
+      db.exec(ddl);
+    } catch {
+      // column already exists
+    }
+  }
   console.log(`[db] sqlite at ${path.join(dataDir, 'game.db')}`);
   return db;
 }
