@@ -4,7 +4,7 @@
     "safeZoneRadius": 300,
     "viewRadius": 1200,
     "maxPlayers": 40,
-    "tickRate": 20
+    "tickRate": 120
   },
   "player": {
     "hp": 100,
@@ -174,8 +174,8 @@
   },
   "food": {
     "heal": 30,
-    "cooldownSec": 2,
-    "maxCarry": 8,
+    "cooldownSec": 0,
+    "maxCarry": 60,
     "price": 25,
     "dropChance": 0.45,
     "pickupRadius": 50,
