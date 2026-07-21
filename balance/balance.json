@@ -20,8 +20,8 @@
   "levels": {
     "max": 10,
     "cost": 100,
-    "hpPerLevel": 10,
-    "damagePerLevel": 0.03
+    "hpPerLevel": 20,
+    "damagePerLevel": 0.06
   },
   "weapons": {
     "fists": {
