@@ -1,8 +1,8 @@
 {
   "world": {
-    "size": 4000,
+    "size": 10000,
     "viewRadius": 1200,
-    "maxPlayers": 40,
+    "maxPlayers": 80,
     "tickRate": 30
   },
   "player": {
