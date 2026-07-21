@@ -36,7 +36,9 @@ export function performAttack(world: World, p: Player, w: WeaponCfg, now: number
     if (Math.abs(angleDiff(ang, p.angle)) > arcRad / 2) continue;
     const src: DamageSource = { id: p.id, name: p.name, weapon: p.equipped, cause: 'player' };
     const hit = applyDamage(world, t, w.damage, src, now, d);
-    if (hit && w.knockback && t.kind !== 'building' && t.kind !== 'boss') {
+    // Knockback only a still-living target — a dead one has already been removed
+    // from the world, and moveEntity would re-insert it into the grid as a 0-HP ghost.
+    if (hit && !t.dead && w.knockback && t.kind !== 'building' && t.kind !== 'boss') {
       world.moveEntity(t, t.x + Math.cos(ang) * w.knockback, t.y + Math.sin(ang) * w.knockback);
     }
   }
@@ -57,11 +59,16 @@ export function applyDamage(
   if (target.dead) return false;
   const pvp = src.cause === 'player' || src.cause === 'turret';
   if (target.kind === 'player' && pvp) {
-    // safe zone protects from PvP in both directions
+    // the safe zone always protects the victim
     if (world.inSafeZone(target.x, target.y)) return false;
-    const attacker = world.players.get(src.id);
-    if (attacker && world.inSafeZone(attacker.x, attacker.y)) return false;
     if (src.id === target.id) return false;
+    // a player attacking from inside the safe zone deals no damage — but this must
+    // NOT gate turrets: a turret is autonomous, its owner's position is irrelevant
+    // (owners commonly stand at their safe-zone base while the turret defends).
+    if (src.cause === 'player') {
+      const attacker = world.players.get(src.id);
+      if (attacker && world.inSafeZone(attacker.x, attacker.y)) return false;
+    }
   }
   if (target.kind === 'building') {
     if (src.cause !== 'player' && src.cause !== 'turret') return false;
