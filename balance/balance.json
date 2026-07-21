@@ -1,0 +1,184 @@
+{
+  "world": {
+    "size": 4000,
+    "safeZoneRadius": 300,
+    "viewRadius": 1200,
+    "maxPlayers": 40,
+    "tickRate": 20
+  },
+  "player": {
+    "hp": 100,
+    "speed": 220,
+    "radius": 24,
+    "regenPerSec": 2,
+    "regenDelaySec": 5,
+    "respawnSec": 4,
+    "startMoney": 50,
+    "dropMoneyFrac": 0.5
+  },
+  "weapons": {
+    "fists": {
+      "type": "melee",
+      "damage": 8,
+      "range": 55,
+      "arc": 100,
+      "attackRate": 1.5,
+      "price": 0,
+      "knockback": 0
+    },
+    "sword": {
+      "type": "melee",
+      "damage": 18,
+      "range": 80,
+      "arc": 90,
+      "attackRate": 1.6,
+      "price": 100,
+      "knockback": 0
+    },
+    "spear": {
+      "type": "melee",
+      "damage": 22,
+      "range": 125,
+      "arc": 30,
+      "attackRate": 1.2,
+      "price": 250,
+      "knockback": 0
+    },
+    "hammer": {
+      "type": "melee",
+      "damage": 40,
+      "range": 75,
+      "arc": 120,
+      "attackRate": 0.6,
+      "price": 400,
+      "knockback": 80
+    },
+    "bow": {
+      "type": "ranged",
+      "damage": 15,
+      "range": 700,
+      "projSpeed": 600,
+      "attackRate": 1.0,
+      "price": 350,
+      "slowFactor": 0.7
+    },
+    "crossbow": {
+      "type": "ranged",
+      "damage": 35,
+      "range": 900,
+      "projSpeed": 800,
+      "attackRate": 0.45,
+      "price": 800,
+      "slowFactor": 0.85
+    }
+  },
+  "mobs": {
+    "slime": {
+      "hp": 30,
+      "damage": 5,
+      "speed": 90,
+      "reward": 10,
+      "radius": 18,
+      "aggroRadius": 0,
+      "attackRange": 30,
+      "attackRate": 1.0,
+      "flees": true,
+      "count": 40,
+      "zoneMin": 0.12,
+      "zoneMax": 0.4,
+      "leashRange": 500
+    },
+    "wolf": {
+      "hp": 70,
+      "damage": 12,
+      "speed": 250,
+      "reward": 30,
+      "radius": 20,
+      "aggroRadius": 300,
+      "attackRange": 40,
+      "attackRate": 1.2,
+      "flees": false,
+      "count": 25,
+      "zoneMin": 0.4,
+      "zoneMax": 0.7,
+      "leashRange": 600
+    },
+    "golem": {
+      "hp": 200,
+      "damage": 25,
+      "speed": 120,
+      "reward": 100,
+      "radius": 30,
+      "aggroRadius": 200,
+      "attackRange": 55,
+      "attackRate": 0.5,
+      "flees": false,
+      "count": 10,
+      "zoneMin": 0.7,
+      "zoneMax": 0.98,
+      "leashRange": 500
+    }
+  },
+  "boss": {
+    "hp": 5000,
+    "speed": 100,
+    "radius": 60,
+    "contactDamage": 15,
+    "spawnIntervalSec": 900,
+    "warnSec": 30,
+    "despawnSec": 300,
+    "reward": 3000,
+    "minDamageForReward": 100,
+    "slam": {
+      "damage": 60,
+      "range": 260,
+      "arc": 90,
+      "telegraphSec": 1.0,
+      "cooldownSec": 5
+    },
+    "burst": {
+      "damage": 25,
+      "count": 8,
+      "projSpeed": 450,
+      "projRange": 800,
+      "telegraphSec": 1.0,
+      "cooldownSec": 8
+    }
+  },
+  "buildings": {
+    "farm": {
+      "price": 150,
+      "hp": 200,
+      "income": 5,
+      "incomeIntervalSec": 10,
+      "radius": 40
+    },
+    "mine": {
+      "price": 600,
+      "hp": 350,
+      "income": 25,
+      "incomeIntervalSec": 10,
+      "radius": 40
+    },
+    "turret": {
+      "price": 500,
+      "hp": 300,
+      "income": 0,
+      "incomeIntervalSec": 0,
+      "radius": 40,
+      "damage": 10,
+      "range": 350,
+      "attackRate": 1.0,
+      "projSpeed": 700
+    }
+  },
+  "economy": {
+    "maxBuildingsPerPlayer": 5,
+    "buildingMinDist": 100,
+    "buildingSafeZoneDist": 400,
+    "raidLootFrac": 0.5,
+    "coinDespawnSec": 60,
+    "coinPickupRadius": 50,
+    "ownerOfflineDespawnSec": 600
+  }
+}
