@@ -5,7 +5,7 @@ import type { WelcomeMsg } from '@shared/protocol.js';
 import { Connection } from './net/connection.js';
 import { sample, type Sampled } from './net/interpolation.js';
 import { Scene } from './game/scene.js';
-import { EntityView } from './game/entities.js';
+import { EntityView, WEAPON_ICONS } from './game/entities.js';
 import { Effects } from './game/effects.js';
 import { InputManager } from './game/input.js';
 import { MobileControls, isTouchDevice } from './game/mobile.js';
@@ -192,6 +192,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     hud.update(self);
     shop.refresh(self);
     mobile?.setFoodCount(self.food);
+    mobile?.setWeapon(WEAPON_ICONS[self.equipped] ?? '👊', self.equipped);
     if (selfDead) {
       hud.updateDeath(self.respawnIn);
       if (self.respawnIn === undefined && self.hp > 0) {
@@ -310,6 +311,13 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   if (mobile) {
     mobile.onEat = () => conn.send({ t: 'eat' });
     mobile.onShop = () => shop.toggle();
+    mobile.onWeapon = () => {
+      const self = conn.self;
+      if (!self || self.weapons.length < 2) return;
+      const idx = self.weapons.indexOf(self.equipped);
+      const next = self.weapons[(idx + 1) % self.weapons.length];
+      conn.send({ t: 'equip', weapon: next });
+    };
   }
 
   shop.onStartPlace = (b) => {

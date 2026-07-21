@@ -150,26 +150,37 @@ class AttackButton {
   }
 }
 
+/** Simple tap button that reliably fires exactly once per touch or click. */
+function tapButton(id: string, handler: () => void): void {
+  const el = document.getElementById(id)!;
+  let lastFire = 0;
+  const fire = (e: Event): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    const now = performance.now();
+    if (now - lastFire < 250) return; // guard against touch->click double fire
+    lastFire = now;
+    handler();
+  };
+  el.addEventListener('pointerdown', fire);
+  // fallback for browsers where pointer events are flaky on touch
+  el.addEventListener('touchstart', fire, { passive: false });
+}
+
 export class MobileControls {
   private left: Joystick;
   private atk: AttackButton;
   onEat: () => void = () => {};
   onShop: () => void = () => {};
+  onWeapon: () => void = () => {};
 
   constructor() {
     document.body.classList.add('touch');
     this.left = new Joystick('joy-left', 'joy-left-base', 'joy-left-stick');
     this.atk = new AttackButton();
-    document.getElementById('mob-eat')!.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.onEat();
-    });
-    document.getElementById('mob-shop')!.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.onShop();
-    });
+    tapButton('mob-eat', () => this.onEat());
+    tapButton('mob-shop', () => this.onShop());
+    tapButton('mob-weapon', () => this.onWeapon());
   }
 
   state(): TouchState {
@@ -183,5 +194,12 @@ export class MobileControls {
 
   setFoodCount(n: number): void {
     document.getElementById('mob-eat-cnt')!.textContent = String(n);
+  }
+
+  setWeapon(icon: string, name: string): void {
+    const i = document.getElementById('mob-weapon-icon')!;
+    const n = document.getElementById('mob-weapon-name')!;
+    if (i.textContent !== icon) i.textContent = icon;
+    if (n.textContent !== name) n.textContent = name;
   }
 }
