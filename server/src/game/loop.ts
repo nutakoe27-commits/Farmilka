@@ -1,4 +1,5 @@
 import { getBalance } from './balance.js';
+import { encodeSnapshot } from '@shared/snapshot-codec.js';
 import type { WorldManager } from './world-manager.js';
 import { buildSnapshot } from '../net/snapshot.js';
 
@@ -7,21 +8,38 @@ export function startLoop(worlds: WorldManager): void {
   const dt = tickMs / 1000;
   let nextAt = Date.now() + tickMs;
   let slowTicks = 0;
+  let lastSample = Date.now();
 
   const tick = (): void => {
     const start = Date.now();
     const active = worlds.active();
     for (const world of active) {
       try {
+        const t0 = Date.now();
         world.tick(start, dt);
+        let bytes = 0;
         for (const p of world.connectedPlayers()) {
-          world.send(p, buildSnapshot(world, p));
+          const buf = encodeSnapshot(buildSnapshot(world, p)); // binary — the bandwidth hog
+          p.ws?.send(buf);
+          bytes += buf.length;
         }
+        world.tickMs = world.tickMs * 0.9 + (Date.now() - t0) * 0.1;
+        world.bytesOut += bytes;
       } catch (err) {
         console.error(`[loop] tick error (server ${world.serverId})`, err);
       }
     }
     worlds.reap(start); // tear down worlds that have sat empty
+
+    // once per second, turn byte accumulators into a rate
+    if (start - lastSample >= 1000) {
+      const secs = (start - lastSample) / 1000;
+      for (const world of active) {
+        world.bytesRate = world.bytesOut / secs;
+        world.bytesOut = 0;
+      }
+      lastSample = start;
+    }
     const dur = Date.now() - start;
     if (dur > 40) {
       slowTicks++;

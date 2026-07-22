@@ -8,6 +8,7 @@
 // gold; damage scales with level for mobs (18 -> 23) but NOT for bosses (18);
 // levels reset to 1 on death.
 import WebSocket from 'ws';
+import { decodeSnapshot } from '@shared/snapshot-codec.js';
 
 const URL = 'ws://localhost:3999/ws';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -19,8 +20,8 @@ class C {
   constructor(name: string) {
     this.ws = new WebSocket(URL);
     this.ws.on('open', () => this.ws.send(JSON.stringify({ t: 'join', name })));
-    this.ws.on('message', (d) => {
-      const m = JSON.parse(d.toString());
+    this.ws.on('message', (d, isBinary) => {
+      const m = isBinary ? decodeSnapshot(d as Buffer) : JSON.parse(d.toString());
       if (m.t === 'welcome') { this.ready = true; this.id = m.id; }
       else if (m.t === 'snapshot') {
         for (const s of m.add) this.entities.set(s.id, s);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '../db/db.js';
-import { reloadBalance } from '../game/balance.js';
+import { reloadBalance, getBalance } from '../game/balance.js';
 import { WEAPON_IDS } from '@shared/balance-schema.js';
 import type { World } from '../game/world.js';
 
@@ -204,10 +204,26 @@ ${table('Последние сессии', ['Вход', 'Длительност�
     }
     const sessionRows = [['< 5 мин', buckets[0]], ['5–15 мин', buckets[1]], ['15–30 мин', buckets[2]], ['30–60 мин', buckets[3]], ['> 60 мин', buckets[4]]];
 
+    // --- live server load (capacity planning) ---
+    const wbal = getBalance().world;
+    const tickBudget = 1000 / wbal.tickRate;
+    const loadRows = worlds.map((w) => [
+      String(w.serverId),
+      `${w.connectedPlayers().length} / ${wbal.maxPlayers}`,
+      String(w.entities.size),
+      `${w.tickMs.toFixed(1)} / ${tickBudget.toFixed(0)}`,
+      `${(w.bytesRate / 1024).toFixed(0)} КБ/с`,
+    ]);
+    const totalKB = worlds.reduce((s, w) => s + w.bytesRate, 0) / 1024;
+    const maxTick = worlds.reduce((m, w) => Math.max(m, w.tickMs), 0);
+    const headroom = Math.max(0, 100 - (maxTick / tickBudget) * 100);
+    const loadTitle = `Нагрузка (${worlds.length}/${wbal.maxServers} миров · тик ${maxTick.toFixed(1)}/${tickBudget.toFixed(0)}мс · запас ~${headroom.toFixed(0)}% · трафик ${totalKB.toFixed(0)} КБ/с)`;
+
     const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>FarmClash — статистика</title>${STYLE}</head><body>
 <h1>FarmClash — статистика (период: ${hours} ч)</h1>
 <p class="note">Период: <a href="?token=${esc(token)}&hours=1">1ч</a> · <a href="?token=${esc(token)}&hours=24">24ч</a> · <a href="?token=${esc(token)}&hours=168">неделя</a> · <a href="?token=${esc(token)}&hours=720">месяц</a>.
 Кликните имя игрока — откроется его профиль.</p>
+${table(loadTitle, ['Срв', 'Игроки', 'Сущности', 'Тик (мс)', 'Трафик'], loadRows, true)}
 ${table(`Сейчас онлайн: ${onlineTotal} (${worlds.map((w) => `сервер ${w.serverId}: ${w.connectedPlayers().length}`).join(' · ')})`, ['Срв', 'Игрок', 'Тип', 'Деньги', 'Убийств', 'Смертей', 'Оружие', 'Шляпа', 'Построек', 'В игре'], onlineRows, true)}
 ${table('Всего за всё время', ['Уникальных игроков', 'Зарегистрировано аккаунтов', 'Сессий', 'Суммарное время игры', `Новых аккаунтов за ${hours}ч`, `Игроков за ${hours}ч`], [[
   totalPlayers, totalAccounts, totalSessions, fmtDur(totalPlayMs), newAccounts, periodPlayers,

@@ -159,6 +159,7 @@ export type ServerMsg =
   | SnapshotMsg
   | { t: 'event'; ev: GameEvent }
   | { t: 'pong'; ts: number }
+  | { t: 'queued'; pos: number }
   | { t: 'reject'; reason: string };
 
 export function encode(msg: ClientMsg | ServerMsg): string {

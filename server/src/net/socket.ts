@@ -42,6 +42,60 @@ export function startServer(worlds: WorldManager): http.Server {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });
 
+  // Spawns a player into a world and sends the welcome payload. Shared by the
+  // direct-join path and the queue-admit path.
+  function enterWorld(ws: WebSocket, world: World, name: string, account?: Account): Player {
+    const bal = getBalance();
+    const player = world.spawnPlayer(name, ws, account);
+    recomputeMaxHp(world, player);
+    try {
+      sessionIds.set(player, telemetry.sessionStart(name));
+    } catch (err) {
+      console.error('[telemetry] session start failed', err);
+    }
+    const welcome: WelcomeMsg = {
+      t: 'welcome',
+      id: player.id,
+      time: Date.now(),
+      registered: !!account,
+      server: world.serverId,
+      servers: worlds.list(),
+      world: { size: bal.world.size, viewRadius: bal.world.viewRadius },
+      player: { speed: bal.player.speed, radius: bal.player.radius },
+      weapons: bal.weapons,
+      buildings: bal.buildings,
+      food: { heal: bal.food.heal, cooldownSec: bal.food.cooldownSec, maxCarry: bal.food.maxCarry, price: bal.food.price },
+      hats: { items: bal.hats.items, lootboxPrice: bal.hats.lootboxPrice, dupGold: bal.hats.dupGold },
+      prestige: bal.prestige,
+      levels: bal.levels,
+      economy: { sellFrac: bal.economy.sellFrac },
+      maxBuildings: bal.economy.maxBuildingsPerPlayer,
+    };
+    ws.send(encode(welcome));
+    console.log(`[ws] ${name}${account ? ' (аккаунт)' : ''} joined server ${world.serverId} (${world.connectedPlayers().length} online)`);
+    return player;
+  }
+
+  // Waiting queue: auto-join players that hit the hard cap wait here (FIFO) and
+  // are admitted as slots free up, instead of being turned away.
+  interface QueueEntry { ws: WebSocket; name: string; account?: Account; bind: (p: Player, w: World) => void; }
+  const queue: QueueEntry[] = [];
+
+  function tryAdmit(): void {
+    while (queue.length) {
+      const e = queue[0];
+      if (e.ws.readyState !== WebSocket.OPEN) { queue.shift(); continue; }
+      const world = worlds.assign();
+      if (!world) break; // still at the hard cap
+      queue.shift();
+      e.bind(enterWorld(e.ws, world, e.name, e.account), world);
+    }
+    queue.forEach((e, i) => {
+      if (e.ws.readyState === WebSocket.OPEN) e.ws.send(encode({ t: 'queued', pos: i + 1 }));
+    });
+  }
+  setInterval(tryAdmit, 2000);
+
   wss.on('connection', (ws: WebSocket) => {
     let player: Player | null = null;
     let world: World | null = null;
@@ -53,30 +107,10 @@ export function startServer(worlds: WorldManager): http.Server {
       if (!player || !world) {
         if (msg.t !== 'join') return;
         const bal = getBalance();
-
-        // pick a world: explicit choice, or auto-assign (grows a new world on demand)
-        if (typeof msg.server === 'number' && Number.isInteger(msg.server)) {
-          const chosen = worlds.get(msg.server);
-          if (!chosen) {
-            ws.send(encode({ t: 'reject', reason: `Сервера ${msg.server} не существует` }));
-            return;
-          }
-          if (!worlds.hasRoom(chosen)) {
-            ws.send(encode({ t: 'reject', reason: `Сервер ${msg.server} заполнен — выберите другой` }));
-            return;
-          }
-          world = chosen;
-        } else {
-          world = worlds.assign();
-          if (!world) {
-            ws.send(encode({ t: 'reject', reason: 'Все серверы заполнены — попробуйте через минуту' }));
-            ws.close();
-            return;
-          }
-        }
         const name = String(msg.name ?? '').trim().slice(0, 16) || 'Безымянный';
         const password = typeof msg.password === 'string' ? msg.password.slice(0, 64) : '';
 
+        // authenticate first, so the same account can't queue/play twice
         let account: Account | undefined;
         try {
           if (password) {
@@ -85,14 +119,13 @@ export function startServer(worlds: WorldManager): http.Server {
               ws.send(encode({ t: 'reject', reason: res.reason ?? 'Ошибка авторизации' }));
               return;
             }
-            // one live session per account — across all game servers
-            for (const w of worlds.active()) {
-              for (const other of w.players.values()) {
-                if (other.ws && other.account && other.account.toLowerCase() === res.account!.name.toLowerCase()) {
-                  ws.send(encode({ t: 'reject', reason: 'Этот аккаунт уже в игре' }));
-                  return;
-                }
-              }
+            const acc = res.account!.name.toLowerCase();
+            // one live session per account — across all worlds and the queue
+            const live = worlds.active().some((w) => [...w.players.values()].some((o) => o.ws && o.account?.toLowerCase() === acc))
+              || queue.some((e) => e.account?.name.toLowerCase() === acc);
+            if (live) {
+              ws.send(encode({ t: 'reject', reason: 'Этот аккаунт уже в игре' }));
+              return;
             }
             account = res.account;
           } else if (accountExists(name)) {
@@ -105,41 +138,31 @@ export function startServer(worlds: WorldManager): http.Server {
           return;
         }
 
-        player = world.spawnPlayer(name, ws, account);
-        recomputeMaxHp(world, player);
-        try {
-          sessionIds.set(player, telemetry.sessionStart(name));
-        } catch (err) {
-          console.error('[telemetry] session start failed', err);
+        // explicit server pick: no queue — just tell them to try another
+        if (typeof msg.server === 'number' && Number.isInteger(msg.server)) {
+          const chosen = worlds.get(msg.server);
+          if (!chosen) {
+            ws.send(encode({ t: 'reject', reason: `Сервера ${msg.server} не существует` }));
+            return;
+          }
+          if (!worlds.hasRoom(chosen)) {
+            ws.send(encode({ t: 'reject', reason: `Сервер ${msg.server} заполнен — выберите другой` }));
+            return;
+          }
+          world = chosen;
+          player = enterWorld(ws, chosen, name, account);
+          return;
         }
-        const welcome: WelcomeMsg = {
-          t: 'welcome',
-          id: player.id,
-          time: Date.now(),
-          registered: !!account,
-          server: world.serverId,
-          servers: worlds.list(),
-          world: {
-            size: bal.world.size,
-            viewRadius: bal.world.viewRadius,
-          },
-          player: { speed: bal.player.speed, radius: bal.player.radius },
-          weapons: bal.weapons,
-          buildings: bal.buildings,
-          food: {
-            heal: bal.food.heal,
-            cooldownSec: bal.food.cooldownSec,
-            maxCarry: bal.food.maxCarry,
-            price: bal.food.price,
-          },
-          hats: { items: bal.hats.items, lootboxPrice: bal.hats.lootboxPrice, dupGold: bal.hats.dupGold },
-          prestige: bal.prestige,
-          levels: bal.levels,
-          economy: { sellFrac: bal.economy.sellFrac },
-          maxBuildings: bal.economy.maxBuildingsPerPlayer,
-        };
-        ws.send(encode(welcome));
-        console.log(`[ws] ${name}${account ? ' (аккаунт)' : ''} joined server ${world.serverId} (${world.connectedPlayers().length} online)`);
+
+        // auto-assign, or wait in the queue when the whole machine is at capacity
+        const assigned = worlds.assign();
+        if (assigned) {
+          world = assigned;
+          player = enterWorld(ws, assigned, name, account);
+          return;
+        }
+        queue.push({ ws, name, account, bind: (p, w) => { player = p; world = w; } });
+        ws.send(encode({ t: 'queued', pos: queue.length }));
         return;
       }
 
@@ -209,6 +232,8 @@ export function startServer(worlds: WorldManager): http.Server {
     });
 
     ws.on('close', () => {
+      const qi = queue.findIndex((e) => e.ws === ws);
+      if (qi >= 0) queue.splice(qi, 1); // was waiting, never entered a world
       if (!player) return;
       const sid = sessionIds.get(player);
       if (sid !== undefined) {
@@ -236,6 +261,7 @@ export function startServer(worlds: WorldManager): http.Server {
       }
       player = null;
       world = null;
+      tryAdmit(); // a slot may have freed up for someone waiting
     });
 
     ws.on('error', () => ws.close());

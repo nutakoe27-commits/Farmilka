@@ -1,6 +1,7 @@
 // Multi-server + hats test. Isolated server on :3999, FRESH DB, test balance:
 // maxPlayers=2, servers=3, hat drop chances 1.0, lootbox always legendary.
 import WebSocket from 'ws';
+import { decodeSnapshot } from '@shared/snapshot-codec.js';
 
 const URL = 'ws://localhost:3999/ws';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -13,8 +14,8 @@ class C {
   constructor(name: string, password = '', register = false, server?: number) {
     this.ws = new WebSocket(URL);
     this.ws.on('open', () => this.ws.send(JSON.stringify({ t: 'join', name, password: password || undefined, register: register || undefined, server })));
-    this.ws.on('message', (d) => {
-      const m = JSON.parse(d.toString());
+    this.ws.on('message', (d, isBinary) => {
+      const m = isBinary ? decodeSnapshot(d as Buffer) : JSON.parse(d.toString());
       if (m.t === 'welcome') { this.ready = true; this.id = m.id; this.server = m.server; }
       else if (m.t === 'reject') this.rejected = m.reason;
       else if (m.t === 'snapshot') {

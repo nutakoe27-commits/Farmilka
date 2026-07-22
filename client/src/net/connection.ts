@@ -1,4 +1,5 @@
 import { decode, encode, type ClientMsg, type ServerMsg, type WelcomeMsg, type SnapshotMsg, type GameEvent, type EntityState } from '@shared/protocol.js';
+import { decodeSnapshot } from '@shared/snapshot-codec.js';
 
 export interface Remote {
   state: EntityState;
@@ -32,15 +33,21 @@ export class Connection {
   onEvent: (ev: GameEvent) => void = () => {};
   onSnapshot: (s: SnapshotMsg) => void = () => {};
   onRemove: (id: string, state: EntityState) => void = () => {};
+  onQueued: (pos: number) => void = () => {};
   onClose: (reason: string) => void = () => {};
 
   constructor(name: string, password = '', register = false, server?: number) {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     this.ws = new WebSocket(`${proto}://${location.host}/ws`);
+    this.ws.binaryType = 'arraybuffer';
     this.ws.onopen = () => this.send({ t: 'join', name, password: password || undefined, register: register || undefined, server });
     this.ws.onclose = () => this.onClose(this.closeReason ?? 'Соединение потеряно');
     this.ws.onerror = () => this.onClose('Ошибка соединения');
-    this.ws.onmessage = (e) => this.handle(String(e.data));
+    // snapshots arrive as binary frames; everything else is JSON text
+    this.ws.onmessage = (e) => {
+      if (typeof e.data === 'string') this.handle(e.data);
+      else this.applySnapshot(decodeSnapshot(e.data as ArrayBuffer));
+    };
   }
 
   private closeReason: string | null = null;
@@ -64,6 +71,9 @@ export class Connection {
         break;
       case 'event':
         this.onEvent(msg.ev);
+        break;
+      case 'queued':
+        this.onQueued(msg.pos);
         break;
       case 'reject':
         this.closeReason = msg.reason;

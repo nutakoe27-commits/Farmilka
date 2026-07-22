@@ -72,11 +72,17 @@ async function startGame(name: string, password: string, register: boolean, serv
       location.reload();
       return;
     }
+    $('queue-screen').classList.add('hidden');
     $('hud').classList.add('hidden');
     showError(reason);
   };
+  conn.onQueued = (pos) => {
+    $('queue-screen').classList.remove('hidden');
+    $('queue-pos').textContent = String(pos);
+  };
   conn.onWelcome = (w) => {
     inGame = true;
+    $('queue-screen').classList.add('hidden');
     initGame(conn, w).catch((err) => {
       console.error(err);
       showError('Ошибка инициализации графики');

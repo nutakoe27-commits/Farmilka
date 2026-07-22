@@ -6,7 +6,8 @@
  * Usage: npx tsx scripts/bots.ts --n 30 --url ws://localhost:3000/ws --minutes 5
  */
 import WebSocket from 'ws';
-import { decode, encode, type ServerMsg, type ClientMsg, type WelcomeMsg, type EntityState } from '@shared/protocol.js';
+import { decode, encode, type ServerMsg, type ClientMsg, type WelcomeMsg, type EntityState, type SnapshotMsg } from '@shared/protocol.js';
+import { decodeSnapshot } from '@shared/snapshot-codec.js';
 
 const args = process.argv.slice(2);
 function arg(name: string, def: string): string {
@@ -40,7 +41,11 @@ class Bot {
   constructor(public name: string) {
     this.ws = new WebSocket(URL);
     this.ws.on('open', () => this.ws.send(encode({ t: 'join', name })));
-    this.ws.on('message', (d) => this.onMsg(d.toString()));
+    this.ws.binaryType = 'nodebuffer';
+    this.ws.on('message', (d, isBinary) => {
+      if (isBinary) { bytes += (d as Buffer).length; this.onSnapshot(decodeSnapshot(d as Buffer)); }
+      else this.onMsg(d.toString());
+    });
     this.ws.on('error', (e) => console.error(`[${name}] ws error:`, e.message));
     this.ws.on('close', () => {
       if (this.timer) clearInterval(this.timer);
@@ -56,26 +61,28 @@ class Bot {
       this.id = msg.id;
       joined++;
       this.timer = setInterval(() => this.think(), 100);
-    } else if (msg.t === 'snapshot') {
-      snapshots++;
-      for (const st of msg.add) this.entities.set(st.id, st);
-      for (const u of msg.upd) {
-        const e = this.entities.get(u.id);
-        if (e) {
-          e.x = u.x;
-          e.y = u.y;
-          if (u.hp !== undefined) e.hp = u.hp;
-        }
-      }
-      for (const id of msg.rem) this.entities.delete(id);
-      this.x = msg.self.x;
-      this.y = msg.self.y;
-      this.money = msg.self.money;
-      this.weapons = msg.self.weapons;
-      this.dead = msg.self.respawnIn !== undefined;
     } else if (msg.t === 'event' && msg.ev.e === 'kill') {
       killsSeen++;
     }
+  }
+
+  onSnapshot(msg: SnapshotMsg): void {
+    snapshots++;
+    for (const st of msg.add) this.entities.set(st.id, st);
+    for (const u of msg.upd) {
+      const e = this.entities.get(u.id);
+      if (e) {
+        e.x = u.x;
+        e.y = u.y;
+        if (u.hp !== undefined) e.hp = u.hp;
+      }
+    }
+    for (const id of msg.rem) this.entities.delete(id);
+    this.x = msg.self.x;
+    this.y = msg.self.y;
+    this.money = msg.self.money;
+    this.weapons = msg.self.weapons;
+    this.dead = msg.self.respawnIn !== undefined;
   }
 
   think(): void {

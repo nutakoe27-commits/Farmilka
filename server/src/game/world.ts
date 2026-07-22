@@ -19,6 +19,11 @@ export class World {
   tickNo = 0;
   time = Date.now();
 
+  // runtime load metrics, updated by the loop and read by the admin dashboard
+  tickMs = 0; // EMA of this world's tick + snapshot-send time
+  bytesOut = 0; // bytes sent since the last sample window
+  bytesRate = 0; // outgoing bytes/sec (updated ~1×/sec)
+
   entities = new Map<string, Entity>();
   players = new Map<string, Player>();
   mobs = new Map<string, Mob>();
