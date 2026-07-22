@@ -95,6 +95,7 @@ export class Connection {
       r.state.y = d.y;
       if (d.angle !== undefined) r.state.angle = d.angle;
       if (d.hp !== undefined) r.state.hp = d.hp;
+      if (d.maxHp !== undefined) r.state.maxHp = d.maxHp;
       if (d.weapon !== undefined) r.state.weapon = d.weapon;
       if (d.prot !== undefined) r.state.prot = d.prot;
       if (d.hat !== undefined) r.state.hat = d.hat;

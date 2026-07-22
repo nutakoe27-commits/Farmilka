@@ -83,6 +83,7 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
       if (e.dirtyTick === world.tickNo) {
         d.hp = Math.round(e.hp);
         if (e.kind === 'player') {
+          d.maxHp = e.maxHp; // changes with level / hat — keep the over-head bar in sync
           d.weapon = e.equipped;
           d.prot = e.invulnUntil > world.time;
           d.hat = e.hat;

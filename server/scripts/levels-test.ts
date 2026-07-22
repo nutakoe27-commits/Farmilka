@@ -24,7 +24,7 @@ class C {
       if (m.t === 'welcome') { this.ready = true; this.id = m.id; }
       else if (m.t === 'snapshot') {
         for (const s of m.add) this.entities.set(s.id, s);
-        for (const u of m.upd) { const e = this.entities.get(u.id); if (e) { e.x = u.x; e.y = u.y; if (u.hp !== undefined) e.hp = u.hp; } }
+        for (const u of m.upd) { const e = this.entities.get(u.id); if (e) { e.x = u.x; e.y = u.y; if (u.hp !== undefined) e.hp = u.hp; if (u.maxHp !== undefined) e.maxHp = u.maxHp; } }
         for (const id of m.rem) this.entities.delete(id);
         this.x = m.self.x; this.y = m.self.y; this.hp = m.self.hp; this.maxHp = m.self.maxHp;
         this.money = m.self.money; this.level = m.self.level; this.levelCost = m.self.levelCost;
@@ -95,6 +95,12 @@ async function main() {
   const dmgL1 = slime1 ? await measureHit(a, slime1) : null;
   check('sword deals 18 at level 1', dmgL1 === 18, `dmg=${dmgL1}`);
 
+  // ---- observer parks next to A (stays in view) to watch maxHp via DELTA ----
+  await moveTo(b, a.x - 40, a.y);
+  await sleep(300);
+  const obsBefore = b.entities.get(a.id);
+  check('observer sees A at maxHp 100 before leveling', !!obsBefore && obsBefore.maxHp === 100, `maxHp=${obsBefore?.maxHp}`);
+
   // ---- buy one level: flat 100 cost, +10 maxHp, +10 current HP ----
   const moneyBefore = a.money;
   const hpBefore = a.hp;
@@ -111,6 +117,9 @@ async function main() {
   check('reached max level 10', a.level === 10, `level=${a.level}`);
   check('maxHp 190 at level 10', a.maxHp === 190, `maxHp=${a.maxHp}`);
   check('no further cost at max', a.levelCost === 0, `cost=${a.levelCost}`);
+  // the over-head HP bar bug: other clients must receive maxHp via delta
+  const obsAfter = b.entities.get(a.id);
+  check('observer sees A maxHp 190 via delta (HP-bar fix)', !!obsAfter && obsAfter.maxHp === 190, `maxHp=${obsAfter?.maxHp}`);
 
   // ---- cannot exceed max ----
   a.events.length = 0;

@@ -76,6 +76,7 @@ export class EntityView {
   aura: Graphics | null = null;
   isSelf = false;
   lastHp = -1;
+  lastMaxHp = -1;
   lastWeapon = '';
   lastHat: string | null = 'no';
   lastPrestige = -1;
@@ -306,8 +307,9 @@ export class EntityView {
       this.aura.alpha = 0.7 + 0.3 * Math.sin(now / 260);
     }
 
-    if (s.hp !== undefined && s.maxHp !== undefined && s.hp !== this.lastHp) {
+    if (s.hp !== undefined && s.maxHp !== undefined && (s.hp !== this.lastHp || s.maxHp !== this.lastMaxHp)) {
       this.lastHp = s.hp;
+      this.lastMaxHp = s.maxHp;
       const frac = Math.max(0, s.hp / s.maxHp);
       const w = s.kind === 'boss' ? 120 : s.radius * 2.2;
       this.hpBar.clear();

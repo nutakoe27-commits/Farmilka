@@ -38,6 +38,7 @@ export interface EntityDelta {
   y: number;
   angle?: number;
   hp?: number;
+  maxHp?: number;
   weapon?: WeaponId;
   dead?: boolean;
   prot?: boolean;
