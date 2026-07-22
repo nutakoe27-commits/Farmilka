@@ -6,7 +6,7 @@ export interface GameSettings {
   killFeed: boolean;
 }
 
-const KEY = 'farmilka-settings';
+const KEY = 'farmclash-settings';
 
 export class Settings {
   values: GameSettings = { shake: true, damageNumbers: true, killFeed: true };
@@ -61,10 +61,10 @@ export class Settings {
       const servers = (await (await fetch('/servers')).json()) as { id: number; online: number; max: number }[];
       list.innerHTML = '';
       const auto = document.createElement('button');
-      auto.className = 'srv-btn' + (localStorage.getItem('farmilka-server') ? '' : ' current');
+      auto.className = 'srv-btn' + (localStorage.getItem('farmclash-server') ? '' : ' current');
       auto.textContent = 'Авто';
       auto.onclick = () => {
-        localStorage.removeItem('farmilka-server');
+        localStorage.removeItem('farmclash-server');
         location.reload();
       };
       list.appendChild(auto);
@@ -75,7 +75,7 @@ export class Settings {
         b.textContent = `Сервер ${srv.id} — ${srv.online}/${srv.max}`;
         b.onclick = () => {
           if (full || srv.id === this.currentServer) return;
-          localStorage.setItem('farmilka-server', String(srv.id));
+          localStorage.setItem('farmclash-server', String(srv.id));
           location.reload();
         };
         list.appendChild(b);

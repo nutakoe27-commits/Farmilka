@@ -36,6 +36,9 @@ export class Scene {
   camY = 0;
   zoom = 1;
   shake = 0;
+  /** Zooms the view out (>1 = see more world). Bumped on touch devices where the
+   *  small, tall screen otherwise shows too little around the player. */
+  viewScale = 1;
 
   /** Everyone sees the same world area regardless of screen size (fair play). */
   static readonly VIEW_W = 1600;
@@ -121,8 +124,8 @@ export class Scene {
 
     const w = this.app.renderer.width;
     const h = this.app.renderer.height;
-    // cover-fit the design viewport: nobody sees more than VIEW_W x VIEW_H world units
-    this.zoom = Math.max(w / Scene.VIEW_W, h / Scene.VIEW_H);
+    // cover-fit the design viewport; viewScale widens it (touch devices see more)
+    this.zoom = Math.max(w / (Scene.VIEW_W * this.viewScale), h / (Scene.VIEW_H * this.viewScale));
 
     const sx = (Math.random() - 0.5) * this.shake;
     const sy = (Math.random() - 0.5) * this.shake;

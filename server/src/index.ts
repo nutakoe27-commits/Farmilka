@@ -16,4 +16,4 @@ const worlds = Array.from({ length: count }, (_, i) => new World(i + 1));
 startServer(worlds);
 startLoop(worlds);
 
-console.log(`[farmilka] up with ${count} game server(s)`);
+console.log(`[farmclash] up with ${count} game server(s)`);

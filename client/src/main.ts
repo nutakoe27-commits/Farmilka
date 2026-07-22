@@ -21,7 +21,7 @@ const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 const nameInput = $('name-input') as HTMLInputElement;
 const passInput = $('pass-input') as HTMLInputElement;
-nameInput.value = localStorage.getItem('farmilka-name') ?? '';
+nameInput.value = localStorage.getItem('farmclash-name') ?? '';
 nameInput.focus();
 
 let inGame = false;
@@ -37,10 +37,10 @@ function tryStart(register: boolean): void {
     showError('Для аккаунта нужен пароль (мин. 4 символа)');
     return;
   }
-  localStorage.setItem('farmilka-name', name);
+  localStorage.setItem('farmclash-name', name);
   $('conn-error').textContent = '';
   $('name-screen').classList.add('hidden');
-  const serverPref = Number(localStorage.getItem('farmilka-server')) || undefined;
+  const serverPref = Number(localStorage.getItem('farmclash-server')) || undefined;
   startGame(name, password, register, serverPref).catch((err) => {
     console.error(err);
     showError('Не удалось запустить игру');
@@ -68,7 +68,7 @@ async function startGame(name: string, password: string, register: boolean, serv
   conn.onClose = (reason) => {
     if (inGame) {
       // hard reload keeps state clean after a real session
-      sessionStorage.setItem('farmilka-msg', reason);
+      sessionStorage.setItem('farmclash-msg', reason);
       location.reload();
       return;
     }
@@ -84,9 +84,9 @@ async function startGame(name: string, password: string, register: boolean, serv
   };
 }
 
-const savedMsg = sessionStorage.getItem('farmilka-msg');
+const savedMsg = sessionStorage.getItem('farmclash-msg');
 if (savedMsg) {
-  sessionStorage.removeItem('farmilka-msg');
+  sessionStorage.removeItem('farmclash-msg');
   $('conn-error').textContent = savedMsg;
 }
 
@@ -96,6 +96,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   $('app').appendChild(app.canvas);
 
   const scene = new Scene(app);
+  scene.viewScale = isTouchDevice() ? 1.6 : 1; // phones get a wider view of the world
   scene.drawGround(welcome.world.size);
   setPrestigeCfg(welcome.prestige);
   const effects = new Effects(scene.layers.effects, scene.layers.telegraphs);

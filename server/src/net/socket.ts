@@ -36,7 +36,7 @@ export function startServer(worlds: World[]): http.Server {
     app.get('/{*splat}', (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
     console.log(`[http] serving client from ${clientDist}`);
   } else {
-    app.get('/', (_req, res) => res.send('Farmilka server. Client build not found — use Vite dev server.'));
+    app.get('/', (_req, res) => res.send('FarmClash server. Client build not found — use Vite dev server.'));
   }
 
   const server = http.createServer(app);

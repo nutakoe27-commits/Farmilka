@@ -85,7 +85,7 @@ export function adminRouter(worlds: World[]): Router {
     const kills = sess.kills ?? 0;
     const deaths = sess.deaths ?? 0;
 
-    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${esc(name)} — Farmilka</title>${STYLE}</head><body>
+    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${esc(name)} — FarmClash</title>${STYLE}</head><body>
 <p><a href="/admin/stats?token=${encodeURIComponent(token)}">← ко всей статистике</a></p>
 <h1>Профиль: ${esc(name)} ${online ? '<span class="tag">онлайн</span>' : ''} ${acc ? '<span class="tag">аккаунт</span>' : '<span class="tag guest">гость</span>'}</h1>
 ${acc ? `<p class="note">Зарегистрирован: ${fmtDate(acc.created_ts)} · был в сети: ${fmtDate(acc.last_seen_ts)} · золото на счету: ${fmt(acc.money)} · оружие: ${esc(acc.weapons)}</p>` : '<p class="note">Играет без аккаунта (имя может использоваться разными людьми).</p>'}
@@ -202,8 +202,8 @@ ${table('Последние сессии', ['Вход', 'Длительност�
     }
     const sessionRows = [['< 5 мин', buckets[0]], ['5–15 мин', buckets[1]], ['15–30 мин', buckets[2]], ['30–60 мин', buckets[3]], ['> 60 мин', buckets[4]]];
 
-    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Farmilka — статистика</title>${STYLE}</head><body>
-<h1>Farmilka — статистика (период: ${hours} ч)</h1>
+    const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>FarmClash — статистика</title>${STYLE}</head><body>
+<h1>FarmClash — статистика (период: ${hours} ч)</h1>
 <p class="note">Период: <a href="?token=${esc(token)}&hours=1">1ч</a> · <a href="?token=${esc(token)}&hours=24">24ч</a> · <a href="?token=${esc(token)}&hours=168">неделя</a> · <a href="?token=${esc(token)}&hours=720">месяц</a>.
 Кликните имя игрока — откроется его профиль.</p>
 ${table(`Сейчас онлайн: ${onlineTotal} (${worlds.map((w) => `сервер ${w.serverId}: ${w.connectedPlayers().length}`).join(' · ')})`, ['Срв', 'Игрок', 'Тип', 'Деньги', 'Убийств', 'Смертей', 'Оружие', 'Шляпа', 'Построек', 'В игре'], onlineRows, true)}
