@@ -26,6 +26,17 @@ interface Ring {
   to: number;
 }
 
+interface Swing {
+  g: Graphics;
+  angle: number;
+  arc: number;
+  r0: number;
+  r1: number;
+  color: number;
+  life: number;
+  maxLife: number;
+}
+
 interface Telegraph {
   g: Graphics;
   until: number;
@@ -35,6 +46,7 @@ export class Effects {
   private parts: Particle[] = [];
   private texts: FloatText[] = [];
   private rings: Ring[] = [];
+  private swings: Swing[] = [];
   private telegraphs: Telegraph[] = [];
 
   constructor(private layer: Container, private telegraphLayer: Container) {}
@@ -77,6 +89,16 @@ export class Effects {
   levelBurst(x: number, y: number): void {
     this.ring(x, y, 0xffd76e, 20, 90, 0.55);
     this.burst(x, y, 0xffe08a, 16, 210);
+  }
+
+  /** Melee attack arc: sweeps across the weapon's arc so you see where you hit. */
+  swing(x: number, y: number, angle: number, range: number, arcDeg: number, color: number): void {
+    const g = new Graphics();
+    g.position.set(x, y);
+    g.blendMode = 'add';
+    this.layer.addChild(g);
+    const arc = Math.min(Math.PI * 2, (arcDeg * Math.PI) / 180);
+    this.swings.push({ g, angle, arc, r0: range * 0.28, r1: range, color, life: 0.2, maxLife: 0.2 });
   }
 
   damageNumber(x: number, y: number, amount: number, color = 0xffe08a): void {
@@ -147,6 +169,32 @@ export class Effects {
       const f = 1 - r.life / r.maxLife;
       r.g.scale.set(r.from + (r.to - r.from) * f);
       r.g.alpha = 1 - f;
+    }
+    for (let i = this.swings.length - 1; i >= 0; i--) {
+      const s = this.swings[i];
+      s.life -= dt;
+      if (s.life <= 0) {
+        s.g.destroy();
+        this.swings.splice(i, 1);
+        continue;
+      }
+      const p = 1 - s.life / s.maxLife; // 0 -> 1
+      const wipe = Math.min(1, p * 1.5);
+      const a0 = s.angle - s.arc / 2;
+      const a1 = a0 + s.arc * wipe;
+      const g = s.g;
+      g.clear();
+      g.moveTo(Math.cos(a0) * s.r0, Math.sin(a0) * s.r0);
+      g.arc(0, 0, s.r1, a0, a1);
+      g.arc(0, 0, s.r0, a1, a0, true);
+      g.closePath();
+      g.fill({ color: s.color, alpha: (1 - p) * 0.35 });
+      g.moveTo(Math.cos(a0) * s.r1, Math.sin(a0) * s.r1);
+      g.arc(0, 0, s.r1, a0, a1);
+      g.stroke({ width: 3, color: s.color, alpha: (1 - p) * 0.8 });
+      g.moveTo(Math.cos(a1) * s.r0, Math.sin(a1) * s.r0);
+      g.lineTo(Math.cos(a1) * s.r1, Math.sin(a1) * s.r1);
+      g.stroke({ width: 3, color: 0xffffff, alpha: (1 - p) * 0.9 }); // bright leading edge
     }
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const ft = this.texts[i];

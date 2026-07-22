@@ -289,6 +289,13 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       case 'heal':
         effects.incomeNumber(dispX, dispY, ev.amount);
         break;
+      case 'swing': {
+        const cfg = welcome.weapons[ev.weapon as WeaponId];
+        if (!cfg || cfg.type !== 'melee') break;
+        const isSelf = ev.id === welcome.id;
+        effects.swing(isSelf ? dispX : ev.x, isSelf ? dispY : ev.y, isSelf ? aim : ev.angle, cfg.range, cfg.arc ?? 90, swingColor(ev.weapon));
+        break;
+      }
       case 'hat': {
         if (ev.dup) {
           hud.notice(`🎩 Дубликат «${escapeHtml(ev.name)}» → <b style="color:#ffd76e">+${ev.gold} золота</b>`);
@@ -518,6 +525,18 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function swingColor(weapon: string): number {
+  switch (weapon) {
+    case 'venom_blade': return 0x8fe86a;
+    case 'vampire_blade': return 0xff6b6b;
+    case 'hammer': return 0xffb86a;
+    case 'scythe': return 0xd8a0ff;
+    case 'daggers': return 0xcfe8ff;
+    case 'spear': return 0x9fe0ff;
+    default: return 0xdff0ff;
+  }
 }
 
 /** First-time tips: a few rotating hints, then never again (localStorage flag). */

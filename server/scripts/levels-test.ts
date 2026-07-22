@@ -15,7 +15,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 class C {
   ws: WebSocket; seq = 0; x = 0; y = 0; hp = 0; maxHp = 0; money = 0; id = ''; ready = false;
-  level = 0; levelCost = 0; respawnIn: number | undefined;
+  level = 0; levelCost = 0; food = 0; respawnIn: number | undefined;
   entities = new Map<string, any>(); events: any[] = [];
   constructor(name: string, password = '', register = false) {
     this.ws = new WebSocket(URL);
@@ -29,7 +29,7 @@ class C {
         for (const id of m.rem) this.entities.delete(id);
         this.x = m.self.x; this.y = m.self.y; this.hp = m.self.hp; this.maxHp = m.self.maxHp;
         this.money = m.self.money; this.level = m.self.level; this.levelCost = m.self.levelCost;
-        this.respawnIn = m.self.respawnIn;
+        this.food = m.self.food; this.respawnIn = m.self.respawnIn;
       } else if (m.t === 'event') this.events.push(m.ev);
     });
   }
@@ -175,13 +175,16 @@ async function main() {
   await acc.waitReady();
   await sleep(300);
   for (let i = 0; i < 3; i++) { acc.send({ t: 'buyLevel' }); await sleep(250); }
+  for (let i = 0; i < 2; i++) { acc.send({ t: 'buy', item: 'food' }); await sleep(200); }
   check('account leveled to 4 before logout', acc.level === 4, `level=${acc.level}`);
+  check('account bought 2 food', acc.food === 2, `food=${acc.food}`);
   acc.ws.close();
   await sleep(900); // let saveProgress run
   const acc2 = new C('Persister', 'pass1234');
   await acc2.waitReady();
   await sleep(400);
   check('level persists across logout/login', acc2.level === 4, `level=${acc2.level}`);
+  check('food persists across logout/login', acc2.food === 2, `food=${acc2.food}`);
   check('maxHp reflects the restored level (130)', acc2.maxHp === 130, `maxHp=${acc2.maxHp}`);
   check('rejoins at full HP', acc2.hp === acc2.maxHp, `hp=${acc2.hp}/${acc2.maxHp}`);
 

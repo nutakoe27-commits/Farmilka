@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import type { EntityState } from '@shared/protocol.js';
 import { GLOW } from './textures.js';
+import { drawMob } from './mob-art.js';
 import { prestigeTier, type PrestigeCfg } from '@shared/prestige.js';
 
 let PRESTIGE_CFG: PrestigeCfg | null = null;
@@ -178,48 +179,7 @@ export class EntityView {
         break;
       }
       case 'mob': {
-        const style = MOB_STYLE[s.mobType ?? 'slime'] ?? { color: 0xcccccc, shape: 'blob' as const };
-        const c = style.color;
-        if (style.glow) {
-          g.circle(0, 0, r + 8).fill({ color: style.glow, alpha: 0.18 });
-        }
-        switch (style.shape) {
-          case 'golem': {
-            const pts: number[] = [];
-            for (let i = 0; i < 6; i++) {
-              const a = (i / 6) * Math.PI * 2;
-              pts.push(Math.cos(a) * r, Math.sin(a) * r);
-            }
-            g.poly(pts).fill(c).stroke({ width: 2, color: 0x0d0f14 });
-            g.circle(-r * 0.25, -r * 0.15, r * 0.12).fill(0x0d0f14);
-            g.circle(r * 0.25, -r * 0.15, r * 0.12).fill(0x0d0f14);
-            break;
-          }
-          case 'beast': {
-            g.poly([r, 0, -r * 0.8, r * 0.7, -r * 0.4, 0, -r * 0.8, -r * 0.7]).fill(c).stroke({ width: 2, color: 0x0d0f14 });
-            break;
-          }
-          case 'ghost': {
-            g.circle(0, 0, r + 5).fill({ color: c, alpha: 0.2 });
-            g.circle(0, 0, r).fill({ color: c, alpha: 0.75 });
-            g.circle(-r * 0.3, -r * 0.15, r * 0.16).fill(0x0d0f14);
-            g.circle(r * 0.3, -r * 0.15, r * 0.16).fill(0x0d0f14);
-            break;
-          }
-          case 'tree': {
-            g.roundRect(-r * 0.85, -r * 0.85, r * 1.7, r * 1.7, r * 0.35).fill(c).stroke({ width: 3, color: 0x0d0f14 });
-            g.circle(-r * 0.3, -r * 0.2, r * 0.14).fill(0xffe08a);
-            g.circle(r * 0.3, -r * 0.2, r * 0.14).fill(0xffe08a);
-            g.moveTo(-r * 0.6, r * 0.45).lineTo(r * 0.6, r * 0.45).stroke({ width: 3, color: 0x0d0f14 });
-            break;
-          }
-          default: {
-            g.circle(0, 0, r + 4).fill({ color: c, alpha: 0.25 });
-            g.circle(0, 0, r).fill(c).stroke({ width: 2, color: 0x0d0f14 });
-            g.circle(-r * 0.3, -r * 0.2, r * 0.15).fill(0x0d0f14);
-            g.circle(r * 0.3, -r * 0.2, r * 0.15).fill(0x0d0f14);
-          }
-        }
+        drawMob(g, s.mobType ?? 'slime', r);
         break;
       }
       case 'boss': {

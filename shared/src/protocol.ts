@@ -90,6 +90,7 @@ export type GameEvent =
   | { e: 'purchase'; ok: boolean; item: string; reason?: string }
   | { e: 'placed'; ok: boolean; reason?: string }
   | { e: 'heal'; amount: number }
+  | { e: 'swing'; id: string; x: number; y: number; angle: number; weapon: string }
   | { e: 'hat'; hat: string; name: string; tier: HatTier; source: 'mob' | 'boss' | 'lootbox'; dup: boolean; gold: number }
   | { e: 'lootbox'; result: 'hat' | 'gold' | 'nothing'; gold: number }
   | { e: 'prestige'; level: number; tier: string | null }

@@ -38,7 +38,8 @@ export function performAttack(world: World, p: Player, w: WeaponCfg, now: number
     }
     return;
   }
-  // melee: arc in front of the player
+  // melee: arc in front of the player — broadcast a swing so it's clear where you hit
+  world.sendNear(p.x, p.y, { e: 'swing', id: p.id, x: p.x, y: p.y, angle: p.angle, weapon: p.equipped });
   const arcRad = ((w.arc ?? 90) * Math.PI) / 180;
   const targets = world.grid.queryCircle(p.x, p.y, w.range + 70);
   for (const t of targets) {

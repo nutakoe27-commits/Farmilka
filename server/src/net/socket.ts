@@ -262,7 +262,7 @@ export function startServer(worlds: WorldManager): http.Server {
       // account progress (gold + weapons + hats) survives the session
       if (player.account) {
         try {
-          saveProgress(player.account, player.money, player.weapons, player.hats, player.hat, player.prestige, player.level);
+          saveProgress(player.account, player.money, player.weapons, player.hats, player.hat, player.prestige, player.level, player.food);
         } catch (err) {
           console.error('[auth] progress save failed', err);
         }
