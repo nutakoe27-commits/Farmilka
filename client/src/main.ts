@@ -1,4 +1,5 @@
-import { Application, Graphics } from 'pixi.js';
+import { Application, Container, Graphics, Sprite } from 'pixi.js';
+import { SPARK } from './game/textures.js';
 import { clamp } from '@shared/math.js';
 import type { WeaponId } from '@shared/types.js';
 import type { WelcomeMsg } from '@shared/protocol.js';
@@ -107,6 +108,34 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   scene.drawGround(welcome.world.size);
   setPrestigeCfg(welcome.prestige);
   const effects = new Effects(scene.layers.effects, scene.layers.telegraphs);
+
+  // ambient drifting motes (screen-space atmosphere)
+  const motes = new Container();
+  motes.eventMode = 'none';
+  app.stage.addChild(motes);
+  const moteList: { s: Sprite; vx: number; vy: number }[] = [];
+  for (let i = 0; i < 40; i++) {
+    const s = new Sprite(SPARK);
+    s.anchor.set(0.5);
+    s.blendMode = 'add';
+    s.tint = 0x9ecbff;
+    s.alpha = 0.06 + Math.random() * 0.1;
+    s.width = s.height = 3 + Math.random() * 6;
+    s.position.set(Math.random() * app.screen.width, Math.random() * app.screen.height);
+    motes.addChild(s);
+    moteList.push({ s, vx: (Math.random() - 0.5) * 8, vy: -5 - Math.random() * 9 });
+  }
+  const updateMotes = (dt: number): void => {
+    const w = app.screen.width, h = app.screen.height;
+    for (const m of moteList) {
+      m.s.position.x += m.vx * dt;
+      m.s.position.y += m.vy * dt;
+      if (m.s.position.y < -10) { m.s.position.y = h + 10; m.s.position.x = Math.random() * w; }
+      if (m.s.position.x < -10) m.s.position.x = w + 10;
+      else if (m.s.position.x > w + 10) m.s.position.x = -10;
+    }
+  };
+  let frame = 0;
   const settings = new Settings();
   settings.currentServer = welcome.server;
   const hud = new Hud();
@@ -253,6 +282,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       }
       case 'damage': {
         if (settings.values.damageNumbers) effects.damageNumber(ev.x, ev.y, ev.amount);
+        views.get(ev.target)?.flash();
         if (ev.target === conn.welcome!.id && settings.values.shake) scene.shake = 7;
         break;
       }
@@ -280,6 +310,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       }
       case 'level': {
+        effects.levelBurst(dispX, dispY);
         const maxed = ev.level >= ev.max;
         hud.notice(maxed
           ? `⭐ <b style="color:#7ee787">Максимальный уровень ${ev.level}!</b> Ты силён в PvE — но босса в одиночку не одолеть.`
@@ -460,7 +491,14 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         sample(r, renderTime, tmp);
         view.update(tmp.x, tmp.y, tmp.angle, now);
       }
+      // glowing trail behind projectiles (throttled to every other frame)
+      if (r.state.kind === 'projectile' && (frame & 1) === 0) {
+        const c = r.state.name === 'boss-burst' ? 0xff7b72 : 0xffe08a;
+        effects.trail(view.root.position.x, view.root.position.y, c);
+      }
     }
+    frame++;
+    updateMotes(dt);
 
     if (ghost) {
       const pos = scene.screenToWorld(input.mouseX, input.mouseY);

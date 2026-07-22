@@ -1,5 +1,6 @@
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import type { EntityState } from '@shared/protocol.js';
+import { GLOW } from './textures.js';
 import { prestigeTier, type PrestigeCfg } from '@shared/prestige.js';
 
 let PRESTIGE_CFG: PrestigeCfg | null = null;
@@ -69,6 +70,10 @@ export class EntityView {
   hpBar = new Graphics();
   protRing: Graphics | null = null;
   statusRing: Graphics | null = null;
+  glow: Sprite | null = null;
+  hitFx: Sprite | null = null;
+  glowAlpha = 0;
+  flashStart = -1e9;
   lastFx = 0;
   weaponText: Text | null = null;
   hatText: Text | null = null;
@@ -96,6 +101,47 @@ export class EntityView {
       this.statusRing = new Graphics();
       this.top.addChild(this.statusRing);
     }
+    this.addGlow(state);
+  }
+
+  /** Additive neon halo behind the body + a white hit-flash sprite over it. */
+  private addGlow(s: EntityState): void {
+    const spec: Record<string, { color: number; scale: number; alpha: number } | undefined> = {
+      player: { color: this.color, scale: 3.7, alpha: 0.62 },
+      mob: { color: MOB_STYLE[s.mobType ?? 'slime']?.glow ?? MOB_STYLE[s.mobType ?? 'slime']?.color ?? 0x88ccff, scale: 3.3, alpha: 0.56 },
+      boss: { color: BOSS_STYLE[s.bossType ?? 'champion']?.glow ?? 0xb565d8, scale: 3.0, alpha: 0.75 },
+      coin: { color: 0xffd76e, scale: 3.6, alpha: 0.72 },
+      food: { color: 0xff9d5c, scale: 3.2, alpha: 0.5 },
+      projectile: { color: s.name === 'boss-burst' ? 0xff7b72 : 0xffe08a, scale: 4.5, alpha: 0.75 },
+      building: { color: BUILDING_COLORS[s.buildingType ?? 'farm'] ?? 0x8a5fb0, scale: 2.2, alpha: 0.28 },
+    };
+    const cfg = spec[s.kind];
+    if (cfg) {
+      const glow = new Sprite(GLOW);
+      glow.anchor.set(0.5);
+      glow.blendMode = 'add';
+      glow.tint = cfg.color;
+      glow.alpha = cfg.alpha;
+      glow.width = glow.height = s.radius * cfg.scale;
+      this.glowAlpha = cfg.alpha;
+      this.glow = glow;
+      this.root.addChildAt(glow, 0); // behind aura/body
+    }
+    if (s.kind === 'player' || s.kind === 'mob' || s.kind === 'boss' || s.kind === 'building') {
+      const hit = new Sprite(GLOW);
+      hit.anchor.set(0.5);
+      hit.blendMode = 'add';
+      hit.tint = 0xffffff;
+      hit.visible = false;
+      hit.width = hit.height = s.radius * 2.8;
+      this.hitFx = hit;
+      this.top.addChild(hit);
+    }
+  }
+
+  /** Trigger a white flash + scale-punch (call on taking damage). */
+  flash(): void {
+    this.flashStart = performance.now();
   }
 
   private build(isSelf: boolean): void {
@@ -249,6 +295,17 @@ export class EntityView {
     // fade in
     const age = now - this.spawnTime;
     this.root.alpha = Math.min(1, age / 200);
+
+    // gentle glow pulse
+    if (this.glow) this.glow.alpha = this.glowAlpha * (0.82 + 0.18 * Math.sin(now / 480 + x * 0.01));
+
+    // hit flash: white pop + scale punch, decays over ~240ms
+    const flash = Math.max(0, 1 - (now - this.flashStart) / 240);
+    if (this.hitFx) {
+      if (flash > 0) { this.hitFx.visible = true; this.hitFx.alpha = flash * 0.85; }
+      else if (this.hitFx.visible) this.hitFx.visible = false;
+    }
+    this.root.scale.set(flash > 0 ? 1 + flash * 0.13 : 1);
 
     if (s.kind === 'mob' && s.mobType === 'slime') {
       const w = 1 + Math.sin(now / 180) * 0.06;
