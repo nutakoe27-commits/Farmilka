@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="4000" height="3000" viewBox="0 0 4000 3000" font-family="'DejaVu Sans','Arial',sans-serif">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="75%">
+      <stop offset="0%" stop-color="#141a23"/>
+      <stop offset="55%" stop-color="#0b0e14"/>
+      <stop offset="100%" stop-color="#05060a"/>
+    </radialGradient>
+    <linearGradient id="btn" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#43e07a"/>
+      <stop offset="100%" stop-color="#1f9c4b"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe79a"/>
+      <stop offset="100%" stop-color="#f4b43a"/>
+    </linearGradient>
+    <radialGradient id="coin" cx="38%" cy="34%" r="72%">
+      <stop offset="0%" stop-color="#ffe79a"/>
+      <stop offset="100%" stop-color="#e39a24"/>
+    </radialGradient>
+    <radialGradient id="vig" cx="50%" cy="50%" r="62%">
+      <stop offset="60%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.72"/>
+    </radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="26" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow" x="-120%" y="-120%" width="340%" height="340%">
+      <feGaussianBlur stdDeviation="70"/>
+    </filter>
+    <filter id="textglow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- background -->
+  <rect width="4000" height="3000" fill="url(#bg)"/>
+
+  <!-- faint ground grid (like the in-game world) -->
+  <g stroke="#9ecbff" stroke-opacity="0.045" stroke-width="2">
+    <g id="vlines"></g>
+  </g>
+  <g stroke="#9ecbff" stroke-opacity="0.045" stroke-width="2">
+    <line x1="0" y1="300" x2="4000" y2="300"/><line x1="0" y1="600" x2="4000" y2="600"/>
+    <line x1="0" y1="900" x2="4000" y2="900"/><line x1="0" y1="1200" x2="4000" y2="1200"/>
+    <line x1="0" y1="1500" x2="4000" y2="1500"/><line x1="0" y1="1800" x2="4000" y2="1800"/>
+    <line x1="0" y1="2100" x2="4000" y2="2100"/><line x1="0" y1="2400" x2="4000" y2="2400"/>
+    <line x1="0" y1="2700" x2="4000" y2="2700"/>
+    <line x1="300" y1="0" x2="300" y2="3000"/><line x1="600" y1="0" x2="600" y2="3000"/>
+    <line x1="900" y1="0" x2="900" y2="3000"/><line x1="1200" y1="0" x2="1200" y2="3000"/>
+    <line x1="1500" y1="0" x2="1500" y2="3000"/><line x1="1800" y1="0" x2="1800" y2="3000"/>
+    <line x1="2100" y1="0" x2="2100" y2="3000"/><line x1="2400" y1="0" x2="2400" y2="3000"/>
+    <line x1="2700" y1="0" x2="2700" y2="3000"/><line x1="3000" y1="0" x2="3000" y2="3000"/>
+    <line x1="3300" y1="0" x2="3300" y2="3000"/><line x1="3700" y1="0" x2="3700" y2="3000"/>
+  </g>
+
+  <!-- ambient colour glow -->
+  <circle cx="780" cy="820" r="520" fill="#1f9c4b" opacity="0.28" filter="url(#softglow)"/>
+  <circle cx="3300" cy="2180" r="560" fill="#8a5cf6" opacity="0.22" filter="url(#softglow)"/>
+  <circle cx="2000" cy="1500" r="700" fill="#2ea043" opacity="0.12" filter="url(#softglow)"/>
+
+  <!-- ===== decorative creatures (outer ring — safe to crop) ===== -->
+
+  <!-- green slime, top-left -->
+  <g transform="translate(760,900) scale(1.15)" filter="url(#glow)">
+    <ellipse rx="160" ry="140" fill="#2fae55"/>
+    <ellipse cy="-34" rx="120" ry="86" fill="#7ff0a0" opacity="0.30"/>
+    <circle cx="-52" cy="-6" r="30" fill="#fff"/><circle cx="-45" cy="-2" r="14" fill="#10151c"/>
+    <circle cx="52" cy="-6" r="30" fill="#fff"/><circle cx="59" cy="-2" r="14" fill="#10151c"/>
+    <path d="M-34 58 Q0 88 34 58" stroke="#10151c" stroke-width="9" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- small green slime, top-right -->
+  <g transform="translate(3300,860) scale(0.82)" filter="url(#glow)">
+    <ellipse rx="160" ry="140" fill="#33bd5c"/>
+    <ellipse cy="-34" rx="120" ry="86" fill="#7ff0a0" opacity="0.30"/>
+    <circle cx="-52" cy="-6" r="30" fill="#fff"/><circle cx="-58" cy="-2" r="14" fill="#10151c"/>
+    <circle cx="52" cy="-6" r="30" fill="#fff"/><circle cx="46" cy="-2" r="14" fill="#10151c"/>
+    <path d="M-30 56 Q0 82 30 56" stroke="#10151c" stroke-width="9" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- hero player orb + a teal creature, bottom-left -->
+  <g transform="translate(720,2210)" filter="url(#glow)">
+    <circle r="120" fill="#16b7c9"/>
+    <circle r="120" fill="none" stroke="#8ef0ff" stroke-width="10" opacity="0.8"/>
+    <circle cx="46" cy="0" r="26" fill="#05242a"/>
+    <rect x="86" y="-26" width="70" height="52" rx="16" fill="#ffd76e"/>
+  </g>
+
+  <!-- boss (angry, spiky), bottom-right -->
+  <g transform="translate(3320,2150) scale(1.25)" filter="url(#glow)">
+    <g fill="#b5327a">
+      <path d="M0 -190 L34 -120 L-34 -120 Z"/><path d="M150 -70 L120 -20 L172 -8 Z"/>
+      <path d="M150 70 L120 20 L172 8 Z"/><path d="M-150 -70 L-120 -20 L-172 -8 Z"/>
+      <path d="M-150 70 L-120 20 L-172 8 Z"/><path d="M0 190 L34 120 L-34 120 Z"/>
+    </g>
+    <circle r="150" fill="#d1418c"/>
+    <ellipse cy="-40" rx="110" ry="70" fill="#ff8fca" opacity="0.28"/>
+    <path d="M-70 -34 L-18 -6" stroke="#2a0a1c" stroke-width="14" stroke-linecap="round"/>
+    <path d="M70 -34 L18 -6" stroke="#2a0a1c" stroke-width="14" stroke-linecap="round"/>
+    <circle cx="-44" cy="6" r="16" fill="#2a0a1c"/><circle cx="44" cy="6" r="16" fill="#2a0a1c"/>
+    <path d="M-40 66 Q0 40 40 66" stroke="#2a0a1c" stroke-width="12" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- coin cluster, mid-left -->
+  <g filter="url(#glow)">
+    <g transform="translate(560,1500)"><circle r="66" fill="url(#coin)"/><circle r="66" fill="none" stroke="#fff4cf" stroke-width="6" opacity="0.6"/><circle r="34" fill="none" stroke="#c9821c" stroke-width="10"/></g>
+    <g transform="translate(700,1620)"><circle r="50" fill="url(#coin)"/><circle r="26" fill="none" stroke="#c9821c" stroke-width="8"/></g>
+  </g>
+  <!-- coin cluster, mid-right -->
+  <g filter="url(#glow)">
+    <g transform="translate(3460,1420)"><circle r="60" fill="url(#coin)"/><circle r="60" fill="none" stroke="#fff4cf" stroke-width="6" opacity="0.6"/><circle r="30" fill="none" stroke="#c9821c" stroke-width="10"/></g>
+    <g transform="translate(3320,1560)"><circle r="44" fill="url(#coin)"/><circle r="22" fill="none" stroke="#c9821c" stroke-width="8"/></g>
+  </g>
+
+  <!-- faux HUD chips (screenshot flavour, croppable) -->
+  <g opacity="0.92">
+    <rect x="150" y="150" width="470" height="150" rx="26" fill="#0d1017" stroke="#232a38" stroke-width="3"/>
+    <text x="185" y="228" font-size="52" font-weight="700" fill="#ffd76e">🏆</text>
+    <text x="255" y="228" font-size="46" font-weight="700" fill="#e8ecf3">Топ сервера</text>
+    <text x="185" y="278" font-size="40" fill="#7ee787">1.  Ты — 12 480</text>
+  </g>
+  <g opacity="0.92">
+    <rect x="3420" y="150" width="430" height="120" rx="26" fill="#0d1017" stroke="#232a38" stroke-width="3"/>
+    <text x="3635" y="230" font-size="60" font-weight="800" fill="#ffd76e" text-anchor="middle">💰 2 480</text>
+  </g>
+
+  <!-- ===== CENTRAL SAFE ZONE — all key content ===== -->
+
+  <!-- emblem badge -->
+  <g transform="translate(2000,760)">
+    <rect x="-115" y="-115" width="230" height="230" rx="52" fill="url(#btn)" filter="url(#glow)"/>
+    <g stroke="#ffffff" stroke-width="26" stroke-linecap="round">
+      <line x1="-58" y1="58" x2="52" y2="-52"/>
+      <line x1="58" y1="58" x2="-52" y2="-52"/>
+    </g>
+    <circle cx="-58" cy="58" r="20" fill="#eaf6ee"/>
+    <circle cx="58" cy="58" r="20" fill="#eaf6ee"/>
+  </g>
+
+  <!-- kicker -->
+  <text x="2000" y="1050" text-anchor="middle" font-size="60" font-weight="700"
+        letter-spacing="14" fill="#8a93a5">МНОГОПОЛЬЗОВАТЕЛЬСКАЯ БРАУЗЕРНАЯ ИГРА</text>
+
+  <!-- wordmark -->
+  <g filter="url(#textglow)">
+    <text x="2000" y="1330" text-anchor="middle" font-size="300" font-weight="800" letter-spacing="4">
+      <tspan fill="#f2f5f8">Farm</tspan><tspan fill="#2ee06a">Clash</tspan>
+    </text>
+  </g>
+
+  <!-- tagline -->
+  <text x="2000" y="1490" text-anchor="middle" font-size="82" font-weight="600" fill="#c7cedb">
+    Фарми · Прокачивайся · Выноси боссов и игроков</text>
+
+  <!-- CTA button -->
+  <g filter="url(#glow)">
+    <rect x="1310" y="1620" width="1380" height="250" rx="125" fill="url(#btn)"/>
+  </g>
+  <text x="2000" y="1785" text-anchor="middle" font-size="104" font-weight="800" fill="#06210f"
+        letter-spacing="4">▶  ИГРАТЬ БЕСПЛАТНО</text>
+
+  <!-- domain -->
+  <text x="2000" y="2010" text-anchor="middle" font-size="88" font-weight="800"
+        letter-spacing="6" fill="url(#gold)">farmclash.online</text>
+  <text x="2000" y="2110" text-anchor="middle" font-size="50" font-weight="600" fill="#7c8698">
+    Без скачивания · играй прямо в браузере</text>
+
+  <!-- vignette on top -->
+  <rect width="4000" height="3000" fill="url(#vig)"/>
+</svg>
