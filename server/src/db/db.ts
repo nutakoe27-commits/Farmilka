@@ -21,6 +21,8 @@ export function openDb(): Database.Database {
     'ALTER TABLE accounts ADD COLUMN prestige INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE accounts ADD COLUMN level INTEGER NOT NULL DEFAULT 1',
     'ALTER TABLE accounts ADD COLUMN food INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE accounts ADD COLUMN last_reward_day INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE accounts ADD COLUMN reward_streak INTEGER NOT NULL DEFAULT 0',
   ]) {
     try {
       db.exec(ddl);

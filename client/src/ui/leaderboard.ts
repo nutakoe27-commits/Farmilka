@@ -1,5 +1,6 @@
 import type { LeaderEntry } from '@shared/protocol.js';
 import { prestigeTier, type PrestigeCfg } from '@shared/prestige.js';
+import { t, lang } from './i18n.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -7,7 +8,7 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 function fmt(n: number): string {
-  return n.toLocaleString('ru-RU');
+  return n.toLocaleString(lang === 'ru' ? 'ru-RU' : 'en-US');
 }
 const MEDAL = ['🥇', '🥈', '🥉'];
 
@@ -23,8 +24,8 @@ export class Leaderboard {
       const pos = MEDAL[i] ?? `${i + 1}`;
       return `<div class="lb-row${mine}"><span class="lb-pos">${pos}</span><span class="lb-name">${badge}${esc(e.name)}</span><span class="lb-money">${fmt(e.money)}</span></div>`;
     }).join('');
-    const you = rank > top.length ? `<div class="lb-you">Ты: #${rank} из ${total}</div>` : '';
-    $('leaderboard').innerHTML = `<div class="lb-title">🏆 Топ сервера</div>${rows}${you}`;
+    const you = rank > top.length ? `<div class="lb-you">${t('lb.you', { rank, total })}</div>` : '';
+    $('leaderboard').innerHTML = `<div class="lb-title">${t('lb.title')}</div>${rows}${you}`;
     $('leaderboard').classList.remove('hidden');
   }
 }

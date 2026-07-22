@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 export interface GameSettings {
@@ -56,13 +58,13 @@ export class Settings {
 
   private async renderServers(): Promise<void> {
     const list = $('server-list');
-    list.innerHTML = '<span style="color:#6a7085;font-size:12px">загрузка…</span>';
+    list.innerHTML = `<span style="color:#6a7085;font-size:12px">${t('set.loading')}</span>`;
     try {
       const servers = (await (await fetch('/servers')).json()) as { id: number; online: number; max: number }[];
       list.innerHTML = '';
       const auto = document.createElement('button');
       auto.className = 'srv-btn' + (localStorage.getItem('farmclash-server') ? '' : ' current');
-      auto.textContent = 'Авто';
+      auto.textContent = t('set.auto');
       auto.onclick = () => {
         localStorage.removeItem('farmclash-server');
         location.reload();
@@ -72,7 +74,7 @@ export class Settings {
         const b = document.createElement('button');
         const full = srv.online >= srv.max;
         b.className = 'srv-btn' + (srv.id === this.currentServer ? ' current' : '') + (full ? ' full' : '');
-        b.textContent = `Сервер ${srv.id} — ${srv.online}/${srv.max}`;
+        b.textContent = t('set.srvBtn', { id: srv.id, online: srv.online, max: srv.max });
         b.onclick = () => {
           if (full || srv.id === this.currentServer) return;
           localStorage.setItem('farmclash-server', String(srv.id));
@@ -81,7 +83,7 @@ export class Settings {
         list.appendChild(b);
       }
     } catch {
-      list.innerHTML = '<span style="color:#ff7b72;font-size:12px">не удалось получить список серверов</span>';
+      list.innerHTML = `<span style="color:#ff7b72;font-size:12px">${t('set.srvFail')}</span>`;
     }
   }
 

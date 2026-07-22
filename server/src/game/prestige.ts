@@ -3,6 +3,7 @@ import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Player } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
+import { tr } from './i18n.js';
 
 /** Cost for the player's NEXT prestige level (0 = maxed out). */
 export function nextPrestigeCost(p: Player): number {
@@ -16,10 +17,10 @@ export function nextPrestigeCost(p: Player): number {
  */
 export function tryPrestige(world: World, p: Player): { ok: boolean; reason?: string } {
   const cfg = getBalance().prestige;
-  if (p.dead) return { ok: false, reason: 'Вы мертвы' };
-  if (p.prestige >= cfg.maxLevel) return { ok: false, reason: 'Достигнут максимальный уровень престижа' };
+  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
+  if (p.prestige >= cfg.maxLevel) return { ok: false, reason: tr(p.lang, 'prestigeMax') };
   const cost = prestigeCost(p.prestige, cfg);
-  if (p.money < cost) return { ok: false, reason: `Нужно ${cost} золота` };
+  if (p.money < cost) return { ok: false, reason: tr(p.lang, 'needGold', { n: cost }) };
   p.money -= cost;
   p.prestige++;
   world.markDirty(p);

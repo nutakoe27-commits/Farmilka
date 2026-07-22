@@ -70,6 +70,8 @@ export interface Player extends BaseEntity, StatusEffects {
   invulnUntil: number;
   /** account name when logged in, null for guests */
   account: string | null;
+  /** client UI language, for localized server messages */
+  lang: 'ru' | 'en';
   attackReadyAt: number;
   lastDamagedAt: number;
   lastBossContactAt: number;

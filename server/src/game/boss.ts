@@ -41,7 +41,7 @@ export function updateBossTimers(world: World, now: number): void {
       timer.pos = randomPointInBiome(biome, bal.world.size, 250);
       (timer as { biome?: BiomeId }).biome = biome;
       timer.warned = true;
-      world.broadcast({ e: 'bossWarn', boss: cfg.name, x: timer.pos.x, y: timer.pos.y, inSec: cfg.warnSec });
+      world.broadcast({ e: 'bossWarn', boss: cfg.name, bossId: bossType, x: timer.pos.x, y: timer.pos.y, inSec: cfg.warnSec });
     }
     if (now >= timer.nextSpawnAt) {
       spawnBoss(world, bossType, timer.pos.x, timer.pos.y, now, (timer as { biome?: BiomeId }).biome ?? 'normal');
@@ -73,7 +73,7 @@ export function spawnBoss(world: World, bossType: BossId, x: number, y: number, 
     despawnAt: now + cfg.despawnSec * 1000,
   };
   world.addEntity(boss);
-  world.broadcast({ e: 'bossSpawned', boss: cfg.name, x, y });
+  world.broadcast({ e: 'bossSpawned', boss: cfg.name, bossId: bossType, x, y });
   return boss;
 }
 
@@ -114,7 +114,7 @@ export function onBossKilled(world: World, boss: Boss, src: DamageSource, now: n
       }
     }
   }
-  world.broadcast({ e: 'bossKilled', boss: cfg.name, rewards });
+  world.broadcast({ e: 'bossKilled', boss: cfg.name, bossId: boss.bossType, rewards });
   scheduleNext(world, boss.bossType, now);
 }
 
@@ -143,7 +143,7 @@ function updateBoss(world: World, boss: Boss, dt: number, now: number): void {
 
   if (now >= boss.despawnAt) {
     world.removeEntity(boss);
-    world.broadcast({ e: 'bossGone', boss: cfg.name });
+    world.broadcast({ e: 'bossGone', boss: cfg.name, bossId: boss.bossType });
     scheduleNext(world, boss.bossType, now);
     return;
   }

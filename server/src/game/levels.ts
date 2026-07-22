@@ -4,6 +4,7 @@ import type { World } from './world.js';
 import type { Player } from './entities.js';
 import { recomputeMaxHp } from './hats.js';
 import { telemetry } from '../db/telemetry.js';
+import { tr } from './i18n.js';
 
 /** Gold cost for the player's NEXT level (0 = maxed out). */
 export function playerLevelCost(p: Player): number {
@@ -17,9 +18,9 @@ export function playerLevelCost(p: Player): number {
  */
 export function tryBuyLevel(world: World, p: Player): { ok: boolean; reason?: string } {
   const cfg = getBalance().levels;
-  if (p.dead) return { ok: false, reason: 'Вы мертвы' };
-  if (p.level >= cfg.max) return { ok: false, reason: 'Достигнут максимальный уровень' };
-  if (p.money < cfg.cost) return { ok: false, reason: `Нужно ${cfg.cost} золота` };
+  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
+  if (p.level >= cfg.max) return { ok: false, reason: tr(p.lang, 'levelMax') };
+  if (p.money < cfg.cost) return { ok: false, reason: tr(p.lang, 'needGold', { n: cfg.cost }) };
   p.money -= cfg.cost;
   p.level++;
   p.hp += cfg.hpPerLevel; // the freshly gained HP is immediately available

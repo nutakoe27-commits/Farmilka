@@ -138,7 +138,7 @@ export class World {
     return { x: (pos.x + c) / 2, y: (pos.y + c) / 2 };
   }
 
-  spawnPlayer(name: string, ws: WebSocket, account?: { name: string; money: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number; level: number; food: number }): Player {
+  spawnPlayer(name: string, ws: WebSocket, account?: { name: string; money: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number; level: number; food: number }, lang: 'ru' | 'en' = 'ru'): Player {
     const bal = getBalance();
     const pos = this.spawnPoint();
     const weapons: WeaponId[] = account ? [...account.weapons] : ['fists'];
@@ -171,6 +171,7 @@ export class World {
       ...freshStatus(),
       invulnUntil: Date.now() + bal.player.spawnProtectSec * 1000,
       account: account ? account.name : null,
+      lang,
       attackReadyAt: 0,
       lastDamagedAt: 0,
       lastBossContactAt: 0,

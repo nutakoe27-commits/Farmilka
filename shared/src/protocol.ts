@@ -80,11 +80,11 @@ export type GameEvent =
   | { e: 'kill'; killer: string; victim: string; weapon: string }
   | { e: 'damage'; target: string; amount: number; x: number; y: number }
   | { e: 'death'; dropped: number; respawnIn: number; cause: DeathCause; kills: number; survivedSec: number; level: number }
-  | { e: 'bossWarn'; boss: string; x: number; y: number; inSec: number }
-  | { e: 'bossSpawned'; boss: string; x: number; y: number }
+  | { e: 'bossWarn'; boss: string; bossId: BossId; x: number; y: number; inSec: number }
+  | { e: 'bossSpawned'; boss: string; bossId: BossId; x: number; y: number }
   | { e: 'bossTelegraph'; kind: 'slam' | 'burst'; x: number; y: number; angle: number; range: number; arc: number; sec: number }
-  | { e: 'bossKilled'; boss: string; rewards: { name: string; amount: number }[] }
-  | { e: 'bossGone'; boss: string }
+  | { e: 'bossKilled'; boss: string; bossId: BossId; rewards: { name: string; amount: number }[] }
+  | { e: 'bossGone'; boss: string; bossId: BossId }
   | { e: 'buildingAttacked'; id: string; x: number; y: number }
   | { e: 'buildingDestroyed'; id: string; byName: string; own: boolean }
   | { e: 'purchase'; ok: boolean; item: string; reason?: string }
@@ -95,6 +95,7 @@ export type GameEvent =
   | { e: 'lootbox'; result: 'hat' | 'gold' | 'nothing'; gold: number }
   | { e: 'prestige'; level: number; tier: string | null }
   | { e: 'level'; level: number; max: number }
+  | { e: 'dailyReward'; gold: number; streak: number }
   | { e: 'notice'; text: string };
 
 // ---------- Client -> Server ----------
@@ -109,7 +110,7 @@ export interface InputMsg {
 }
 
 export type ClientMsg =
-  | { t: 'join'; name: string; password?: string; register?: boolean; server?: number }
+  | { t: 'join'; name: string; password?: string; register?: boolean; server?: number; lang?: 'ru' | 'en' }
   | InputMsg
   | { t: 'buy'; item: WeaponId | BuildingId | 'food' }
   | { t: 'equip'; weapon: WeaponId }

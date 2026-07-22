@@ -1,5 +1,6 @@
 import { decode, encode, type ClientMsg, type ServerMsg, type WelcomeMsg, type SnapshotMsg, type GameEvent, type EntityState, type LeaderEntry } from '@shared/protocol.js';
 import { decodeSnapshot } from '@shared/snapshot-codec.js';
+import { lang, t } from '../ui/i18n.js';
 
 export interface Remote {
   state: EntityState;
@@ -41,9 +42,9 @@ export class Connection {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     this.ws = new WebSocket(`${proto}://${location.host}/ws`);
     this.ws.binaryType = 'arraybuffer';
-    this.ws.onopen = () => this.send({ t: 'join', name, password: password || undefined, register: register || undefined, server });
-    this.ws.onclose = () => this.onClose(this.closeReason ?? 'Соединение потеряно');
-    this.ws.onerror = () => this.onClose('Ошибка соединения');
+    this.ws.onopen = () => this.send({ t: 'join', name, password: password || undefined, register: register || undefined, server, lang });
+    this.ws.onclose = () => this.onClose(this.closeReason ?? t('net.lost'));
+    this.ws.onerror = () => this.onClose(t('net.error'));
     // snapshots arrive as binary frames; everything else is JSON text
     this.ws.onmessage = (e) => {
       if (typeof e.data === 'string') this.handle(e.data);

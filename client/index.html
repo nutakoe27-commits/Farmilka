@@ -35,6 +35,12 @@
     .tg-link { display: inline-block; margin-top: 14px; padding: 7px 14px; border-radius: 8px; background: rgba(41,169,235,.14); border: 1px solid rgba(41,169,235,.45); color: #4db8f0; font-size: 13px; font-weight: 600; text-decoration: none; }
     .tg-link:hover { background: rgba(41,169,235,.24); }
     #settings .tg-link { display: block; text-align: center; margin: 12px 0 6px; }
+    .share-btn { background: linear-gradient(135deg,#8a5cf6,#6d3fd6) !important; }
+    #settings .share-btn, #settings-share { width: 100%; margin-top: 6px; }
+    .lang-switch { display: inline-flex; gap: 0; border: 1px solid #3a4156; border-radius: 8px; overflow: hidden; }
+    .lang-switch button { cursor: pointer; border: none; background: #0d0f14; color: #8a8fa3; font-size: 12px; font-weight: 700; padding: 5px 12px; }
+    .lang-switch button.active { background: #2ea043; color: #fff; }
+    .menu-lang { display: flex; justify-content: center; margin-top: 14px; }
 
     /* HUD */
     #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
@@ -168,14 +174,14 @@
     <div id="money">💰 0</div>
     <div id="onboarding" class="hidden"></div>
     <div id="leaderboard" class="hidden"></div>
-    <div id="zone-label" class="hidden">🛡 Защита после возрождения</div>
+    <div id="zone-label" class="hidden" data-i18n="hud.protect">🛡 Защита после возрождения</div>
     <div id="hp-wrap">
       <div id="level-badge">⭐ Ур. 1<span class="mx">/10</span></div>
       <div id="hp-bar-bg"><div id="hp-bar"></div></div>
       <div id="hp-text">100 / 100</div>
     </div>
     <div id="hotbar"></div>
-    <div id="food-slot" title="Съесть еду (Q)">
+    <div id="food-slot" data-i18n-title="hud.foodTitle" title="Съесть еду (Q)">
       <span class="key">Q</span>
       <span class="icon">🍖</span>
       <span class="cnt">0</span>
@@ -183,70 +189,72 @@
     </div>
     <div id="killfeed"></div>
     <div id="boss-banner" class="hidden"></div>
-    <div id="hint">WASD — движение · мышь — прицел · ЛКМ — атака<br>B — магазин · Q — еда · 1–4 — оружие · перетаскивай слоты</div>
+    <div id="hint" data-i18n="hud.hint">WASD — движение · мышь — прицел · ЛКМ — атака<br>B — магазин · Q — еда · 1–4 — оружие · перетаскивай слоты</div>
     <canvas id="minimap" width="160" height="160"></canvas>
-    <button id="settings-btn" title="Настройки">⚙</button>
+    <button id="settings-btn" data-i18n-title="hud.settingsTitle" title="Настройки">⚙</button>
   </div>
 
-  <div id="place-hint" class="hidden">Кликните на карте, чтобы поставить постройку · ПКМ/Esc — отмена</div>
+  <div id="place-hint" class="hidden" data-i18n="hud.placeHint">Кликните на карте, чтобы поставить постройку · ПКМ/Esc — отмена</div>
 
   <div id="settings" class="panel hidden">
-    <h2>⚙ Настройки</h2>
+    <h2 data-i18n="set.title">⚙ Настройки</h2>
     <div style="margin-bottom:14px">
-      <div style="font-size:13px;color:#8a8fa3;margin-bottom:6px">Игровой сервер (смена переподключит):</div>
+      <div style="font-size:13px;color:#8a8fa3;margin-bottom:6px" data-i18n="set.server">Игровой сервер (смена переподключит):</div>
       <div id="server-list" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
-    <div class="set-row"><span>Тряска экрана</span><input type="checkbox" id="set-shake" checked></div>
-    <div class="set-row"><span>Числа урона</span><input type="checkbox" id="set-dmg" checked></div>
-    <div class="set-row"><span>Лента убийств</span><input type="checkbox" id="set-feed" checked></div>
-    <a class="tg-link" href="https://t.me/farmclashonline" target="_blank" rel="noopener">📢 Новости и чат — Telegram</a>
-    <button class="btn alt" id="settings-close">Продолжить игру</button>
-    <button class="btn" id="exit-btn">Выйти в меню</button>
+    <div class="set-row"><span data-i18n="set.lang">Язык / Language</span><span class="lang-switch"><button data-lang="ru">RU</button><button data-lang="en">EN</button></span></div>
+    <div class="set-row"><span data-i18n="set.shake">Тряска экрана</span><input type="checkbox" id="set-shake" checked></div>
+    <div class="set-row"><span data-i18n="set.dmg">Числа урона</span><input type="checkbox" id="set-dmg" checked></div>
+    <div class="set-row"><span data-i18n="set.feed">Лента убийств</span><input type="checkbox" id="set-feed" checked></div>
+    <button class="btn share-btn" id="settings-share" data-i18n="set.share">🔗 Поделиться игрой</button>
+    <a class="tg-link" href="https://t.me/farmclashonline" target="_blank" rel="noopener" data-i18n="set.tg">📢 Новости и чат — Telegram</a>
+    <button class="btn alt" id="settings-close" data-i18n="set.continue">Продолжить игру</button>
+    <button class="btn" id="exit-btn" data-i18n="set.exit">Выйти в меню</button>
   </div>
 
   <div id="shop" class="panel hidden">
     <div id="shop-head">
       <button id="shop-close">✕</button>
-      <h2>Магазин</h2>
-      <div class="sub">Работает из любой точки мира. При смерти теряются оружие и еда!</div>
+      <h2 data-i18n="shop.title">Магазин</h2>
+      <div class="sub" data-i18n="shop.sub">Работает из любой точки мира. При смерти теряются оружие и еда!</div>
       <div id="shop-msg"></div>
       <div id="level-box" style="background:linear-gradient(135deg,#14231a,#151926);border:1px solid #2d523a;border-radius:10px;padding:10px 14px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
           <div>
-            <div style="font-size:15px;font-weight:700">⭐ Уровень <span id="level-cur" style="color:#7ee787"></span><span id="level-max" style="color:#8a8fa3;font-weight:400"></span></div>
-            <div id="level-desc" style="font-size:11px;color:#8a8fa3;margin-top:3px">+HP и +урон за уровень. Теряется при смерти. На боссов не действует.</div>
+            <div style="font-size:15px;font-weight:700"><span data-i18n="shop.level">⭐ Уровень</span> <span id="level-cur" style="color:#7ee787"></span><span id="level-max" style="color:#8a8fa3;font-weight:400"></span></div>
+            <div id="level-desc" style="font-size:11px;color:#8a8fa3;margin-top:3px" data-i18n="shop.levelDesc">+HP и +урон за уровень. Теряется при смерти. На боссов не действует.</div>
           </div>
           <button id="level-btn" style="cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#2ea043,#1f7a33);color:#fff;white-space:nowrap"></button>
         </div>
       </div>
       <div id="shop-tabs">
-        <button class="shop-tab active" data-tab="weapons">⚔️ Оружие</button>
-        <button class="shop-tab" data-tab="buildings">🏰 Постройки</button>
-        <button class="shop-tab" data-tab="hats">🎩 Шляпы</button>
+        <button class="shop-tab active" data-tab="weapons" data-i18n="shop.tabWeapons">⚔️ Оружие</button>
+        <button class="shop-tab" data-tab="buildings" data-i18n="shop.tabBuildings">🏰 Постройки</button>
+        <button class="shop-tab" data-tab="hats" data-i18n="shop.tabHats">🎩 Шляпы</button>
       </div>
     </div>
     <div id="shop-body">
       <div class="shop-panel" data-panel="weapons">
-        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Еда</h3>
+        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef" data-i18n="shop.food">Еда</h3>
         <div class="shop-grid" id="shop-food"></div>
-        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Оружие</h3>
+        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef" data-i18n="shop.weapons">Оружие</h3>
         <div class="shop-grid" id="shop-weapons"></div>
       </div>
       <div class="shop-panel hidden" data-panel="buildings">
-        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Постройки <span id="build-count" style="color:#8a8fa3;font-weight:400"></span></h3>
+        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef"><span data-i18n="shop.buildings">Постройки</span> <span id="build-count" style="color:#8a8fa3;font-weight:400"></span></h3>
         <div class="shop-grid" id="shop-buildings"></div>
       </div>
       <div class="shop-panel hidden" data-panel="hats">
         <div id="prestige-box" style="background:linear-gradient(135deg,#1a1428,#151926);border:1px solid #3a2d52;border-radius:10px;padding:10px 14px;margin:6px 0 14px">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
             <div>
-              <div style="font-size:15px;font-weight:700">✦ Престиж <span id="prestige-level" style="color:#d88bff"></span> <span id="prestige-tier" class="tier-badge"></span></div>
-              <div style="font-size:11px;color:#8a8fa3;margin-top:3px">Слив золота на статус: цвет имени, аура, значок. На бой не влияет.</div>
+              <div style="font-size:15px;font-weight:700"><span data-i18n="shop.prestige">✦ Престиж</span> <span id="prestige-level" style="color:#d88bff"></span> <span id="prestige-tier" class="tier-badge"></span></div>
+              <div style="font-size:11px;color:#8a8fa3;margin-top:3px" data-i18n="shop.prestigeDesc">Слив золота на статус: цвет имени, аура, значок. На бой не влияет.</div>
             </div>
             <button id="prestige-btn" style="cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#8a2be2,#6a1fb5);color:#fff;white-space:nowrap"></button>
           </div>
         </div>
-        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">🎩 Шляпы <span id="hat-count" style="color:#8a8fa3;font-weight:400"></span></h3>
+        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef"><span data-i18n="shop.hats">🎩 Шляпы</span> <span id="hat-count" style="color:#8a8fa3;font-weight:400"></span></h3>
         <div class="shop-grid" id="shop-lootbox"></div>
         <div class="shop-grid" id="shop-hats"></div>
       </div>
@@ -255,22 +263,22 @@
 
   <div id="death-screen" class="overlay hidden">
     <div class="panel">
-      <h2>Вы погибли</h2>
+      <h2 data-i18n="death.title">Вы погибли</h2>
       <p id="death-info"></p>
       <div id="death-stats">
-        <div class="dstat"><span class="dv" id="ds-survived">—</span><span class="dl">Прожито</span></div>
-        <div class="dstat"><span class="dv" id="ds-kills">0</span><span class="dl">Убийств</span></div>
-        <div class="dstat"><span class="dv" id="ds-level">1</span><span class="dl">Уровень</span></div>
-        <div class="dstat"><span class="dv" id="ds-dropped">0</span><span class="dl">💰 потеряно</span></div>
+        <div class="dstat"><span class="dv" id="ds-survived">—</span><span class="dl" data-i18n="death.survived">Прожито</span></div>
+        <div class="dstat"><span class="dv" id="ds-kills">0</span><span class="dl" data-i18n="death.kills">Убийств</span></div>
+        <div class="dstat"><span class="dv" id="ds-level">1</span><span class="dl" data-i18n="death.level">Уровень</span></div>
+        <div class="dstat"><span class="dv" id="ds-dropped">0</span><span class="dl" data-i18n="death.dropped">💰 потеряно</span></div>
       </div>
-      <p style="color:#ff9d8a;font-size:12px">Оружие и еда потеряны, уровень сброшен.</p>
+      <p style="color:#ff9d8a;font-size:12px" data-i18n="death.lost">Оружие и еда потеряны, уровень сброшен.</p>
       <div id="respawn-ring"><span id="respawn-count">4</span></div>
-      <p style="color:#8a8fa3;font-size:12px">Возвращаемся в бой… (3с защиты после спавна)</p>
+      <p style="color:#8a8fa3;font-size:12px" data-i18n="death.respawn">Возвращаемся в бой… (3с защиты после спавна)</p>
     </div>
   </div>
 
   <div id="joy-left" class="joy-zone"><div class="joy-base" id="joy-left-base"><div class="joy-stick" id="joy-left-stick"></div></div></div>
-  <div id="atk-btn">⚔<div id="atk-dir"></div><span class="lbl">тап — атака · тяни — прицел</span></div>
+  <div id="atk-btn">⚔<div id="atk-dir"></div><span class="lbl" data-i18n="hud.atk">тап — атака · тяни — прицел</span></div>
   <div id="mob-buttons">
     <button class="mob-btn" id="mob-weapon"><span id="mob-weapon-icon">👊</span><span class="sub" id="mob-weapon-name">fists</span></button>
     <button class="mob-btn" id="mob-eat">🍖<span class="sub" style="color:#ffd76e" id="mob-eat-cnt">0</span></button>
@@ -293,25 +301,27 @@
         <svg viewBox="0 0 32 32" width="46" height="46"><rect width="32" height="32" rx="7" fill="#0d0f14"/><circle cx="16" cy="16" r="9" fill="#4fd06a" stroke="#0a1f10" stroke-width="1.5"/><g stroke="#ffe08a" stroke-width="2.6" stroke-linecap="round"><line x1="9" y1="23" x2="20.5" y2="9.5"/><line x1="23" y1="23" x2="11.5" y2="9.5"/></g></svg>
         <span>Farm<b>Clash</b></span>
       </div>
-      <p>Фарми мобов, строй фермы, покупай оружие,<br>охоться на боссов и других игроков.</p>
-      <input id="name-input" class="field" maxlength="16" placeholder="Ваше имя" autocomplete="username" />
-      <input id="pass-input" class="field" type="password" maxlength="64" placeholder="Пароль (нужен только для аккаунта)" autocomplete="current-password" />
+      <p data-i18n="menu.tagline">Фарми мобов, строй фермы, покупай оружие,<br>охоться на боссов и других игроков.</p>
+      <input id="name-input" class="field" maxlength="16" placeholder="Ваше имя" data-i18n-ph="menu.namePh" autocomplete="username" />
+      <input id="pass-input" class="field" type="password" maxlength="64" placeholder="Пароль (нужен только для аккаунта)" data-i18n-ph="menu.passPh" autocomplete="current-password" />
       <div id="btn-row">
-        <button id="play-btn" class="btn">Играть</button>
-        <button id="register-btn" class="btn alt">Создать аккаунт</button>
+        <button id="play-btn" class="btn" data-i18n="menu.play">Играть</button>
+        <button id="register-btn" class="btn alt" data-i18n="menu.register">Создать аккаунт</button>
       </div>
       <div id="conn-error"></div>
-      <div id="acc-hint">Без пароля — гостевой вход (прогресс не сохраняется).<br>С аккаунтом золото и оружие сохраняются между сеансами.</div>
-      <a class="tg-link" href="https://t.me/farmclashonline" target="_blank" rel="noopener">📢 Новости и чат — Telegram-канал</a>
+      <div id="acc-hint" data-i18n="menu.accHint">Без пароля — гостевой вход (прогресс не сохраняется).<br>С аккаунтом золото и оружие сохраняются между сеансами.</div>
+      <button class="btn share-btn" id="menu-share" data-i18n="menu.share">🔗 Поделиться игрой</button>
+      <a class="tg-link" href="https://t.me/farmclashonline" target="_blank" rel="noopener" data-i18n="menu.tg">📢 Новости и чат — Telegram-канал</a>
+      <div class="lang-switch menu-lang"><button data-lang="ru">RU</button><button data-lang="en">EN</button></div>
     </div>
   </div>
 
   <div id="queue-screen" class="overlay hidden">
     <div class="panel">
-      <h2>Все серверы заполнены</h2>
-      <p>Вы в очереди — как только освободится место, игра начнётся автоматически.</p>
+      <h2 data-i18n="queue.title">Все серверы заполнены</h2>
+      <p data-i18n="queue.body">Вы в очереди — как только освободится место, игра начнётся автоматически.</p>
       <div id="queue-pos" style="font-size:52px;font-weight:800;color:#ffd76e;margin:10px 0;text-shadow:0 2px 6px #000">1</div>
-      <p style="color:#8a8fa3;font-size:12px">Ваша позиция в очереди</p>
+      <p style="color:#8a8fa3;font-size:12px" data-i18n="queue.pos">Ваша позиция в очереди</p>
     </div>
   </div>
 

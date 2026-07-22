@@ -5,27 +5,28 @@ import type { World } from './world.js';
 import type { Building, Player } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { hatEffects } from './hats.js';
+import { tr } from './i18n.js';
 
 const BUILDING_IDS: BuildingId[] = ['farm', 'mine', 'turret'];
 const PLACE_RANGE = 300;
 
 export function tryPlaceBuilding(world: World, p: Player, type: BuildingId, x: number, y: number): { ok: boolean; reason?: string } {
   const bal = getBalance();
-  if (!BUILDING_IDS.includes(type)) return { ok: false, reason: 'Неизвестная постройка' };
-  if (p.dead) return { ok: false, reason: 'Вы мертвы' };
+  if (!BUILDING_IDS.includes(type)) return { ok: false, reason: tr(p.lang, 'unknownBuilding') };
+  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
   const cfg = bal.buildings[type];
-  if (p.money < cfg.price) return { ok: false, reason: 'Недостаточно денег' };
+  if (p.money < cfg.price) return { ok: false, reason: tr(p.lang, 'noMoney') };
   if (p.buildingIds.size >= bal.economy.maxBuildingsPerPlayer) {
-    return { ok: false, reason: `Лимит построек: ${bal.economy.maxBuildingsPerPlayer}` };
+    return { ok: false, reason: tr(p.lang, 'buildLimit', { n: bal.economy.maxBuildingsPerPlayer }) };
   }
   const size = bal.world.size;
   if (x < cfg.radius || y < cfg.radius || x > size - cfg.radius || y > size - cfg.radius) {
-    return { ok: false, reason: 'За границей мира' };
+    return { ok: false, reason: tr(p.lang, 'outOfWorld') };
   }
-  if (dist(p.x, p.y, x, y) > PLACE_RANGE) return { ok: false, reason: 'Слишком далеко от вас' };
+  if (dist(p.x, p.y, x, y) > PLACE_RANGE) return { ok: false, reason: tr(p.lang, 'tooFar') };
   for (const b of world.grid.queryCircle(x, y, bal.economy.buildingMinDist + 50)) {
     if (b.kind === 'building' && dist(x, y, b.x, b.y) < bal.economy.buildingMinDist) {
-      return { ok: false, reason: 'Слишком близко к другой постройке' };
+      return { ok: false, reason: tr(p.lang, 'tooClose') };
     }
   }
 

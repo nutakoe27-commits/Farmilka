@@ -14,8 +14,9 @@ import { tryPlaceBuilding, removePlayerBuildings } from '../game/buildings.js';
 import { tryLootbox, tryEquipHat, recomputeMaxHp } from '../game/hats.js';
 import { tryPrestige } from '../game/prestige.js';
 import { tryBuyLevel } from '../game/levels.js';
+import { tr, normalizeLang, type Lang } from '../game/i18n.js';
 import { telemetry } from '../db/telemetry.js';
-import { accountExists, login, register, saveProgress, type Account } from '../db/accounts.js';
+import { accountExists, login, register, saveProgress, claimDailyReward, type Account } from '../db/accounts.js';
 import { adminRouter } from '../admin/stats.js';
 
 const sessionIds = new WeakMap<Player, number>();
@@ -44,9 +45,9 @@ export function startServer(worlds: WorldManager): http.Server {
 
   // Spawns a player into a world and sends the welcome payload. Shared by the
   // direct-join path and the queue-admit path.
-  function enterWorld(ws: WebSocket, world: World, name: string, account?: Account): Player {
+  function enterWorld(ws: WebSocket, world: World, name: string, account?: Account, lang: Lang = 'ru'): Player {
     const bal = getBalance();
-    const player = world.spawnPlayer(name, ws, account);
+    const player = world.spawnPlayer(name, ws, account, lang);
     recomputeMaxHp(world, player); // fold in restored level + hat
     player.hp = player.maxHp; // (re)join at full HP for the restored level
     try {
@@ -79,7 +80,7 @@ export function startServer(worlds: WorldManager): http.Server {
 
   // Waiting queue: auto-join players that hit the hard cap wait here (FIFO) and
   // are admitted as slots free up, instead of being turned away.
-  interface QueueEntry { ws: WebSocket; name: string; account?: Account; bind: (p: Player, w: World) => void; }
+  interface QueueEntry { ws: WebSocket; name: string; account?: Account; lang: Lang; bind: (p: Player, w: World) => void; }
   const queue: QueueEntry[] = [];
 
   function tryAdmit(): void {
@@ -89,7 +90,7 @@ export function startServer(worlds: WorldManager): http.Server {
       const world = worlds.assign();
       if (!world) break; // still at the hard cap
       queue.shift();
-      e.bind(enterWorld(e.ws, world, e.name, e.account), world);
+      e.bind(enterWorld(e.ws, world, e.name, e.account, e.lang), world);
     }
     queue.forEach((e, i) => {
       if (e.ws.readyState === WebSocket.OPEN) e.ws.send(encode({ t: 'queued', pos: i + 1 }));
@@ -123,16 +124,17 @@ export function startServer(worlds: WorldManager): http.Server {
       if (!player || !world) {
         if (msg.t !== 'join') return;
         const bal = getBalance();
-        const name = String(msg.name ?? '').trim().slice(0, 16) || 'Безымянный';
+        const lang = normalizeLang(msg.lang);
+        const name = String(msg.name ?? '').trim().slice(0, 16) || tr(lang, 'anon');
         const password = typeof msg.password === 'string' ? msg.password.slice(0, 64) : '';
 
         // authenticate first, so the same account can't queue/play twice
         let account: Account | undefined;
         try {
           if (password) {
-            const res = msg.register ? register(name, password, bal.player.startMoney) : login(name, password);
+            const res = msg.register ? register(name, password, bal.player.startMoney, lang) : login(name, password, lang);
             if (!res.ok) {
-              ws.send(encode({ t: 'reject', reason: res.reason ?? 'Ошибка авторизации' }));
+              ws.send(encode({ t: 'reject', reason: res.reason ?? tr(lang, 'authError') }));
               return;
             }
             const acc = res.account!.name.toLowerCase();
@@ -140,33 +142,42 @@ export function startServer(worlds: WorldManager): http.Server {
             const live = worlds.active().some((w) => [...w.players.values()].some((o) => o.ws && o.account?.toLowerCase() === acc))
               || queue.some((e) => e.account?.name.toLowerCase() === acc);
             if (live) {
-              ws.send(encode({ t: 'reject', reason: 'Этот аккаунт уже в игре' }));
+              ws.send(encode({ t: 'reject', reason: tr(lang, 'accountInGame') }));
               return;
             }
             account = res.account;
           } else if (accountExists(name)) {
-            ws.send(encode({ t: 'reject', reason: 'Это имя зарегистрировано — введите пароль' }));
+            ws.send(encode({ t: 'reject', reason: tr(lang, 'nameRegistered') }));
             return;
           }
         } catch (err) {
           console.error('[auth] failed', err);
-          ws.send(encode({ t: 'reject', reason: 'Ошибка сервера при авторизации' }));
+          ws.send(encode({ t: 'reject', reason: tr(lang, 'authServerError') }));
           return;
         }
+
+        // grant any daily reward for accounts (before spawning, so welcome + event flow cleanly)
+        const daily = account ? claimDailyReward(account.name) : null;
+        if (daily && account) account.money += daily.gold;
+
+        const finishJoin = (p: Player): void => {
+          if (daily) p.ws?.send(encode({ t: 'event', ev: { e: 'dailyReward', gold: daily.gold, streak: daily.streak } }));
+        };
 
         // explicit server pick: no queue — just tell them to try another
         if (typeof msg.server === 'number' && Number.isInteger(msg.server)) {
           const chosen = worlds.get(msg.server);
           if (!chosen) {
-            ws.send(encode({ t: 'reject', reason: `Сервера ${msg.server} не существует` }));
+            ws.send(encode({ t: 'reject', reason: tr(lang, 'serverNotExist', { n: msg.server }) }));
             return;
           }
           if (!worlds.hasRoom(chosen)) {
-            ws.send(encode({ t: 'reject', reason: `Сервер ${msg.server} заполнен — выберите другой` }));
+            ws.send(encode({ t: 'reject', reason: tr(lang, 'serverFull', { n: msg.server }) }));
             return;
           }
           world = chosen;
-          player = enterWorld(ws, chosen, name, account);
+          player = enterWorld(ws, chosen, name, account, lang);
+          finishJoin(player);
           return;
         }
 
@@ -174,10 +185,11 @@ export function startServer(worlds: WorldManager): http.Server {
         const assigned = worlds.assign();
         if (assigned) {
           world = assigned;
-          player = enterWorld(ws, assigned, name, account);
+          player = enterWorld(ws, assigned, name, account, lang);
+          finishJoin(player);
           return;
         }
-        queue.push({ ws, name, account, bind: (p, w) => { player = p; world = w; } });
+        queue.push({ ws, name, account, lang, bind: (p, w) => { player = p; world = w; finishJoin(p); } });
         ws.send(encode({ t: 'queued', pos: queue.length }));
         return;
       }

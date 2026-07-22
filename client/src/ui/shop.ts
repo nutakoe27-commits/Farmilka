@@ -2,33 +2,27 @@ import type { SelfState, WelcomeMsg } from '@shared/protocol.js';
 import type { WeaponId, BuildingId } from '@shared/types.js';
 import { WEAPON_ICONS, BUILDING_ICONS, HAT_EMOJI, TIER_NAMES, TIER_COLORS } from '../game/entities.js';
 import { prestigeTier } from '@shared/prestige.js';
+import { t } from './i18n.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
-const WEAPON_NOTES: Record<string, string> = {
-  sword: 'база', spear: 'длинный укол', hammer: 'медленный, AoE + отброс', bow: 'дальний бой', crossbow: 'снайпер',
-  daggers: 'быстрые · удар в спину ×2.5', scythe: 'бьёт вокруг на 360°', venom_blade: 'отравляет: урон со временем',
-  vampire_blade: 'вампиризм: лечит за урон', triple_bow: '3 стрелы веером', ice_staff: 'замораживает: замедляет цель',
-};
-const BUILDING_NOTES: Record<string, string> = {
-  farm: 'пассивный доход', mine: 'больше дохода', turret: 'стреляет по врагам',
-};
+const pct = (mult: number): number => Math.round((mult - 1) * 100);
 
 function describeEffect(effect: Record<string, number | undefined>): string {
   const parts: string[] = [];
-  if (effect.speedMult) parts.push(`+${Math.round((effect.speedMult - 1) * 100)}% скорость`);
-  if (effect.maxHpAdd) parts.push(`+${effect.maxHpAdd} HP`);
-  if (effect.damageMult) parts.push(`+${Math.round((effect.damageMult - 1) * 100)}% урон`);
-  if (effect.foodHealMult) parts.push(`+${Math.round((effect.foodHealMult - 1) * 100)}% лечение едой`);
-  if (effect.incomeMult) parts.push(`+${Math.round((effect.incomeMult - 1) * 100)}% доход построек`);
-  if (effect.regenMult) parts.push(`×${effect.regenMult} реген`);
-  if (effect.coinMagnetAdd) parts.push(`+${effect.coinMagnetAdd} радиус сбора монет`);
-  if (effect.foodFindMult) parts.push(`+${Math.round((effect.foodFindMult - 1) * 100)}% шанс еды с мобов`);
-  if (effect.mobRewardMult) parts.push(`+${Math.round((effect.mobRewardMult - 1) * 100)}% награда с мобов`);
-  if (effect.respawnMult) parts.push(`×${effect.respawnMult} время возрождения`);
-  if (effect.dropSaveFrac) parts.push(`−${Math.round(effect.dropSaveFrac * 100)}% потеря денег при смерти`);
-  if (effect.bossDmgMult) parts.push(`+${Math.round((effect.bossDmgMult - 1) * 100)}% урон боссам`);
-  return parts.join(' · ') || 'без эффекта';
+  if (effect.speedMult) parts.push(t('fx.speed', { n: pct(effect.speedMult) }));
+  if (effect.maxHpAdd) parts.push(t('fx.hp', { n: effect.maxHpAdd }));
+  if (effect.damageMult) parts.push(t('fx.damage', { n: pct(effect.damageMult) }));
+  if (effect.foodHealMult) parts.push(t('fx.foodHeal', { n: pct(effect.foodHealMult) }));
+  if (effect.incomeMult) parts.push(t('fx.income', { n: pct(effect.incomeMult) }));
+  if (effect.regenMult) parts.push(t('fx.regen', { n: effect.regenMult }));
+  if (effect.coinMagnetAdd) parts.push(t('fx.magnet', { n: effect.coinMagnetAdd }));
+  if (effect.foodFindMult) parts.push(t('fx.foodFind', { n: pct(effect.foodFindMult) }));
+  if (effect.mobRewardMult) parts.push(t('fx.mobReward', { n: pct(effect.mobRewardMult) }));
+  if (effect.respawnMult) parts.push(t('fx.respawn', { n: effect.respawnMult }));
+  if (effect.dropSaveFrac) parts.push(t('fx.dropSave', { n: Math.round(effect.dropSaveFrac * 100) }));
+  if (effect.bossDmgMult) parts.push(t('fx.bossDmg', { n: pct(effect.bossDmgMult) }));
+  return parts.join(' · ') || t('fx.none');
 }
 
 export class Shop {
@@ -73,7 +67,7 @@ export class Shop {
     const fel = document.createElement('div');
     fel.className = 'shop-item';
     fel.dataset.item = 'food';
-    fel.innerHTML = `<div><div class="nm">🍖 Еда</div><div class="st">+${f.heal} HP · перезарядка ${f.cooldownSec}с · макс. ${f.maxCarry} шт<br>жми Q вовремя — и выживешь в PvP</div></div><div class="btns"><button>💰 ${f.price}</button></div>`;
+    fel.innerHTML = `<div><div class="nm">${t('shop.foodName')}</div><div class="st">${t('shop.foodStat', { heal: f.heal, cd: f.cooldownSec, max: f.maxCarry })}</div></div><div class="btns"><button>💰 ${f.price}</button></div>`;
     fel.querySelector('button')!.onclick = () => this.onBuy('food');
     fg.appendChild(fel);
 
@@ -88,9 +82,9 @@ export class Shop {
       el.className = 'shop-item';
       el.dataset.item = id;
       const stats = cfg.type === 'melee'
-        ? `урон ${cfg.damage} · дальн. ${cfg.range} · ${cfg.attackRate}/с`
-        : `урон ${cfg.damage} · дальн. ${cfg.range} · ${cfg.attackRate}/с · снаряд`;
-      el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${WEAPON_NOTES[id] ?? ''}</div></div><div class="btns"><button class="buy">💰 ${cfg.price}</button><button class="sell hidden">Продать</button></div>`;
+        ? t('shop.dmg', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate })
+        : t('shop.dmgRanged', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate });
+      el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${t('note.' + id)}</div></div><div class="btns"><button class="buy">💰 ${cfg.price}</button><button class="sell hidden">${t('shop.sell')}</button></div>`;
       (el.querySelector('.buy') as HTMLButtonElement).onclick = () => this.onBuy(id as WeaponId);
       (el.querySelector('.sell') as HTMLButtonElement).onclick = () => this.onSell(id as WeaponId);
       wg.appendChild(el);
@@ -104,9 +98,9 @@ export class Shop {
       el.className = 'shop-item';
       el.dataset.item = id;
       const stats = cfg.income > 0
-        ? `+${cfg.income} монет / ${cfg.incomeIntervalSec}с · HP ${cfg.hp}`
-        : `урон ${cfg.damage}/выстрел · дальн. ${cfg.range} · HP ${cfg.hp}`;
-      el.innerHTML = `<div><div class="nm">${BUILDING_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${BUILDING_NOTES[id] ?? ''}<br>исчезает при выходе из игры</div></div><div class="btns"><button>💰 ${cfg.price}</button></div>`;
+        ? t('shop.income', { n: cfg.income, sec: cfg.incomeIntervalSec, hp: cfg.hp })
+        : t('shop.turretStat', { dmg: cfg.damage ?? 0, range: cfg.range ?? 0, hp: cfg.hp });
+      el.innerHTML = `<div><div class="nm">${BUILDING_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${t('note.' + id)}<br>${t('shop.buildingVanish')}</div></div><div class="btns"><button>💰 ${cfg.price}</button></div>`;
       el.querySelector('button')!.onclick = () => {
         this.hide();
         this.onStartPlace(id as BuildingId);
@@ -119,7 +113,7 @@ export class Shop {
     lb.innerHTML = '';
     const lbe = document.createElement('div');
     lbe.className = 'shop-item';
-    lbe.innerHTML = `<div><div class="nm">🎁 Лутбокс</div><div class="st">Шанс на эпическую или легендарную шляпу,<br>золото — или ничего. Дубликат = бонусное золото.</div></div><div class="btns"><button id="lootbox-btn">💰 ${this.welcome.hats.lootboxPrice}</button></div>`;
+    lbe.innerHTML = `<div><div class="nm">${t('shop.lootbox')}</div><div class="st">${t('shop.lootboxDesc')}</div></div><div class="btns"><button id="lootbox-btn">💰 ${this.welcome.hats.lootboxPrice}</button></div>`;
     (lbe.querySelector('#lootbox-btn') as HTMLButtonElement).onclick = () => this.onLootbox();
     lb.appendChild(lbe);
 
@@ -127,7 +121,7 @@ export class Shop {
     const hg = $('shop-hats');
     hg.innerHTML = '';
     const sourceText: Record<string, string> = {
-      common: 'падает с мобов', rare: 'падает с боссов', epic: 'только из лутбокса', legendary: 'только из лутбокса',
+      common: t('src.common'), rare: t('src.rare'), epic: t('src.epic'), legendary: t('src.legendary'),
     };
     const tierOrder = ['common', 'rare', 'epic', 'legendary'];
     const hats = Object.entries(this.welcome.hats.items)
@@ -152,7 +146,7 @@ export class Shop {
 
     const foodBtn = $('shop-food').querySelector('button') as HTMLButtonElement;
     foodBtn.disabled = self.money < this.welcome.food.price || self.food >= this.welcome.food.maxCarry;
-    foodBtn.textContent = self.food >= this.welcome.food.maxCarry ? 'Максимум' : `💰 ${this.welcome.food.price}`;
+    foodBtn.textContent = self.food >= this.welcome.food.maxCarry ? t('shop.max') : `💰 ${this.welcome.food.price}`;
 
     for (const el of document.querySelectorAll<HTMLElement>('#shop-weapons .shop-item')) {
       const id = el.dataset.item as WeaponId;
@@ -162,10 +156,10 @@ export class Shop {
       const owned = self.weapons.includes(id);
       el.classList.toggle('owned', owned);
       if (owned) {
-        buy.textContent = 'Куплено';
+        buy.textContent = t('shop.bought');
         buy.disabled = true;
         sell.classList.remove('hidden');
-        sell.textContent = `Продать +${Math.floor(cfg.price * sellFrac)}`;
+        sell.textContent = t('shop.sellFor', { n: Math.floor(cfg.price * sellFrac) });
         sell.disabled = false;
       } else {
         buy.textContent = `💰 ${cfg.price}`;
@@ -179,13 +173,13 @@ export class Shop {
       const btn = el.querySelector('button') as HTMLButtonElement;
       btn.disabled = self.money < cfg.price || self.buildings >= this.welcome.maxBuildings;
     }
-    $('build-count').textContent = `(${self.buildings}/${this.welcome.maxBuildings})`;
+    $('build-count').textContent = t('shop.buildCount', { n: self.buildings, max: this.welcome.maxBuildings });
 
     // level
     $('level-cur').textContent = String(self.level);
     const lvlBtn = $('level-btn') as HTMLButtonElement;
     if (self.levelCost <= 0) {
-      lvlBtn.textContent = 'Максимум';
+      lvlBtn.textContent = t('shop.max');
       lvlBtn.disabled = true;
     } else {
       lvlBtn.textContent = `💰 ${self.levelCost}`;
@@ -207,7 +201,7 @@ export class Shop {
     }
     const pBtn = $('prestige-btn') as HTMLButtonElement;
     if (self.prestigeCost <= 0) {
-      pBtn.textContent = 'Максимум';
+      pBtn.textContent = t('shop.max');
       pBtn.disabled = true;
     } else {
       pBtn.textContent = `💰 ${self.prestigeCost}`;
@@ -216,7 +210,7 @@ export class Shop {
 
     // hats
     ($('lootbox-btn') as HTMLButtonElement).disabled = self.money < this.welcome.hats.lootboxPrice;
-    $('hat-count').textContent = `(собрано ${self.hats.length}/${Object.keys(this.welcome.hats.items).length})`;
+    $('hat-count').textContent = t('shop.hatCount', { n: self.hats.length, total: Object.keys(this.welcome.hats.items).length });
     for (const el of document.querySelectorAll<HTMLElement>('#shop-hats .shop-item')) {
       const id = el.dataset.hat!;
       const btn = el.querySelector('.hat-btn') as HTMLButtonElement;
@@ -225,11 +219,11 @@ export class Shop {
       el.style.opacity = owned ? '1' : '0.55';
       btn.dataset.equipped = equipped ? '1' : '0';
       if (!owned) {
-        btn.textContent = 'Нет';
+        btn.textContent = t('shop.none');
         btn.disabled = true;
       } else {
         btn.disabled = false;
-        btn.textContent = equipped ? 'Снять' : 'Надеть';
+        btn.textContent = equipped ? t('shop.unequip') : t('shop.equip');
         btn.style.background = equipped ? '#238636' : '#1f6feb';
       }
     }

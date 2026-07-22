@@ -4,6 +4,7 @@ import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Player } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
+import { tr } from './i18n.js';
 
 export interface HatEffects {
   speedMult: number;
@@ -95,8 +96,8 @@ export function tryEquipHat(world: World, p: Player, hatId: string | null): void
 
 export function tryLootbox(world: World, p: Player): { ok: boolean; reason?: string } {
   const bal = getBalance();
-  if (p.dead) return { ok: false, reason: 'Вы мертвы' };
-  if (p.money < bal.hats.lootboxPrice) return { ok: false, reason: 'Недостаточно денег' };
+  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
+  if (p.money < bal.hats.lootboxPrice) return { ok: false, reason: tr(p.lang, 'noMoney') };
   p.money -= bal.hats.lootboxPrice;
   telemetry.purchase(p.name, 'lootbox', bal.hats.lootboxPrice);
 

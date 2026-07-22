@@ -6,15 +6,16 @@ import type { World } from './world.js';
 import type { Player } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { hatEffects } from './hats.js';
+import { tr } from './i18n.js';
 
 export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boolean; reason?: string } {
   const bal = getBalance();
-  if (!WEAPON_IDS.includes(item)) return { ok: false, reason: 'Неизвестный предмет' };
-  if (p.dead) return { ok: false, reason: 'Вы мертвы' };
-  if (p.weapons.includes(item)) return { ok: false, reason: 'Уже куплено' };
-  if (p.weapons.length >= 4) return { ok: false, reason: 'Хотбар заполнен (кулаки + 3 оружия)' };
+  if (!WEAPON_IDS.includes(item)) return { ok: false, reason: tr(p.lang, 'unknownItem') };
+  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
+  if (p.weapons.includes(item)) return { ok: false, reason: tr(p.lang, 'owned') };
+  if (p.weapons.length >= 4) return { ok: false, reason: tr(p.lang, 'hotbarFull') };
   const cfg = bal.weapons[item];
-  if (p.money < cfg.price) return { ok: false, reason: 'Недостаточно денег' };
+  if (p.money < cfg.price) return { ok: false, reason: tr(p.lang, 'noMoney') };
   p.money -= cfg.price;
   p.weapons.push(item);
   p.equipped = item;
@@ -25,9 +26,9 @@ export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boo
 
 export function tryBuyFood(world: World, p: Player): { ok: boolean; reason?: string } {
   const bal = getBalance();
-  if (p.dead) return { ok: false, reason: 'Вы мертвы' };
-  if (p.food >= bal.food.maxCarry) return { ok: false, reason: `Максимум еды: ${bal.food.maxCarry}` };
-  if (p.money < bal.food.price) return { ok: false, reason: 'Недостаточно денег' };
+  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
+  if (p.food >= bal.food.maxCarry) return { ok: false, reason: tr(p.lang, 'maxFood', { n: bal.food.maxCarry }) };
+  if (p.money < bal.food.price) return { ok: false, reason: tr(p.lang, 'noMoney') };
   p.money -= bal.food.price;
   p.food++;
   telemetry.purchase(p.name, 'food', bal.food.price);
@@ -36,10 +37,10 @@ export function tryBuyFood(world: World, p: Player): { ok: boolean; reason?: str
 
 export function trySellWeapon(world: World, p: Player, weapon: WeaponId): { ok: boolean; reason?: string } {
   const bal = getBalance();
-  if (p.dead) return { ok: false, reason: 'Вы мертвы' };
-  if (weapon === 'fists') return { ok: false, reason: 'Кулаки не продаются' };
+  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
+  if (weapon === 'fists') return { ok: false, reason: tr(p.lang, 'fistsNoSell') };
   const idx = p.weapons.indexOf(weapon);
-  if (idx < 0) return { ok: false, reason: 'У вас нет этого оружия' };
+  if (idx < 0) return { ok: false, reason: tr(p.lang, 'noWeapon') };
   const refund = Math.floor(bal.weapons[weapon].price * bal.economy.sellFrac);
   p.weapons.splice(idx, 1);
   if (p.equipped === weapon) p.equipped = 'fists';

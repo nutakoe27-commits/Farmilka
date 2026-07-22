@@ -1,12 +1,13 @@
 import type { SelfState } from '@shared/protocol.js';
 import type { WeaponId } from '@shared/types.js';
 import { WEAPON_ICONS } from '../game/entities.js';
+import { t } from './i18n.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 function fmtTime(sec: number): string {
   const s = Math.floor(sec);
-  return s >= 60 ? `${Math.floor(s / 60)}м ${s % 60}с` : `${s}с`;
+  return s >= 60 ? `${Math.floor(s / 60)}${t('time.min')} ${s % 60}${t('time.sec')}` : `${s}${t('time.sec')}`;
 }
 
 export class Hud {
@@ -47,14 +48,14 @@ export class Hud {
     $('hp-text').textContent = `${self.hp} / ${self.maxHp}`;
     if (self.level !== this.lastLevel) {
       this.lastLevel = self.level;
-      $('level-badge').innerHTML = `⭐ Ур. ${self.level}<span class="mx">/${this.maxLevel}</span>`;
+      $('level-badge').innerHTML = `${t('hud.level', { n: self.level })}<span class="mx">/${this.maxLevel}</span>`;
     }
     if (self.money !== this.lastMoney) {
       this.lastMoney = self.money;
       $('money').textContent = `💰 ${self.money}`;
     }
     if (self.protIn > 0) {
-      $('zone-label').textContent = `🛡 Защита после возрождения: ${Math.ceil(self.protIn)}с`;
+      $('zone-label').textContent = t('hud.protectSec', { n: Math.ceil(self.protIn) });
       $('zone-label').classList.remove('hidden');
     } else {
       $('zone-label').classList.add('hidden');
@@ -138,9 +139,9 @@ export class Hud {
 
   showDeath(ev: { dropped: number; cause: string; kills: number; survivedSec: number; level: number }): void {
     const causeText: Record<string, string> = {
-      player: '☠ Убит игроком', mob: 'Убит мобом', boss: 'Убит боссом', turret: 'Расстрелян турелью',
+      player: t('death.byPlayer'), mob: t('death.byMob'), boss: t('death.byBoss'), turret: t('death.byTurret'),
     };
-    $('death-info').textContent = causeText[ev.cause] ?? 'Погиб';
+    $('death-info').textContent = causeText[ev.cause] ?? t('death.generic');
     $('ds-survived').textContent = fmtTime(ev.survivedSec);
     $('ds-kills').textContent = String(ev.kills);
     $('ds-level').textContent = String(ev.level);

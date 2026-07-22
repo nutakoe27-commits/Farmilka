@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { WeaponId } from '@shared/types.js';
 import { getDb } from './db.js';
+import { tr, type Lang } from '../game/i18n.js';
 
 export interface Account {
   name: string;
@@ -25,9 +26,9 @@ export function accountExists(name: string): boolean {
   return !!getDb().prepare('SELECT 1 FROM accounts WHERE name = ? COLLATE NOCASE').get(name);
 }
 
-export function register(name: string, password: string, startMoney = 0): { ok: boolean; reason?: string; account?: Account } {
-  if (password.length < 4) return { ok: false, reason: 'Пароль слишком короткий (мин. 4 символа)' };
-  if (accountExists(name)) return { ok: false, reason: 'Это имя уже зарегистрировано' };
+export function register(name: string, password: string, startMoney = 0, lang: Lang = 'ru'): { ok: boolean; reason?: string; account?: Account } {
+  if (password.length < 4) return { ok: false, reason: tr(lang, 'passShort') };
+  if (accountExists(name)) return { ok: false, reason: tr(lang, 'nameTaken') };
   const salt = crypto.randomBytes(16).toString('hex');
   const now = Date.now();
   getDb()
@@ -36,14 +37,14 @@ export function register(name: string, password: string, startMoney = 0): { ok: 
   return { ok: true, account: { name, money: startMoney, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now } };
 }
 
-export function login(name: string, password: string): { ok: boolean; reason?: string; account?: Account } {
+export function login(name: string, password: string, lang: Lang = 'ru'): { ok: boolean; reason?: string; account?: Account } {
   const row = getDb()
     .prepare('SELECT name, pass_hash, salt, money, weapons, hats, hat, prestige, level, food, created_ts FROM accounts WHERE name = ? COLLATE NOCASE')
     .get(name) as { name: string; pass_hash: string; salt: string; money: number; weapons: string; hats: string | null; hat: string | null; prestige: number | null; level: number | null; food: number | null; created_ts: number } | undefined;
-  if (!row) return { ok: false, reason: 'Аккаунт не найден — отметьте «Создать аккаунт»' };
+  if (!row) return { ok: false, reason: tr(lang, 'accountNotFound') };
   const attempt = hash(password, row.salt);
   if (!crypto.timingSafeEqual(Buffer.from(attempt), Buffer.from(row.pass_hash))) {
-    return { ok: false, reason: 'Неверный пароль' };
+    return { ok: false, reason: tr(lang, 'wrongPass') };
   }
   let weapons: WeaponId[];
   try {
@@ -61,6 +62,32 @@ export function login(name: string, password: string): { ok: boolean; reason?: s
   }
   const hat = row.hat && hats.includes(row.hat) ? row.hat : null;
   return { ok: true, account: { name: row.name, money: row.money, weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts } };
+}
+
+const DAY_MS = 86_400_000;
+const REWARD_BASE = 100; // day-1 reward
+const REWARD_STEP = 50; // added per consecutive day
+const REWARD_MAX_STREAK = 7; // streak beyond this no longer raises the reward
+
+/**
+ * Grants a daily login reward once per UTC day. The streak grows on
+ * consecutive days and resets after a missed day. Returns null if already
+ * claimed today (or the account is missing). Gold is persisted immediately so
+ * a crash before logout can't yield a second claim.
+ */
+export function claimDailyReward(name: string): { gold: number; streak: number } | null {
+  const db = getDb();
+  const row = db
+    .prepare('SELECT last_reward_day, reward_streak FROM accounts WHERE name = ? COLLATE NOCASE')
+    .get(name) as { last_reward_day: number; reward_streak: number } | undefined;
+  if (!row) return null;
+  const today = Math.floor(Date.now() / DAY_MS);
+  if (row.last_reward_day === today) return null; // already claimed today
+  const streak = row.last_reward_day === today - 1 ? row.reward_streak + 1 : 1;
+  const gold = REWARD_BASE + (Math.min(streak, REWARD_MAX_STREAK) - 1) * REWARD_STEP;
+  db.prepare('UPDATE accounts SET last_reward_day = ?, reward_streak = ?, money = money + ? WHERE name = ? COLLATE NOCASE')
+    .run(today, streak, gold, name);
+  return { gold, streak };
 }
 
 /** Persists gold, weapons, hats, prestige, level and food at logout. */

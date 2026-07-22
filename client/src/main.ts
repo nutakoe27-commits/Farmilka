@@ -16,8 +16,34 @@ import { Shop } from './ui/shop.js';
 import { Minimap } from './ui/minimap.js';
 import { Leaderboard } from './ui/leaderboard.js';
 import { Settings } from './ui/settings.js';
+import { t, tList, lang, setLang, applyStaticI18n, bossName } from './ui/i18n.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
+
+// translate all static markup up front, then wire the language switchers
+applyStaticI18n();
+for (const btn of document.querySelectorAll<HTMLButtonElement>('.lang-switch button')) {
+  btn.classList.toggle('active', btn.dataset.lang === lang);
+  btn.onclick = () => setLang(btn.dataset.lang as 'ru' | 'en');
+}
+
+/** Copy/native-share an invite link to the game. */
+function shareGame(feedback?: HTMLElement): void {
+  const url = location.origin || `${location.protocol}//${location.host}`;
+  if (navigator.share) {
+    navigator.share({ title: 'FarmClash', text: t('menu.shareText'), url }).catch(() => {});
+    return;
+  }
+  navigator.clipboard?.writeText(t('menu.shareText') + url).then(() => {
+    if (feedback) {
+      const prev = feedback.textContent;
+      feedback.textContent = t('menu.shareCopied');
+      setTimeout(() => { if (feedback.textContent === t('menu.shareCopied')) feedback.textContent = prev; }, 2500);
+    }
+  }).catch(() => {});
+}
+$('menu-share').onclick = () => shareGame($('conn-error'));
+$('settings-share').onclick = () => shareGame($('settings-share'));
 
 // ---------- name/login screen ----------
 
@@ -36,7 +62,7 @@ function tryStart(register: boolean): void {
   }
   const password = passInput.value;
   if (register && !password) {
-    showError('Для аккаунта нужен пароль (мин. 4 символа)');
+    showError(t('menu.needPass'));
     return;
   }
   localStorage.setItem('farmclash-name', name);
@@ -45,7 +71,7 @@ function tryStart(register: boolean): void {
   const serverPref = Number(localStorage.getItem('farmclash-server')) || undefined;
   startGame(name, password, register, serverPref).catch((err) => {
     console.error(err);
-    showError('Не удалось запустить игру');
+    showError(t('menu.startFailed'));
   });
 }
 
@@ -87,7 +113,7 @@ async function startGame(name: string, password: string, register: boolean, serv
     $('queue-screen').classList.add('hidden');
     initGame(conn, w).catch((err) => {
       console.error(err);
-      showError('Ошибка инициализации графики');
+      showError(t('menu.initFailed'));
     });
   };
 }
@@ -298,44 +324,45 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       }
       case 'hat': {
         if (ev.dup) {
-          hud.notice(`🎩 Дубликат «${escapeHtml(ev.name)}» → <b style="color:#ffd76e">+${ev.gold} золота</b>`);
+          hud.notice(t('ev.hatDup', { name: escapeHtml(ev.name), gold: ev.gold }));
         } else {
-          hud.bossBanner(`🎩 Новая шляпа: ${ev.name}!`);
+          hud.bossBanner(t('ev.hatNewBanner', { name: escapeHtml(ev.name) }));
           setTimeout(() => hud.bossBanner(null), 5000);
-          hud.notice(`🎩 Выпала шляпа: <b>${escapeHtml(ev.name)}</b> — надень её в магазине (B)`);
+          hud.notice(t('ev.hatNew', { name: escapeHtml(ev.name) }));
         }
         break;
       }
       case 'lootbox': {
-        if (ev.result === 'gold') hud.notice(`🎁 Лутбокс: <b style="color:#ffd76e">+${ev.gold} золота!</b>`);
-        else if (ev.result === 'nothing') hud.notice('🎁 Лутбокс: пусто… не повезло');
+        if (ev.result === 'gold') hud.notice(t('ev.lootGold', { gold: ev.gold }));
+        else if (ev.result === 'nothing') hud.notice(t('ev.lootNothing'));
         break;
       }
       case 'prestige': {
-        hud.bossBanner(`✦ Престиж ${ev.level}${ev.tier ? ` — ${ev.tier}!` : '!'}`);
+        hud.bossBanner(t('ev.prestige', { level: ev.level, tier: ev.tier ? ` — ${ev.tier}!` : '!' }));
         setTimeout(() => hud.bossBanner(null), 5000);
         break;
       }
       case 'level': {
         effects.levelBurst(dispX, dispY);
         const maxed = ev.level >= ev.max;
-        hud.notice(maxed
-          ? `⭐ <b style="color:#7ee787">Максимальный уровень ${ev.level}!</b> Ты силён в PvE — но босса в одиночку не одолеть.`
-          : `⭐ Уровень <b style="color:#7ee787">${ev.level}</b> — больше HP и урона`);
+        hud.notice(maxed ? t('ev.levelMax', { n: ev.level }) : t('ev.level', { n: ev.level }));
         break;
       }
+      case 'dailyReward':
+        hud.notice(t('ev.daily', { gold: ev.gold, streak: ev.streak }), 9000);
+        break;
       case 'death':
         selfDead = true;
         hud.showDeath(ev);
         break;
       case 'bossWarn':
         bossWarnUntil = performance.now() + ev.inSec * 1000;
-        bossWarnName = ev.boss;
+        bossWarnName = bossName(ev.bossId, ev.boss);
         minimap.ping(ev.x, ev.y, ev.inSec * 1000);
         break;
       case 'bossSpawned':
         bossWarnUntil = 0;
-        hud.bossBanner(`💀 ${ev.boss} появился! Убей его ради награды!`);
+        hud.bossBanner(t('ev.bossSpawned', { boss: bossName(ev.bossId, ev.boss) }));
         minimap.ping(ev.x, ev.y, 60_000);
         setTimeout(() => hud.bossBanner(null), 6000);
         break;
@@ -344,20 +371,20 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       case 'bossKilled': {
         const top = ev.rewards.slice(0, 3).map((r) => `${escapeHtml(r.name)}: +${r.amount}`).join(' · ');
-        hud.bossBanner(`💀 ${ev.boss} повержен! ${top}`);
+        hud.bossBanner(t('ev.bossKilled', { boss: bossName(ev.bossId, ev.boss), top }));
         setTimeout(() => hud.bossBanner(null), 8000);
         break;
       }
       case 'bossGone':
-        hud.bossBanner(`${ev.boss} исчез…`);
+        hud.bossBanner(t('ev.bossGone', { boss: bossName(ev.bossId, ev.boss) }));
         setTimeout(() => hud.bossBanner(null), 4000);
         break;
       case 'buildingAttacked':
-        hud.notice('⚠ <b style="color:#ffd76e">Вашу постройку атакуют!</b>');
+        hud.notice(t('ev.buildAttacked'));
         minimap.ping(ev.x, ev.y, 5000);
         break;
       case 'buildingDestroyed':
-        hud.notice(ev.own ? `💥 Вашу постройку разрушил <b>${escapeHtml(ev.byName)}</b>` : '💥 Вы разрушили постройку — заберите лут!');
+        hud.notice(ev.own ? t('ev.buildDestroyedMine', { name: escapeHtml(ev.byName) }) : t('ev.buildDestroyedTheirs'));
         break;
       case 'purchase':
         if (!ev.ok && ev.reason) shop.message(ev.reason);
@@ -513,7 +540,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     }
 
     if (bossWarnUntil > now) {
-      hud.bossBanner(`⚠ ${bossWarnName} появится через ${Math.ceil((bossWarnUntil - now) / 1000)}с — смотри на миникарту!`);
+      hud.bossBanner(t('ev.bossWarn', { boss: bossWarnName, n: Math.ceil((bossWarnUntil - now) / 1000) }));
     }
 
     hud.killFeedEnabled = settings.values.killFeed;
@@ -542,9 +569,7 @@ function swingColor(weapon: string): number {
 /** First-time tips: a few rotating hints, then never again (localStorage flag). */
 function runOnboarding(mobile: boolean): void {
   if (localStorage.getItem('farmclash-onboarded')) return;
-  const tips = mobile
-    ? ['👈 Левый джойстик — движение', '⚔ Большая кнопка — атака (тап = автоприцел)', '🛒 Кнопка магазина — оружие и уровни', '🍖 Ешь еду, чтобы выжить в бою']
-    : ['WASD — движение, мышь — прицел, ЛКМ — атака', 'Убивай мобов и собирай монеты 💰', 'B — магазин: оружие, постройки, уровни', 'Q — съешь еду, чтобы выжить в бою 🍖'];
+  const tips = tList(mobile ? 'onboard.mobile' : 'onboard.desktop');
   const el = document.getElementById('onboarding')!;
   let i = 0;
   const step = (): void => {
