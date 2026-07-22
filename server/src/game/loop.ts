@@ -1,8 +1,8 @@
 import { getBalance } from './balance.js';
-import type { World } from './world.js';
+import type { WorldManager } from './world-manager.js';
 import { buildSnapshot } from '../net/snapshot.js';
 
-export function startLoop(worlds: World[]): void {
+export function startLoop(worlds: WorldManager): void {
   const tickMs = 1000 / getBalance().world.tickRate;
   const dt = tickMs / 1000;
   let nextAt = Date.now() + tickMs;
@@ -10,7 +10,8 @@ export function startLoop(worlds: World[]): void {
 
   const tick = (): void => {
     const start = Date.now();
-    for (const world of worlds) {
+    const active = worlds.active();
+    for (const world of active) {
       try {
         world.tick(start, dt);
         for (const p of world.connectedPlayers()) {
@@ -20,11 +21,12 @@ export function startLoop(worlds: World[]): void {
         console.error(`[loop] tick error (server ${world.serverId})`, err);
       }
     }
+    worlds.reap(start); // tear down worlds that have sat empty
     const dur = Date.now() - start;
     if (dur > 40) {
       slowTicks++;
       if (slowTicks % 20 === 1) {
-        const stats = worlds.map((w) => `s${w.serverId}:${w.connectedPlayers().length}p/${w.entities.size}e`).join(' ');
+        const stats = active.map((w) => `s${w.serverId}:${w.connectedPlayers().length}p/${w.entities.size}e`).join(' ');
         console.warn(`[loop] slow tick: ${dur}ms (${stats})`);
       }
     }
@@ -34,5 +36,5 @@ export function startLoop(worlds: World[]): void {
     setTimeout(tick, Math.max(0, delay));
   };
   setTimeout(tick, tickMs);
-  console.log(`[loop] ${worlds.length} world(s) at ${getBalance().world.tickRate} TPS`);
+  console.log(`[loop] dynamic worlds at ${getBalance().world.tickRate} TPS`);
 }

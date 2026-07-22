@@ -130,7 +130,10 @@ export interface Balance {
     viewRadius: number;
     maxPlayers: number;
     tickRate: number;
+    /** minimum / always-on world count */
     servers: number;
+    /** hard cap on dynamically-spawned worlds */
+    maxServers: number;
   };
   player: {
     hp: number;
@@ -203,6 +206,7 @@ export function validateBalance(raw: unknown): Balance {
   num(world, 'maxPlayers', 'world', 1);
   num(world, 'tickRate', 'world', 1);
   num(world, 'servers', 'world', 1);
+  num(world, 'maxServers', 'world', 1);
 
   const player = section(root, 'player');
   for (const k of ['hp', 'speed', 'radius', 'regenPerSec', 'regenDelaySec', 'respawnSec', 'startMoney', 'dropMoneyFrac', 'spawnProtectSec']) {

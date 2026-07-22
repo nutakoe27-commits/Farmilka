@@ -2,9 +2,10 @@
   "world": {
     "size": 7000,
     "viewRadius": 1200,
-    "maxPlayers": 80,
+    "maxPlayers": 40,
     "tickRate": 30,
-    "servers": 3
+    "servers": 3,
+    "maxServers": 8
   },
   "player": {
     "hp": 100,

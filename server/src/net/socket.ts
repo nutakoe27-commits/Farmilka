@@ -7,6 +7,7 @@ import { decode, encode, type ClientMsg, type WelcomeMsg } from '@shared/protoco
 import { clamp } from '@shared/math.js';
 import { getBalance } from '../game/balance.js';
 import type { World } from '../game/world.js';
+import type { WorldManager } from '../game/world-manager.js';
 import type { Player } from '../game/entities.js';
 import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip } from '../game/economy.js';
 import { tryPlaceBuilding, removePlayerBuildings } from '../game/buildings.js';
@@ -19,14 +20,13 @@ import { adminRouter } from '../admin/stats.js';
 
 const sessionIds = new WeakMap<Player, number>();
 
-export function startServer(worlds: World[]): http.Server {
+export function startServer(worlds: WorldManager): http.Server {
   const app = express();
-  app.use('/admin', adminRouter(worlds));
+  app.use('/admin', adminRouter(() => worlds.active()));
 
   // live server list for the client's server picker
   app.get('/servers', (_req, res) => {
-    const max = getBalance().world.maxPlayers;
-    res.json(worlds.map((w) => ({ id: w.serverId, online: w.connectedPlayers().length, max })));
+    res.json(worlds.list());
   });
 
   // serve built client in production
@@ -54,22 +54,22 @@ export function startServer(worlds: World[]): http.Server {
         if (msg.t !== 'join') return;
         const bal = getBalance();
 
-        // pick a world: explicit choice or first with a free slot
+        // pick a world: explicit choice, or auto-assign (grows a new world on demand)
         if (typeof msg.server === 'number' && Number.isInteger(msg.server)) {
-          const chosen = worlds[msg.server - 1];
+          const chosen = worlds.get(msg.server);
           if (!chosen) {
             ws.send(encode({ t: 'reject', reason: `Сервера ${msg.server} не существует` }));
             return;
           }
-          if (chosen.connectedPlayers().length >= bal.world.maxPlayers) {
+          if (!worlds.hasRoom(chosen)) {
             ws.send(encode({ t: 'reject', reason: `Сервер ${msg.server} заполнен — выберите другой` }));
             return;
           }
           world = chosen;
         } else {
-          world = worlds.find((w) => w.connectedPlayers().length < bal.world.maxPlayers) ?? null;
+          world = worlds.assign();
           if (!world) {
-            ws.send(encode({ t: 'reject', reason: 'Все серверы заполнены' }));
+            ws.send(encode({ t: 'reject', reason: 'Все серверы заполнены — попробуйте через минуту' }));
             ws.close();
             return;
           }
@@ -86,7 +86,7 @@ export function startServer(worlds: World[]): http.Server {
               return;
             }
             // one live session per account — across all game servers
-            for (const w of worlds) {
+            for (const w of worlds.active()) {
               for (const other of w.players.values()) {
                 if (other.ws && other.account && other.account.toLowerCase() === res.account!.name.toLowerCase()) {
                   ws.send(encode({ t: 'reject', reason: 'Этот аккаунт уже в игре' }));
@@ -118,7 +118,7 @@ export function startServer(worlds: World[]): http.Server {
           time: Date.now(),
           registered: !!account,
           server: world.serverId,
-          servers: worlds.map((w) => ({ id: w.serverId, online: w.connectedPlayers().length, max: bal.world.maxPlayers })),
+          servers: worlds.list(),
           world: {
             size: bal.world.size,
             viewRadius: bal.world.viewRadius,

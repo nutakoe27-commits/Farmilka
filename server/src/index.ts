@@ -1,7 +1,7 @@
 import { loadBalance, watchBalance, getBalance } from './game/balance.js';
 import { openDb } from './db/db.js';
 import { startTelemetryFlusher } from './db/telemetry.js';
-import { World } from './game/world.js';
+import { WorldManager } from './game/world-manager.js';
 import { startLoop } from './game/loop.js';
 import { startServer } from './net/socket.js';
 
@@ -10,10 +10,10 @@ watchBalance();
 openDb();
 startTelemetryFlusher();
 
-// number of worlds is fixed at boot (changing it in balance.json needs a restart)
-const count = Math.max(1, Math.floor(getBalance().world.servers));
-const worlds = Array.from({ length: count }, (_, i) => new World(i + 1));
+// worlds grow/shrink with demand between servers..maxServers (see WorldManager)
+const worlds = new WorldManager();
 startServer(worlds);
 startLoop(worlds);
 
-console.log(`[farmclash] up with ${count} game server(s)`);
+const bal = getBalance();
+console.log(`[farmclash] up: ${bal.world.servers}..${bal.world.maxServers} worlds × ${bal.world.maxPlayers} players (dynamic)`);

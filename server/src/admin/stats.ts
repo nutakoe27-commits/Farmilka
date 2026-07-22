@@ -46,7 +46,7 @@ function playerLink(name: string, token: string): string {
 
 const PLAYER_WEAPONS: string[] = WEAPON_IDS;
 
-export function adminRouter(worlds: World[]): Router {
+export function adminRouter(getWorlds: () => World[]): Router {
   const router = Router();
   const token = process.env.ADMIN_TOKEN ?? 'dev';
 
@@ -65,6 +65,7 @@ export function adminRouter(worlds: World[]): Router {
   // ---------- player profile ----------
   router.get('/player', (req, res) => {
     const db = getDb();
+    const worlds = getWorlds();
     const name = String(req.query.name ?? '');
     const now = Date.now();
 
@@ -107,6 +108,7 @@ ${table('Последние сессии', ['Вход', 'Длительност�
   // ---------- main dashboard ----------
   router.get('/stats', (req, res) => {
     const db = getDb();
+    const worlds = getWorlds();
     const hours = Math.max(1, Math.min(24 * 30, Number(req.query.hours) || 24));
     const since = Date.now() - hours * 3600_000;
     const now = Date.now();
