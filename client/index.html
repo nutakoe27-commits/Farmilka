@@ -25,6 +25,9 @@
     #btn-row { display: flex; gap: 8px; justify-content: center; }
     #conn-error { color: #ff7b72; font-size: 13px; margin-top: 10px; min-height: 16px; }
     #acc-hint { font-size: 11px; color: #6a7085; margin-top: 10px; line-height: 1.5; }
+    .tg-link { display: inline-block; margin-top: 14px; padding: 7px 14px; border-radius: 8px; background: rgba(41,169,235,.14); border: 1px solid rgba(41,169,235,.45); color: #4db8f0; font-size: 13px; font-weight: 600; text-decoration: none; }
+    .tg-link:hover { background: rgba(41,169,235,.24); }
+    #settings .tg-link { display: block; text-align: center; margin: 12px 0 6px; }
 
     /* HUD */
     #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
@@ -152,6 +155,7 @@
     <div class="set-row"><span>Тряска экрана</span><input type="checkbox" id="set-shake" checked></div>
     <div class="set-row"><span>Числа урона</span><input type="checkbox" id="set-dmg" checked></div>
     <div class="set-row"><span>Лента убийств</span><input type="checkbox" id="set-feed" checked></div>
+    <a class="tg-link" href="https://t.me/farmclashonline" target="_blank" rel="noopener">📢 Новости и чат — Telegram</a>
     <button class="btn alt" id="settings-close">Продолжить игру</button>
     <button class="btn" id="exit-btn">Выйти в меню</button>
   </div>
@@ -220,6 +224,7 @@
       </div>
       <div id="conn-error"></div>
       <div id="acc-hint">Без пароля — гостевой вход (прогресс не сохраняется).<br>С аккаунтом золото и оружие сохраняются между сеансами.</div>
+      <a class="tg-link" href="https://t.me/farmclashonline" target="_blank" rel="noopener">📢 Новости и чат — Telegram-канал</a>
     </div>
   </div>
 
