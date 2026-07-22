@@ -20,7 +20,7 @@ export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boo
   p.weapons.push(item);
   p.equipped = item;
   world.markDirty(p);
-  telemetry.purchase(p.name, item, cfg.price);
+  if (!p.bot) telemetry.purchase(p.name, item, cfg.price);
   return { ok: true };
 }
 
@@ -31,7 +31,7 @@ export function tryBuyFood(world: World, p: Player): { ok: boolean; reason?: str
   if (p.money < bal.food.price) return { ok: false, reason: tr(p.lang, 'noMoney') };
   p.money -= bal.food.price;
   p.food++;
-  telemetry.purchase(p.name, 'food', bal.food.price);
+  if (!p.bot) telemetry.purchase(p.name, 'food', bal.food.price);
   return { ok: true };
 }
 
@@ -46,7 +46,7 @@ export function trySellWeapon(world: World, p: Player, weapon: WeaponId): { ok: 
   if (p.equipped === weapon) p.equipped = 'fists';
   p.money += refund;
   world.markDirty(p);
-  telemetry.purchase(p.name, `sell:${weapon}`, -refund);
+  if (!p.bot) telemetry.purchase(p.name, `sell:${weapon}`, -refund);
   return { ok: true };
 }
 
@@ -69,7 +69,7 @@ export function tryEat(world: World, p: Player, now: number): void {
   const healed = Math.min(bal.food.heal * hatEffects(p.hat).foodHealMult, p.maxHp - p.hp);
   p.hp += healed;
   world.markDirty(p);
-  telemetry.heal(p.name, healed);
+  if (!p.bot) telemetry.heal(p.name, healed);
   world.sendEvent(p, { e: 'heal', amount: Math.round(healed) });
 }
 
@@ -90,7 +90,7 @@ export function updateCoins(world: World, now: number): void {
     if (now >= food.despawnAt) world.removeEntity(food);
   }
   for (const p of world.players.values()) {
-    if (p.dead || !p.ws) continue;
+    if (p.dead || (!p.ws && !p.bot)) continue;
     const magnet = hatEffects(p.hat).coinMagnetAdd;
     const pickupR = Math.max(bal.economy.coinPickupRadius + magnet, bal.food.pickupRadius);
     const near = world.grid.queryCircle(p.x, p.y, pickupR + 20);
@@ -102,7 +102,7 @@ export function updateCoins(world: World, now: number): void {
         e.dead = true;
         p.money += e.value;
         p.session.moneyEarned += e.value;
-        telemetry.income(p.name, 'loot', e.value);
+        if (!p.bot) telemetry.income(p.name, 'loot', e.value);
       } else if (e.kind === 'food') {
         if (p.food >= bal.food.maxCarry) continue;
         if (dist(p.x, p.y, e.x, e.y) > bal.food.pickupRadius + p.radius) continue;

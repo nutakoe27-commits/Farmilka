@@ -101,10 +101,10 @@ export function onBossKilled(world: World, boss: Boss, src: DamageSource, now: n
     const amount = Math.round((cfg.reward * dmg) / totalDmg);
     rewards.push({ name, amount });
     for (const p of world.players.values()) {
-      if (p.name === name && p.ws) {
+      if (p.name === name && (p.ws || p.bot)) {
         p.money += amount;
         p.session.moneyEarned += amount;
-        telemetry.income(p.name, 'boss', amount);
+        if (!p.bot) telemetry.income(p.name, 'boss', amount);
         // rare hats drop from bosses for everyone who earned a reward
         if (Math.random() < bal.hats.bossDropChance) {
           const hat = randomHatOfTier('rare');

@@ -4,6 +4,7 @@ services:
     restart: unless-stopped
     environment:
       - ADMIN_TOKEN=${ADMIN_TOKEN:-change-me}
+      - BOTS_PER_WORLD=${BOTS_PER_WORLD:-5}   # server-driven filler bots per world (0 disables)
     volumes:
       - ./data:/app/data          # SQLite (game.db) — метрики баланса
       - ./balance:/app/balance    # balance.json — правится на хосте, применяется на лету

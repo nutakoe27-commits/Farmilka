@@ -14,6 +14,7 @@ import { updateBosses, updateBossTimers } from './boss.js';
 import { updateBuildings } from './buildings.js';
 import { updateCoins } from './economy.js';
 import { updateProjectiles } from './combat.js';
+import { ensureBots, updateBots } from './bots.js';
 
 export class World {
   tickNo = 0;
@@ -138,7 +139,7 @@ export class World {
     return { x: (pos.x + c) / 2, y: (pos.y + c) / 2 };
   }
 
-  spawnPlayer(name: string, ws: WebSocket, account?: { name: string; money: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number; level: number; food: number }, lang: 'ru' | 'en' = 'ru'): Player {
+  spawnPlayer(name: string, ws: WebSocket | null, account?: { name: string; money: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number; level: number; food: number }, lang: 'ru' | 'en' = 'ru', bot = false): Player {
     const bal = getBalance();
     const pos = this.spawnPoint();
     const weapons: WeaponId[] = account ? [...account.weapons] : ['fists'];
@@ -172,6 +173,8 @@ export class World {
       invulnUntil: Date.now() + bal.player.spawnProtectSec * 1000,
       account: account ? account.name : null,
       lang,
+      bot,
+      brain: null,
       attackReadyAt: 0,
       lastDamagedAt: 0,
       lastBossContactAt: 0,
@@ -205,6 +208,11 @@ export class World {
     p.movedTick = this.tickNo;
     p.dirtyTick = this.tickNo;
     this.addEntity(p);
+  }
+
+  /** Spawns a server-driven filler bot (no ws; the brain is attached by game/bots.ts). */
+  spawnBot(name: string): Player {
+    return this.spawnPlayer(name, null, undefined, 'ru', true);
   }
 
   spawnFood(x: number, y: number): Food {
@@ -322,6 +330,8 @@ export class World {
     this.tickNo++;
     this.time = now;
     this.inTick = true;
+    ensureBots(this); // keep the world stocked with filler bots
+    updateBots(this, dt, now); // set bot inputs before players are simulated
     updatePlayers(this, dt, now);
     updateMobs(this, dt, now);
     updateBossTimers(this, now);

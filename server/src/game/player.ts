@@ -8,10 +8,10 @@ export function updatePlayers(world: World, dt: number, now: number): void {
   const bal = getBalance();
   for (const p of world.players.values()) {
     if (p.dead) {
-      if (p.respawnAt && now >= p.respawnAt && p.ws) world.respawnPlayer(p);
+      if (p.respawnAt && now >= p.respawnAt && (p.ws || p.bot)) world.respawnPlayer(p);
       continue;
     }
-    if (!p.ws) continue;
+    if (!p.ws && !p.bot) continue;
 
     // movement from held input, server-clamped
     let mx = clamp(p.input.mx, -1, 1);

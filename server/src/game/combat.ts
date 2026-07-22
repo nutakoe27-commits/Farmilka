@@ -165,7 +165,10 @@ export function applyDamage(
     alertBuildingOwner(world, target, now);
   }
 
-  telemetry.damage(src.name, src.weapon, amount, target.kind);
+  // filler bots are excluded from all telemetry (as attacker or victim)
+  const attackerBot = !!world.players.get(src.id)?.bot;
+  const targetBot = target.kind === 'player' && (target as Player).bot;
+  if (!attackerBot && !targetBot) telemetry.damage(src.name, src.weapon, amount, target.kind);
   world.sendNear(target.x, target.y, { e: 'damage', target: target.id, amount: Math.round(amount), x: target.x, y: target.y });
 
   if (target.hp <= 0) {
@@ -198,6 +201,7 @@ function alertBuildingOwner(world: World, b: Building, now: number): void {
 function handleDeath(world: World, target: Entity, src: DamageSource, now: number, distance: number): void {
   const bal = getBalance();
   const killerPlayer = src.cause === 'player' || src.cause === 'turret' ? world.players.get(src.id) : undefined;
+  const killerBot = !!killerPlayer?.bot; // filler bots never generate telemetry
 
   switch (target.kind) {
     case 'player': {
@@ -214,7 +218,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       target.respawnAt = now + bal.player.respawnSec * 1000 * victimFx.respawnMult;
       target.session.deaths++;
       world.removeEntity(target);
-      telemetry.death(target.name, src.cause, src.weapon, equippedAtDeath, dropped);
+      if (!target.bot) telemetry.death(target.name, src.cause, src.weapon, equippedAtDeath, dropped);
       world.sendEvent(target, {
         e: 'death',
         dropped,
@@ -226,7 +230,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       });
       world.broadcast({ e: 'kill', killer: src.name, victim: target.name, weapon: src.weapon });
       if (killerPlayer) { killerPlayer.session.kills++; killerPlayer.killsThisLife++; }
-      telemetry.kill(src.name, target.name, src.weapon, distance, 'player');
+      if (!killerBot && !target.bot) telemetry.kill(src.name, target.name, src.weapon, distance, 'player');
       break;
     }
     case 'mob': {
@@ -239,7 +243,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
         const reward = Math.round(cfg.reward * killerFx.mobRewardMult);
         killerPlayer.money += reward;
         killerPlayer.session.moneyEarned += reward;
-        telemetry.income(killerPlayer.name, 'mob', reward);
+        if (!killerBot) telemetry.income(killerPlayer.name, 'mob', reward);
       }
       if (Math.random() < bal.food.dropChance * (killerFx ? killerFx.foodFindMult : 1)) {
         world.spawnFood(target.x, target.y);
@@ -249,13 +253,13 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
         const hat = randomHatOfTier('common');
         if (hat) grantHat(world, killerPlayer, hat, 'mob');
       }
-      telemetry.kill(src.name, target.mobType, src.weapon, distance, 'mob');
+      if (!killerBot) telemetry.kill(src.name, target.mobType, src.weapon, distance, 'mob');
       break;
     }
     case 'boss': {
       target.dead = true;
       onBossKilled(world, target, src, now);
-      telemetry.kill(src.name, 'boss', src.weapon, distance, 'boss');
+      if (!killerBot) telemetry.kill(src.name, 'boss', src.weapon, distance, 'boss');
       break;
     }
     case 'building': {
@@ -271,9 +275,9 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       world.spawnCoinPiles(target.x, target.y, loot);
       if (killerPlayer) {
         world.sendEvent(killerPlayer, { e: 'buildingDestroyed', id: target.id, byName: src.name, own: false });
-        telemetry.income(killerPlayer.name, 'raid', loot);
+        if (!killerBot) telemetry.income(killerPlayer.name, 'raid', loot);
       }
-      telemetry.kill(src.name, target.buildingType, src.weapon, distance, 'building');
+      if (!killerBot) telemetry.kill(src.name, target.buildingType, src.weapon, distance, 'building');
       break;
     }
   }

@@ -48,6 +48,21 @@ export interface SessionStats {
   moneyEarned: number;
 }
 
+/** Per-bot AI memory (see game/bots.ts). */
+export interface BotBrain {
+  /** current wander heading and when to reroll it */
+  wanderAngle: number;
+  nextWanderAt: number;
+  /** next time this bot re-evaluates shopping */
+  nextShopAt: number;
+  /** personality: 0..1 willingness to fight other players */
+  aggro: number;
+  /** gold to keep in reserve before spending on levels */
+  reserve: number;
+  /** input sequence counter (mirrors a real client's) */
+  seq: number;
+}
+
 export interface Player extends BaseEntity, StatusEffects {
   kind: 'player';
   name: string;
@@ -72,6 +87,10 @@ export interface Player extends BaseEntity, StatusEffects {
   account: string | null;
   /** client UI language, for localized server messages */
   lang: 'ru' | 'en';
+  /** true for server-driven filler bots (no ws; excluded from stats & player cap) */
+  bot: boolean;
+  /** AI memory for filler bots; null for real players */
+  brain: BotBrain | null;
   attackReadyAt: number;
   lastDamagedAt: number;
   lastBossContactAt: number;
