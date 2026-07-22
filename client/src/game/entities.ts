@@ -103,9 +103,6 @@ export class EntityView {
       this.top.addChild(this.statusRing);
     }
     this.addGlow(state);
-    // mob/boss art is static and detailed — cache it as a texture so each renders
-    // as one quad instead of many tessellated fills (keeps the framerate smooth).
-    if (state.kind === 'mob' || state.kind === 'boss') this.body.cacheAsTexture(true);
   }
 
   /** Additive neon halo behind the body + a white hit-flash sprite over it. */
