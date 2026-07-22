@@ -17,9 +17,9 @@ class C {
   ws: WebSocket; seq = 0; x = 0; y = 0; hp = 0; maxHp = 0; money = 0; id = ''; ready = false;
   level = 0; levelCost = 0; respawnIn: number | undefined;
   entities = new Map<string, any>(); events: any[] = [];
-  constructor(name: string) {
+  constructor(name: string, password = '', register = false) {
     this.ws = new WebSocket(URL);
-    this.ws.on('open', () => this.ws.send(JSON.stringify({ t: 'join', name })));
+    this.ws.on('open', () => this.ws.send(JSON.stringify({ t: 'join', name, password: password || undefined, register: register || undefined })));
     this.ws.on('message', (d, isBinary) => {
       const m = isBinary ? decodeSnapshot(d as Buffer) : JSON.parse(d.toString());
       if (m.t === 'welcome') { this.ready = true; this.id = m.id; }
@@ -170,7 +170,22 @@ async function main() {
   check('level reset to 1 on death', a.level === 1, `level=${a.level}`);
   check('maxHp reset to 100 on death', a.maxHp === 100, `maxHp=${a.maxHp}`);
 
-  a.ws.close(); b.ws.close();
+  // ---- levels persist across logout for accounts (reset only on death) ----
+  const acc = new C('Persister', 'pass1234', true);
+  await acc.waitReady();
+  await sleep(300);
+  for (let i = 0; i < 3; i++) { acc.send({ t: 'buyLevel' }); await sleep(250); }
+  check('account leveled to 4 before logout', acc.level === 4, `level=${acc.level}`);
+  acc.ws.close();
+  await sleep(900); // let saveProgress run
+  const acc2 = new C('Persister', 'pass1234');
+  await acc2.waitReady();
+  await sleep(400);
+  check('level persists across logout/login', acc2.level === 4, `level=${acc2.level}`);
+  check('maxHp reflects the restored level (130)', acc2.maxHp === 130, `maxHp=${acc2.maxHp}`);
+  check('rejoins at full HP', acc2.hp === acc2.maxHp, `hp=${acc2.hp}/${acc2.maxHp}`);
+
+  a.ws.close(); b.ws.close(); acc2.ws.close();
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail > 0 ? 1 : 0);
 }

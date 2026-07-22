@@ -47,7 +47,8 @@ export function startServer(worlds: WorldManager): http.Server {
   function enterWorld(ws: WebSocket, world: World, name: string, account?: Account): Player {
     const bal = getBalance();
     const player = world.spawnPlayer(name, ws, account);
-    recomputeMaxHp(world, player);
+    recomputeMaxHp(world, player); // fold in restored level + hat
+    player.hp = player.maxHp; // (re)join at full HP for the restored level
     try {
       sessionIds.set(player, telemetry.sessionStart(name));
     } catch (err) {
@@ -261,7 +262,7 @@ export function startServer(worlds: WorldManager): http.Server {
       // account progress (gold + weapons + hats) survives the session
       if (player.account) {
         try {
-          saveProgress(player.account, player.money, player.weapons, player.hats, player.hat, player.prestige);
+          saveProgress(player.account, player.money, player.weapons, player.hats, player.hat, player.prestige, player.level);
         } catch (err) {
           console.error('[auth] progress save failed', err);
         }
