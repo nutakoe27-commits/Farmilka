@@ -71,9 +71,16 @@
     .tier-badge { font-size: 10px; padding: 1px 6px; border-radius: 6px; font-weight: 700; }
 
     /* shop */
-    #shop { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 15; width: 580px; max-width: 96vw; max-height: 84vh; overflow-y: auto; pointer-events: auto; }
+    #shop { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 15; width: 580px; max-width: 96vw; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; pointer-events: auto; }
     #shop h2 { font-size: 18px; margin-bottom: 4px; color: #9ecbff; }
-    #shop .sub { font-size: 12px; color: #8a8fa3; margin-bottom: 12px; }
+    #shop .sub { font-size: 12px; color: #8a8fa3; margin-bottom: 10px; }
+    #shop-head { flex: 0 0 auto; }
+    #shop-body { flex: 1 1 auto; overflow-y: auto; margin: 0 -6px; padding: 2px 6px 0; }
+    #shop-tabs { display: flex; gap: 6px; margin: 4px 0 2px; }
+    .shop-tab { flex: 1; cursor: pointer; border: 1px solid #2c3242; background: #151926; color: #9aa5b8; border-radius: 9px; padding: 10px 6px; font-size: 13px; font-weight: 700; transition: background .12s, color .12s; }
+    .shop-tab:hover { color: #e8e8ef; }
+    .shop-tab.active { background: linear-gradient(135deg,#1f6feb,#1a5fd0); border-color: #1f6feb; color: #fff; }
+    @media (max-width: 600px) { #shop { padding: 16px 18px; max-height: 90vh; } .shop-tab { font-size: 12px; padding: 11px 4px; } }
     .shop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
     @media (max-width: 600px) { .shop-grid { grid-template-columns: 1fr; } }
     .shop-item { background: #151926; border: 1px solid #2c3242; border-radius: 10px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -161,37 +168,52 @@
   </div>
 
   <div id="shop" class="panel hidden">
-    <button id="shop-close">✕</button>
-    <h2>Магазин</h2>
-    <div class="sub">Магазин работает из любой точки мира. При смерти теряются купленное оружие и еда!</div>
-    <div id="shop-msg"></div>
-    <div id="level-box" style="background:linear-gradient(135deg,#14231a,#151926);border:1px solid #2d523a;border-radius:10px;padding:12px 14px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <div>
-          <div style="font-size:15px;font-weight:700">⭐ Уровень <span id="level-cur" style="color:#7ee787"></span><span id="level-max" style="color:#8a8fa3;font-weight:400"></span></div>
-          <div id="level-desc" style="font-size:11px;color:#8a8fa3;margin-top:3px">+HP и +урон за каждый уровень. Теряется при смерти. На боссов урон не действует.</div>
+    <div id="shop-head">
+      <button id="shop-close">✕</button>
+      <h2>Магазин</h2>
+      <div class="sub">Работает из любой точки мира. При смерти теряются оружие и еда!</div>
+      <div id="shop-msg"></div>
+      <div id="level-box" style="background:linear-gradient(135deg,#14231a,#151926);border:1px solid #2d523a;border-radius:10px;padding:10px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <div>
+            <div style="font-size:15px;font-weight:700">⭐ Уровень <span id="level-cur" style="color:#7ee787"></span><span id="level-max" style="color:#8a8fa3;font-weight:400"></span></div>
+            <div id="level-desc" style="font-size:11px;color:#8a8fa3;margin-top:3px">+HP и +урон за уровень. Теряется при смерти. На боссов не действует.</div>
+          </div>
+          <button id="level-btn" style="cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#2ea043,#1f7a33);color:#fff;white-space:nowrap"></button>
         </div>
-        <button id="level-btn" style="cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#2ea043,#1f7a33);color:#fff;white-space:nowrap"></button>
+      </div>
+      <div id="shop-tabs">
+        <button class="shop-tab active" data-tab="weapons">⚔️ Оружие</button>
+        <button class="shop-tab" data-tab="buildings">🏰 Постройки</button>
+        <button class="shop-tab" data-tab="hats">🎩 Шляпы</button>
       </div>
     </div>
-    <div id="prestige-box" style="background:linear-gradient(135deg,#1a1428,#151926);border:1px solid #3a2d52;border-radius:10px;padding:12px 14px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <div>
-          <div style="font-size:15px;font-weight:700">✦ Престиж <span id="prestige-level" style="color:#d88bff"></span> <span id="prestige-tier" class="tier-badge"></span></div>
-          <div style="font-size:11px;color:#8a8fa3;margin-top:3px">Слив золота на статус: цвет имени, аура, значок. На бой не влияет.</div>
+    <div id="shop-body">
+      <div class="shop-panel" data-panel="weapons">
+        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Еда</h3>
+        <div class="shop-grid" id="shop-food"></div>
+        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Оружие</h3>
+        <div class="shop-grid" id="shop-weapons"></div>
+      </div>
+      <div class="shop-panel hidden" data-panel="buildings">
+        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Постройки <span id="build-count" style="color:#8a8fa3;font-weight:400"></span></h3>
+        <div class="shop-grid" id="shop-buildings"></div>
+      </div>
+      <div class="shop-panel hidden" data-panel="hats">
+        <div id="prestige-box" style="background:linear-gradient(135deg,#1a1428,#151926);border:1px solid #3a2d52;border-radius:10px;padding:10px 14px;margin:6px 0 14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+            <div>
+              <div style="font-size:15px;font-weight:700">✦ Престиж <span id="prestige-level" style="color:#d88bff"></span> <span id="prestige-tier" class="tier-badge"></span></div>
+              <div style="font-size:11px;color:#8a8fa3;margin-top:3px">Слив золота на статус: цвет имени, аура, значок. На бой не влияет.</div>
+            </div>
+            <button id="prestige-btn" style="cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#8a2be2,#6a1fb5);color:#fff;white-space:nowrap"></button>
+          </div>
         </div>
-        <button id="prestige-btn" style="cursor:pointer;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;background:linear-gradient(135deg,#8a2be2,#6a1fb5);color:#fff;white-space:nowrap"></button>
+        <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">🎩 Шляпы <span id="hat-count" style="color:#8a8fa3;font-weight:400"></span></h3>
+        <div class="shop-grid" id="shop-lootbox"></div>
+        <div class="shop-grid" id="shop-hats"></div>
       </div>
     </div>
-    <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Еда</h3>
-    <div class="shop-grid" id="shop-food"></div>
-    <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Оружие</h3>
-    <div class="shop-grid" id="shop-weapons"></div>
-    <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">Постройки <span id="build-count" style="color:#8a8fa3;font-weight:400"></span></h3>
-    <div class="shop-grid" id="shop-buildings"></div>
-    <h3 style="font-size:14px;margin:8px 0;color:#e8e8ef">🎩 Шляпы <span id="hat-count" style="color:#8a8fa3;font-weight:400"></span></h3>
-    <div class="shop-grid" id="shop-lootbox"></div>
-    <div class="shop-grid" id="shop-hats"></div>
   </div>
 
   <div id="death-screen" class="overlay hidden">

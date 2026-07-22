@@ -48,7 +48,21 @@ export class Shop {
     ($('prestige-btn') as HTMLButtonElement).onclick = () => this.onPrestige();
     ($('level-btn') as HTMLButtonElement).onclick = () => this.onBuyLevel();
     $('level-max').textContent = `/${this.welcome.levels.max}`;
+    for (const tab of document.querySelectorAll<HTMLElement>('.shop-tab')) {
+      tab.onclick = () => this.showTab(tab.dataset.tab!);
+    }
     this.buildItems();
+  }
+
+  /** Switches the visible category tab; the header (level-up, close) stays put. */
+  private showTab(name: string): void {
+    for (const t of document.querySelectorAll<HTMLElement>('.shop-tab')) {
+      t.classList.toggle('active', t.dataset.tab === name);
+    }
+    for (const p of document.querySelectorAll<HTMLElement>('.shop-panel')) {
+      p.classList.toggle('hidden', p.dataset.panel !== name);
+    }
+    $('shop-body').scrollTop = 0;
   }
 
   private buildItems(): void {
