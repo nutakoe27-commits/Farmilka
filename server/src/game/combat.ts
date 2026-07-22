@@ -214,9 +214,17 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       target.session.deaths++;
       world.removeEntity(target);
       telemetry.death(target.name, src.cause, src.weapon, equippedAtDeath, dropped);
-      world.sendEvent(target, { e: 'death', dropped, respawnIn: bal.player.respawnSec, cause: src.cause });
+      world.sendEvent(target, {
+        e: 'death',
+        dropped,
+        respawnIn: bal.player.respawnSec * victimFx.respawnMult,
+        cause: src.cause,
+        kills: target.killsThisLife,
+        survivedSec: Math.max(0, (now - target.lifeStartAt) / 1000),
+        level: target.level,
+      });
       world.broadcast({ e: 'kill', killer: src.name, victim: target.name, weapon: src.weapon });
-      if (killerPlayer) killerPlayer.session.kills++;
+      if (killerPlayer) { killerPlayer.session.kills++; killerPlayer.killsThisLife++; }
       telemetry.kill(src.name, target.name, src.weapon, distance, 'player');
       break;
     }

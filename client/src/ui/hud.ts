@@ -4,6 +4,11 @@ import { WEAPON_ICONS } from '../game/entities.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
+function fmtTime(sec: number): string {
+  const s = Math.floor(sec);
+  return s >= 60 ? `${Math.floor(s / 60)}м ${s % 60}с` : `${s}с`;
+}
+
 export class Hud {
   private lastMoney = -1;
   private lastLevel = -1;
@@ -131,11 +136,15 @@ export class Hud {
     }
   }
 
-  showDeath(dropped: number, cause: string): void {
+  showDeath(ev: { dropped: number; cause: string; kills: number; survivedSec: number; level: number }): void {
     const causeText: Record<string, string> = {
-      player: 'Убит игроком', mob: 'Убит мобом', boss: 'Убит боссом', turret: 'Расстрелян турелью',
+      player: '☠ Убит игроком', mob: 'Убит мобом', boss: 'Убит боссом', turret: 'Расстрелян турелью',
     };
-    $('death-info').textContent = `${causeText[cause] ?? 'Погиб'}. Потеряно монет: ${dropped}`;
+    $('death-info').textContent = causeText[ev.cause] ?? 'Погиб';
+    $('ds-survived').textContent = fmtTime(ev.survivedSec);
+    $('ds-kills').textContent = String(ev.kills);
+    $('ds-level').textContent = String(ev.level);
+    $('ds-dropped').textContent = String(ev.dropped);
     $('death-screen').classList.remove('hidden');
   }
 

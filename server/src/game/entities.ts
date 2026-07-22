@@ -74,6 +74,10 @@ export interface Player extends BaseEntity, StatusEffects {
   lastDamagedAt: number;
   lastBossContactAt: number;
   respawnAt: number;
+  /** wall-clock when the current life began (spawn/respawn) — for the run summary */
+  lifeStartAt: number;
+  /** PvP kills scored in the current life (reset on death) */
+  killsThisLife: number;
   buildingIds: Set<string>;
   known: Set<string>;
   session: SessionStats;

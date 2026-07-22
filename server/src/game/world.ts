@@ -175,6 +175,8 @@ export class World {
       lastDamagedAt: 0,
       lastBossContactAt: 0,
       respawnAt: 0,
+      lifeStartAt: Date.now(),
+      killsThisLife: 0,
       buildingIds: new Set(),
       known: new Set(),
       session: { joinedAt: Date.now(), kills: 0, deaths: 0, moneyEarned: 0 },
@@ -195,6 +197,8 @@ export class World {
     p.hp = p.maxHp; // respawn at full HP
     p.dead = false;
     p.respawnAt = 0;
+    p.lifeStartAt = Date.now();
+    p.killsThisLife = 0;
     p.invulnUntil = Date.now() + bal.player.spawnProtectSec * 1000;
     p.equipped = p.weapons.includes(p.equipped) ? p.equipped : 'fists';
     p.movedTick = this.tickNo;

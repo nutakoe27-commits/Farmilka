@@ -13,6 +13,7 @@ import { MobileControls, isTouchDevice } from './game/mobile.js';
 import { Hud } from './ui/hud.js';
 import { Shop } from './ui/shop.js';
 import { Minimap } from './ui/minimap.js';
+import { Leaderboard } from './ui/leaderboard.js';
 import { Settings } from './ui/settings.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -114,9 +115,11 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   hud.killFeedEnabled = settings.values.killFeed;
   const shop = new Shop(welcome);
   const minimap = new Minimap(welcome.world.size);
+  const leaderboard = new Leaderboard(welcome.prestige);
   const input = new InputManager();
   const mobile = isTouchDevice() ? new MobileControls() : null;
   hud.show();
+  runOnboarding(!!mobile);
 
   const views = new Map<string, EntityView>();
   const tmp: Sampled = { x: 0, y: 0, angle: 0 };
@@ -285,7 +288,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       }
       case 'death':
         selfDead = true;
-        hud.showDeath(ev.dropped, ev.cause);
+        hud.showDeath(ev);
         break;
       case 'bossWarn':
         bossWarnUntil = performance.now() + ev.inSec * 1000;
@@ -347,6 +350,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   shop.onEquipHat = (hat) => conn.send({ t: 'equipHat', hat });
   shop.onPrestige = () => conn.send({ t: 'prestige' });
   shop.onBuyLevel = () => conn.send({ t: 'buyLevel' });
+  conn.onLeaderboard = (top, rank, total) => leaderboard.update(top, rank, total);
   settings.onExit = () => conn.ws.close();
   if (mobile) {
     mobile.onEat = () => conn.send({ t: 'eat' });
@@ -476,4 +480,27 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** First-time tips: a few rotating hints, then never again (localStorage flag). */
+function runOnboarding(mobile: boolean): void {
+  if (localStorage.getItem('farmclash-onboarded')) return;
+  const tips = mobile
+    ? ['👈 Левый джойстик — движение', '⚔ Большая кнопка — атака (тап = автоприцел)', '🛒 Кнопка магазина — оружие и уровни', '🍖 Ешь еду, чтобы выжить в бою']
+    : ['WASD — движение, мышь — прицел, ЛКМ — атака', 'Убивай мобов и собирай монеты 💰', 'B — магазин: оружие, постройки, уровни', 'Q — съешь еду, чтобы выжить в бою 🍖'];
+  const el = document.getElementById('onboarding')!;
+  let i = 0;
+  const step = (): void => {
+    if (i >= tips.length) {
+      el.style.opacity = '0';
+      setTimeout(() => el.classList.add('hidden'), 400);
+      localStorage.setItem('farmclash-onboarded', '1');
+      return;
+    }
+    el.textContent = tips[i++];
+    el.classList.remove('hidden');
+    el.style.opacity = '1';
+    setTimeout(step, 4200);
+  };
+  step();
 }

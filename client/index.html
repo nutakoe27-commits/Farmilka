@@ -14,7 +14,13 @@
     .panel { background: rgba(18, 21, 30, 0.94); border: 1px solid #2c3242; border-radius: 14px; padding: 28px 34px; box-shadow: 0 12px 40px rgba(0,0,0,.6); }
 
     /* name screen */
-    #name-screen .panel { text-align: center; width: 360px; max-width: 94vw; }
+    #name-screen .panel { position: relative; z-index: 1; text-align: center; width: 360px; max-width: 94vw; }
+    #menu-bg { position: absolute; inset: 0; overflow: hidden; z-index: 0; background: radial-gradient(1200px 620px at 50% 38%, #16232e 0%, #0d0f14 68%); }
+    #menu-bg .blob { position: absolute; border-radius: 50%; opacity: .4; filter: blur(2px); animation-name: floaty; animation-timing-function: ease-in-out; animation-iteration-count: infinite; animation-direction: alternate; }
+    @keyframes floaty { from { transform: translate(0,0) scale(1); } to { transform: translate(26px,-36px) scale(1.14); } }
+    #logo { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 10px; }
+    #logo span { font-size: 32px; font-weight: 800; letter-spacing: .5px; color: #e8e8ef; }
+    #logo b { color: #4fd06a; }
     #name-screen h1 { font-size: 34px; letter-spacing: 2px; background: linear-gradient(90deg,#7ee787,#9ecbff); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 6px; }
     #name-screen p { color: #8a8fa3; font-size: 13px; margin-bottom: 14px; line-height: 1.5; }
     .field { width: 100%; padding: 10px 14px; font-size: 16px; border-radius: 8px; border: 1px solid #3a4156; background: #0d0f14; color: #fff; outline: none; margin-bottom: 10px; text-align: center; }
@@ -39,6 +45,8 @@
     #hp-text { text-align: center; font-size: 11px; color: #bfc4d4; margin-top: 3px; text-shadow: 0 1px 2px #000; }
     #money { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 700; color: #ffd76e; text-shadow: 0 1px 4px #000; }
     #zone-label { position: fixed; top: 42px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #7ee787; text-shadow: 0 1px 3px #000; white-space: nowrap; }
+    #onboarding { position: fixed; top: 72px; left: 50%; transform: translateX(-50%); max-width: 90vw; background: linear-gradient(135deg,#1f6feb,#1a5fd0); color: #fff; padding: 10px 18px; border-radius: 22px; font-size: 14px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.5); z-index: 14; text-align: center; transition: opacity .4s; }
+    body.touch #onboarding { top: 162px; font-size: 13px; padding: 9px 15px; } /* below leaderboard + minimap */
     #hotbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; display: flex; gap: 8px; }
     .slot { width: 56px; height: 56px; border-radius: 10px; background: rgba(14,17,25,.85); border: 2px solid #2c3242; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: #bfc4d4; position: relative; user-select: none; }
     .slot.active { border-color: #7ee787; box-shadow: 0 0 12px rgba(126,231,135,.35); }
@@ -95,10 +103,15 @@
     #shop-msg { color: #ff7b72; font-size: 12px; min-height: 16px; }
 
     /* death screen */
-    #death-screen .panel { text-align: center; width: 320px; border-color: #6e2c33; }
-    #death-screen h2 { color: #ff7b72; margin-bottom: 8px; }
+    #death-screen .panel { text-align: center; width: 360px; max-width: 94vw; border-color: #6e2c33; }
+    #death-screen h2 { color: #ff7b72; margin-bottom: 6px; }
     #death-screen p { color: #bfc4d4; font-size: 14px; margin-bottom: 6px; }
-    #respawn-count { font-size: 30px; font-weight: 800; color: #fff; }
+    #death-stats { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin: 14px 0; }
+    .dstat { background: #151926; border: 1px solid #2c3242; border-radius: 10px; padding: 10px 4px; }
+    .dstat .dv { display: block; font-size: 20px; font-weight: 800; color: #ffd76e; }
+    .dstat .dl { display: block; font-size: 10px; color: #8a8fa3; margin-top: 2px; }
+    #respawn-ring { width: 64px; height: 64px; margin: 8px auto 4px; border-radius: 50%; border: 3px solid #2ea043; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 18px rgba(46,160,67,.4); }
+    #respawn-count { font-size: 28px; font-weight: 800; color: #fff; }
 
     #place-hint { position: fixed; top: 100px; left: 50%; transform: translateX(-50%); background: rgba(20,40,20,.9); border: 1px solid #2ea043; padding: 6px 16px; border-radius: 8px; font-size: 13px; z-index: 16; max-width: 90vw; text-align: center; }
 
@@ -119,11 +132,31 @@
     body.touch #mob-buttons { display: flex; }
     body.touch #hint { display: none; }
     body.touch #hotbar { display: none; } /* weapon switch is the right-side button */
-    body.touch #hp-wrap { left: 40%; bottom: 110px; }
+    /* mobile HUD: bigger and clearer, kept clear of the action buttons */
+    body.touch #hp-wrap { left: 36%; bottom: 122px; width: min(300px, 60vw); }
+    body.touch #hp-bar-bg { height: 18px; border-radius: 10px; }
+    body.touch #hp-bar { border-radius: 10px; }
+    body.touch #hp-text { font-size: 13px; margin-top: 4px; }
+    body.touch #level-badge { font-size: 14px; margin-bottom: 5px; }
+    body.touch #money { font-size: 26px; top: 10px; }
+    body.touch .mob-btn { width: 62px; height: 62px; font-size: 25px; border-radius: 18px; }
+    body.touch .mob-btn .sub { font-size: 11px; margin-top: 2px; }
+    body.touch #atk-btn { width: 104px; height: 104px; font-size: 42px; }
+    #leaderboard { position: fixed; top: 12px; left: 12px; width: 190px; background: rgba(14,17,25,.82); border: 1px solid #2c3242; border-radius: 10px; padding: 8px 10px; font-size: 12px; backdrop-filter: blur(3px); }
+    .lb-title { font-size: 11px; font-weight: 700; color: #ffd76e; margin-bottom: 5px; letter-spacing: .3px; }
+    .lb-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; color: #cfd4e4; }
+    .lb-row .lb-pos { width: 18px; text-align: center; color: #8a8fa3; font-weight: 700; flex: 0 0 auto; }
+    .lb-row .lb-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-row .lb-money { color: #ffd76e; font-weight: 700; flex: 0 0 auto; }
+    .lb-row.lb-me { background: rgba(46,160,67,.18); border-radius: 5px; margin: 0 -4px; padding: 2px 4px; color: #fff; }
+    .lb-badge { font-weight: 700; }
+    .lb-you { margin-top: 5px; padding-top: 5px; border-top: 1px solid #2c3242; color: #7ee787; font-weight: 700; font-size: 11px; }
     body.touch #minimap { right: 12px; top: 12px; bottom: auto; width: 110px; height: 110px; }
     body.touch #killfeed { top: 130px; right: 12px; }
     body.touch #settings-btn { left: 12px; right: auto; }
     body.touch #food-slot { display: none; } /* mobile uses the side button */
+    body.touch #leaderboard { top: 58px; left: 8px; width: 150px; font-size: 11px; padding: 6px 8px; }
+    body.touch #leaderboard .lb-row:nth-child(n+5) { display: none; } /* top 3 + title on phones */
   </style>
 </head>
 <body>
@@ -131,6 +164,8 @@
 
   <div id="hud" class="hidden">
     <div id="money">💰 0</div>
+    <div id="onboarding" class="hidden"></div>
+    <div id="leaderboard" class="hidden"></div>
     <div id="zone-label" class="hidden">🛡 Защита после возрождения</div>
     <div id="hp-wrap">
       <div id="level-badge">⭐ Ур. 1<span class="mx">/10</span></div>
@@ -220,9 +255,15 @@
     <div class="panel">
       <h2>Вы погибли</h2>
       <p id="death-info"></p>
-      <p style="color:#ff9d8a;font-size:12px">Купленное оружие и еда потеряны!</p>
-      <div id="respawn-count">4</div>
-      <p style="color:#8a8fa3;font-size:12px">Возрождение… (после спавна — 3с защиты)</p>
+      <div id="death-stats">
+        <div class="dstat"><span class="dv" id="ds-survived">—</span><span class="dl">Прожито</span></div>
+        <div class="dstat"><span class="dv" id="ds-kills">0</span><span class="dl">Убийств</span></div>
+        <div class="dstat"><span class="dv" id="ds-level">1</span><span class="dl">Уровень</span></div>
+        <div class="dstat"><span class="dv" id="ds-dropped">0</span><span class="dl">💰 потеряно</span></div>
+      </div>
+      <p style="color:#ff9d8a;font-size:12px">Оружие и еда потеряны, уровень сброшен.</p>
+      <div id="respawn-ring"><span id="respawn-count">4</span></div>
+      <p style="color:#8a8fa3;font-size:12px">Возвращаемся в бой… (3с защиты после спавна)</p>
     </div>
   </div>
 
@@ -235,8 +276,21 @@
   </div>
 
   <div id="name-screen" class="overlay">
+    <div id="menu-bg">
+      <span class="blob" style="left:8%;top:18%;width:90px;height:90px;background:#4fd06a;animation-duration:15s"></span>
+      <span class="blob" style="left:82%;top:24%;width:64px;height:64px;background:#9fd8ff;animation-duration:19s;animation-delay:-4s"></span>
+      <span class="blob" style="left:20%;top:70%;width:120px;height:120px;background:#9b4fc4;animation-duration:23s;animation-delay:-8s"></span>
+      <span class="blob" style="left:70%;top:74%;width:80px;height:80px;background:#6ee8e0;animation-duration:17s;animation-delay:-2s"></span>
+      <span class="blob" style="left:46%;top:12%;width:50px;height:50px;background:#ffd76e;animation-duration:21s;animation-delay:-6s"></span>
+      <span class="blob" style="left:90%;top:60%;width:70px;height:70px;background:#d8a24a;animation-duration:25s;animation-delay:-10s"></span>
+      <span class="blob" style="left:12%;top:44%;width:44px;height:44px;background:#6ee8ff;animation-duration:16s;animation-delay:-3s"></span>
+      <span class="blob" style="left:62%;top:42%;width:100px;height:100px;background:#4fd06a;animation-duration:27s;animation-delay:-12s"></span>
+    </div>
     <div class="panel">
-      <h1>FARMCLASH</h1>
+      <div id="logo">
+        <svg viewBox="0 0 32 32" width="46" height="46"><rect width="32" height="32" rx="7" fill="#0d0f14"/><circle cx="16" cy="16" r="9" fill="#4fd06a" stroke="#0a1f10" stroke-width="1.5"/><g stroke="#ffe08a" stroke-width="2.6" stroke-linecap="round"><line x1="9" y1="23" x2="20.5" y2="9.5"/><line x1="23" y1="23" x2="11.5" y2="9.5"/></g></svg>
+        <span>Farm<b>Clash</b></span>
+      </div>
       <p>Фарми мобов, строй фермы, покупай оружие,<br>охоться на боссов и других игроков.</p>
       <input id="name-input" class="field" maxlength="16" placeholder="Ваше имя" autocomplete="username" />
       <input id="pass-input" class="field" type="password" maxlength="64" placeholder="Пароль (нужен только для аккаунта)" autocomplete="current-password" />

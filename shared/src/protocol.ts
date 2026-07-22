@@ -79,7 +79,7 @@ export interface SelfState {
 export type GameEvent =
   | { e: 'kill'; killer: string; victim: string; weapon: string }
   | { e: 'damage'; target: string; amount: number; x: number; y: number }
-  | { e: 'death'; dropped: number; respawnIn: number; cause: DeathCause }
+  | { e: 'death'; dropped: number; respawnIn: number; cause: DeathCause; kills: number; survivedSec: number; level: number }
   | { e: 'bossWarn'; boss: string; x: number; y: number; inSec: number }
   | { e: 'bossSpawned'; boss: string; x: number; y: number }
   | { e: 'bossTelegraph'; kind: 'slam' | 'burst'; x: number; y: number; angle: number; range: number; arc: number; sec: number }
@@ -154,12 +154,19 @@ export interface SnapshotMsg {
   self: SelfState;
 }
 
+export interface LeaderEntry {
+  name: string;
+  money: number;
+  prestige: number;
+}
+
 export type ServerMsg =
   | WelcomeMsg
   | SnapshotMsg
   | { t: 'event'; ev: GameEvent }
   | { t: 'pong'; ts: number }
   | { t: 'queued'; pos: number }
+  | { t: 'leaderboard'; top: LeaderEntry[]; rank: number; total: number }
   | { t: 'reject'; reason: string };
 
 export function encode(msg: ClientMsg | ServerMsg): string {

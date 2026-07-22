@@ -96,6 +96,21 @@ export function startServer(worlds: WorldManager): http.Server {
   }
   setInterval(tryAdmit, 2000);
 
+  // Leaderboard: top players by net worth (money), pushed to each world every 2s.
+  setInterval(() => {
+    for (const w of worlds.active()) {
+      const players = [...w.players.values()].filter((p) => p.ws && p.ws.readyState === WebSocket.OPEN);
+      if (!players.length) continue;
+      const sorted = [...players].sort((a, b) => b.money - a.money);
+      const top = sorted.slice(0, 5).map((p) => ({ name: p.name, money: p.money, prestige: p.prestige }));
+      const rankOf = new Map(sorted.map((p, i) => [p, i + 1]));
+      const msg = { top, total: sorted.length };
+      for (const p of players) {
+        p.ws!.send(encode({ t: 'leaderboard', ...msg, rank: rankOf.get(p) ?? 0 }));
+      }
+    }
+  }, 2000);
+
   wss.on('connection', (ws: WebSocket) => {
     let player: Player | null = null;
     let world: World | null = null;

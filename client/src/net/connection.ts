@@ -1,4 +1,4 @@
-import { decode, encode, type ClientMsg, type ServerMsg, type WelcomeMsg, type SnapshotMsg, type GameEvent, type EntityState } from '@shared/protocol.js';
+import { decode, encode, type ClientMsg, type ServerMsg, type WelcomeMsg, type SnapshotMsg, type GameEvent, type EntityState, type LeaderEntry } from '@shared/protocol.js';
 import { decodeSnapshot } from '@shared/snapshot-codec.js';
 
 export interface Remote {
@@ -34,6 +34,7 @@ export class Connection {
   onSnapshot: (s: SnapshotMsg) => void = () => {};
   onRemove: (id: string, state: EntityState) => void = () => {};
   onQueued: (pos: number) => void = () => {};
+  onLeaderboard: (top: LeaderEntry[], rank: number, total: number) => void = () => {};
   onClose: (reason: string) => void = () => {};
 
   constructor(name: string, password = '', register = false, server?: number) {
@@ -74,6 +75,9 @@ export class Connection {
         break;
       case 'queued':
         this.onQueued(msg.pos);
+        break;
+      case 'leaderboard':
+        this.onLeaderboard(msg.top, msg.rank, msg.total);
         break;
       case 'reject':
         this.closeReason = msg.reason;
