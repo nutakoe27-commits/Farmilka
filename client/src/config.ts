@@ -12,6 +12,9 @@ const DEFAULT_ORIGIN = 'https://farmclash.online';
 const onSelf = SELF_HOSTS.includes(location.hostname);
 const useRelative = onSelf && !OVERRIDE;
 
+/** True on our own domain / local dev — i.e. NOT hosted on a third-party platform like Yandex. */
+export const IS_SELF_HOST = onSelf;
+
 /** HTTP base for API calls: '' means same-origin (relative). */
 export const API_ORIGIN = useRelative ? '' : (OVERRIDE || DEFAULT_ORIGIN).replace(/\/$/, '');
 

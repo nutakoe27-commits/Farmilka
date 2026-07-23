@@ -5,6 +5,7 @@
 // their metrics/ads, and expose ad helpers.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { IS_SELF_HOST } from '../config.js';
 
 interface State {
   available: boolean;
@@ -45,14 +46,24 @@ async function readPlayer(): Promise<void> {
   } catch { /* not authenticated */ }
 }
 
-/** Loads + initialises the SDK when running inside the Yandex platform iframe. Safe to await anywhere. */
+/**
+ * Loads + initialises the Yandex SDK. Detection is by host, not by iframe:
+ * on our own domain / local dev we skip entirely; anywhere else (the Yandex
+ * archive runs on Yandex's origin) we load the platform loader and init. If
+ * that doesn't yield a working SDK we silently fall back to standalone.
+ * Safe to await anywhere.
+ */
 export async function initYandex(): Promise<void> {
-  // The platform embeds the game in an iframe; a direct visit to our own site is top-level.
-  if (window.self === window.top) return;
+  if (IS_SELF_HOST) return; // farmclash.online / localhost — never a Yandex host
+  // Archive-hosted games load the SDK from /sdk.js (served at the game origin);
+  // fall back to the absolute loader just in case.
+  try { await loadScript('/sdk.js'); } catch { /* try fallback */ }
+  if (!(window as any).YaGames) {
+    try { await loadScript('https://yandex.ru/games/sdk/v2'); } catch { /* not on Yandex */ }
+  }
+  const YaGames = (window as any).YaGames;
+  if (!YaGames) return; // not actually running on the Yandex platform
   try {
-    await loadScript('https://yandex.ru/games/sdk/v2');
-    const YaGames = (window as any).YaGames;
-    if (!YaGames) return;
     state.sdk = await withTimeout(YaGames.init(), 8000);
     state.available = true;
     try {
