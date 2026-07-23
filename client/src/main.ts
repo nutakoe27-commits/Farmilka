@@ -114,7 +114,21 @@ nameInput.addEventListener('keydown', (e) => {
 function showError(text: string): void {
   $('name-screen').classList.remove('hidden');
   $('conn-error').textContent = text;
+  $('retry-btn').classList.add('hidden'); // no retry for validation messages
 }
+
+/** Connection failure: informative message + an explicit retry action (required by Yandex host review). */
+function showConnError(reason: string): void {
+  $('name-screen').classList.remove('hidden');
+  $('conn-error').textContent = reason || t('menu.connFail');
+  $('retry-btn').classList.remove('hidden');
+}
+
+$('retry-btn').onclick = () => {
+  $('retry-btn').classList.add('hidden');
+  $('conn-error').textContent = '';
+  tryStart(false);
+};
 
 // ---------- game ----------
 
@@ -129,7 +143,7 @@ async function startGame(name: string, password: string, register: boolean, serv
     }
     $('queue-screen').classList.add('hidden');
     $('hud').classList.add('hidden');
-    showError(reason);
+    showConnError(reason);
   };
   conn.onQueued = (pos) => {
     $('queue-screen').classList.remove('hidden');
