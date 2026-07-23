@@ -18,12 +18,22 @@ import { Leaderboard } from './ui/leaderboard.js';
 import { Settings } from './ui/settings.js';
 import { t, tList, lang, setLang, applyStaticI18n, bossName } from './ui/i18n.js';
 import { initYandex, yandex, promptYandexAuth, gameReady, gameplayStart, gameplayStop, showInterstitial } from './net/yandex.js';
+import { audio } from './game/audio.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 // Suppress the browser context menu across the whole game — right-click on
 // desktop and long-press on mobile (Yandex moderation 1.6.1.8 / 1.6.2.7).
 window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Audio may only start after a user gesture (autoplay policy) — unlock on first
+// interaction. Silence sound while the tab is hidden (Yandex moderation 1.3).
+const unlockAudio = (): void => audio.unlock();
+window.addEventListener('pointerdown', unlockAudio, { once: true });
+window.addEventListener('keydown', unlockAudio, { once: true });
+document.addEventListener('visibilitychange', () => audio.duckForBlur(document.hidden));
+window.addEventListener('blur', () => audio.duckForBlur(true));
+window.addEventListener('focus', () => audio.duckForBlur(false));
 
 // translate all static markup up front, then wire the language switchers
 applyStaticI18n();
@@ -236,6 +246,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   let aim = 0;
   let seq = 0;
   let selfDead = false;
+  let lastMoney = -1; // for the coin-pickup sound
   let bossWarnUntil = 0;
   let bossWarnName = '';
 
@@ -321,6 +332,9 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     predX = px;
     predY = py;
 
+    if (lastMoney >= 0 && self.money > lastMoney) audio.coin(); // income (coins, mob/boss reward)
+    lastMoney = self.money;
+
     hud.update(self);
     shop.refresh(self);
     mobile?.setFoodCount(self.food);
@@ -339,6 +353,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     const view = views.get(id);
     if (view) {
       if (state.kind === 'player' || state.kind === 'mob' || state.kind === 'boss') {
+        if (state.kind === 'mob' || state.kind === 'boss') audio.mobDie();
         effects.burst(view.root.position.x, view.root.position.y, view.color, state.kind === 'boss' ? 40 : 14, state.kind === 'boss' ? 320 : 180);
       } else if (state.kind === 'coin' || state.kind === 'food') {
         effects.burst(view.root.position.x, view.root.position.y, state.kind === 'coin' ? 0xffd76e : 0xff9d5c, 6, 90);
@@ -358,18 +373,21 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       }
       case 'damage': {
+        audio.hit();
         if (settings.values.damageNumbers) effects.damageNumber(ev.x, ev.y, ev.amount);
         views.get(ev.target)?.flash();
         if (ev.target === conn.welcome!.id && settings.values.shake) scene.shake = 7;
         break;
       }
       case 'heal':
+        audio.heal();
         effects.incomeNumber(dispX, dispY, ev.amount);
         break;
       case 'swing': {
         const cfg = welcome.weapons[ev.weapon as WeaponId];
         if (!cfg || cfg.type !== 'melee') break;
         const isSelf = ev.id === welcome.id;
+        if (isSelf) audio.swing();
         effects.swing(isSelf ? dispX : ev.x, isSelf ? dispY : ev.y, isSelf ? aim : ev.angle, cfg.range, cfg.arc ?? 90, swingColor(ev.weapon));
         break;
       }
@@ -377,6 +395,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         if (ev.dup) {
           hud.notice(t('ev.hatDup', { name: escapeHtml(ev.name), gold: ev.gold }));
         } else {
+          audio.reward();
           hud.bossBanner(t('ev.hatNewBanner', { name: escapeHtml(ev.name) }));
           setTimeout(() => hud.bossBanner(null), 5000);
           hud.notice(t('ev.hatNew', { name: escapeHtml(ev.name) }));
@@ -384,16 +403,18 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       }
       case 'lootbox': {
-        if (ev.result === 'gold') hud.notice(t('ev.lootGold', { gold: ev.gold }));
+        if (ev.result === 'gold') { audio.reward(); hud.notice(t('ev.lootGold', { gold: ev.gold })); }
         else if (ev.result === 'nothing') hud.notice(t('ev.lootNothing'));
         break;
       }
       case 'prestige': {
+        audio.reward();
         hud.bossBanner(t('ev.prestige', { level: ev.level, tier: ev.tier ? ` — ${ev.tier}!` : '!' }));
         setTimeout(() => hud.bossBanner(null), 5000);
         break;
       }
       case 'level': {
+        audio.level();
         effects.levelBurst(dispX, dispY);
         const maxed = ev.level >= ev.max;
         hud.notice(maxed ? t('ev.levelMax', { n: ev.level }) : t('ev.level', { n: ev.level }));
@@ -404,6 +425,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       case 'death':
         selfDead = true;
+        audio.death();
         hud.showDeath(ev);
         gameplayStop(); // Yandex: gameplay paused; a fullscreen ad may show at this break
         showInterstitial();
@@ -415,6 +437,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       case 'bossSpawned':
         bossWarnUntil = 0;
+        audio.boss();
         hud.bossBanner(t('ev.bossSpawned', { boss: bossName(ev.bossId, ev.boss) }));
         minimap.ping(ev.x, ev.y, 60_000);
         setTimeout(() => hud.bossBanner(null), 6000);
@@ -441,6 +464,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       case 'purchase':
         if (!ev.ok && ev.reason) shop.message(ev.reason);
+        else if (ev.ok) audio.reward();
         break;
       case 'placed':
         if (!ev.ok && ev.reason) hud.notice(`🚫 ${escapeHtml(ev.reason)}`);

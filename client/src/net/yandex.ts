@@ -7,6 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { IS_SELF_HOST } from '../config.js';
 import { setLangLive, hasManualLang } from '../ui/i18n.js';
+import { audio } from '../game/audio.js';
 
 interface State {
   available: boolean;
@@ -101,16 +102,27 @@ export function gameReady(): void { try { state.sdk?.features?.LoadingAPI?.ready
 export function gameplayStart(): void { try { state.sdk?.features?.GameplayAPI?.start?.(); } catch { /* no-op */ } }
 export function gameplayStop(): void { try { state.sdk?.features?.GameplayAPI?.stop?.(); } catch { /* no-op */ } }
 
-/** Fullscreen ad — call only at natural breaks (death/menu). The SDK enforces its own min interval. */
+/** Fullscreen ad — call only at natural breaks (death/menu). Mutes game audio while it plays (rule 4.7). */
 export function showInterstitial(): void {
   if (!state.sdk) return;
-  try { state.sdk.adv.showFullscreenAdv({ callbacks: { onClose: () => {}, onError: () => {} } }); } catch { /* no-op */ }
+  try {
+    state.sdk.adv.showFullscreenAdv({ callbacks: {
+      onOpen: () => audio.duckForAd(true),
+      onClose: () => audio.duckForAd(false),
+      onError: () => audio.duckForAd(false),
+    } });
+  } catch { /* no-op */ }
 }
 
-/** Rewarded ad — grants `onReward` on a counted view. Standalone / failure falls back to no reward. */
+/** Rewarded ad — grants `onReward` on a counted view; mutes game audio while it plays (rule 4.7). */
 export function showRewarded(onReward: () => void): void {
   if (!state.sdk) { return; }
   try {
-    state.sdk.adv.showRewardedVideo({ callbacks: { onRewarded: () => onReward(), onClose: () => {}, onError: () => {} } });
+    state.sdk.adv.showRewardedVideo({ callbacks: {
+      onOpen: () => audio.duckForAd(true),
+      onRewarded: () => onReward(),
+      onClose: () => audio.duckForAd(false),
+      onError: () => audio.duckForAd(false),
+    } });
   } catch { /* no-op */ }
 }

@@ -1,5 +1,6 @@
 import { t } from './i18n.js';
 import { API_ORIGIN } from '../config.js';
+import { audio } from '../game/audio.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -38,6 +39,11 @@ export class Settings {
     shake.onchange = save;
     dmg.onchange = save;
     feed.onchange = save;
+
+    // sound toggle (stored by the audio manager itself, checkbox = sound ON)
+    const sound = $('set-sound') as HTMLInputElement;
+    sound.checked = !audio.isMuted();
+    sound.onchange = () => audio.setMuted(!sound.checked);
 
     $('settings-btn').onclick = () => this.toggle();
     $('settings-close').onclick = () => this.hide();

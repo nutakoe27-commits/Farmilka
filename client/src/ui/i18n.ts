@@ -41,6 +41,7 @@ const RU: Dict = {
   // settings
   'set.title': '⚙ Настройки',
   'set.server': 'Игровой сервер (смена переподключит):',
+  'set.sound': 'Звук',
   'set.shake': 'Тряска экрана',
   'set.dmg': 'Числа урона',
   'set.feed': 'Лента убийств',
@@ -213,6 +214,7 @@ const EN: Dict = {
 
   'set.title': '⚙ Settings',
   'set.server': 'Game server (switching reconnects):',
+  'set.sound': 'Sound',
   'set.shake': 'Screen shake',
   'set.dmg': 'Damage numbers',
   'set.feed': 'Kill feed',
