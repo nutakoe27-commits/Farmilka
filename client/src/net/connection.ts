@@ -2,6 +2,7 @@ import { decode, encode, type ClientMsg, type ServerMsg, type WelcomeMsg, type S
 import { decodeSnapshot } from '@shared/snapshot-codec.js';
 import { lang, t } from '../ui/i18n.js';
 import { yandex } from './yandex.js';
+import { WS_URL } from '../config.js';
 
 export interface Remote {
   state: EntityState;
@@ -40,8 +41,7 @@ export class Connection {
   onClose: (reason: string) => void = () => {};
 
   constructor(name: string, password = '', register = false, server?: number) {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    this.ws = new WebSocket(`${proto}://${location.host}/ws`);
+    this.ws = new WebSocket(WS_URL);
     this.ws.binaryType = 'arraybuffer';
     this.ws.onopen = () => {
       const y = yandex.identity();

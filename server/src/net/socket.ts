@@ -24,6 +24,15 @@ const sessionIds = new WeakMap<Player, number>();
 
 export function startServer(worlds: WorldManager): http.Server {
   const app = express();
+
+  // Allow the Yandex-hosted client (different origin) to call read-only API
+  // endpoints like /servers. WebSocket upgrades are not subject to CORS.
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
+    next();
+  });
+
   app.use('/admin', adminRouter(() => worlds.active()));
 
   // live server list for the client's server picker

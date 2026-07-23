@@ -1,4 +1,5 @@
 import { t } from './i18n.js';
+import { API_ORIGIN } from '../config.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -60,7 +61,7 @@ export class Settings {
     const list = $('server-list');
     list.innerHTML = `<span style="color:#6a7085;font-size:12px">${t('set.loading')}</span>`;
     try {
-      const servers = (await (await fetch('/servers')).json()) as { id: number; online: number; max: number }[];
+      const servers = (await (await fetch(`${API_ORIGIN}/servers`)).json()) as { id: number; online: number; max: number }[];
       list.innerHTML = '';
       const auto = document.createElement('button');
       auto.className = 'srv-btn' + (localStorage.getItem('farmclash-server') ? '' : ' current');
