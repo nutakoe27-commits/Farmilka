@@ -58,7 +58,8 @@ const RU: Dict = {
   'shop.title': 'Магазин',
   'shop.sub': 'Работает из любой точки мира. При смерти теряются оружие и еда!',
   'shop.level': '⭐ Уровень',
-  'shop.levelDesc': '+HP и +урон за уровень. Теряется при смерти. На боссов не действует.',
+  'shop.levelDesc': 'Уровень растёт от убийств мобов и игроков. +HP и +урон, теряется при смерти.',
+  'shop.levelProg': 'ещё {n} до ур. ↑',
   'shop.tabWeapons': '⚔️ Оружие',
   'shop.tabBuildings': '🏰 Постройки',
   'shop.tabHats': '🎩 Шляпы',
@@ -156,7 +157,7 @@ const RU: Dict = {
   'note.ice_staff': 'замораживает: замедляет цель',
   'note.farm': 'пассивный доход',
   'note.mine': 'больше дохода',
-  'note.turret': 'стреляет по врагам',
+  'note.turret': 'бьёт всех: мобов, боссов, игроков · макс. 2',
 
   // hat sources
   'src.common': 'падает с мобов',
@@ -228,7 +229,8 @@ const EN: Dict = {
   'shop.title': 'Shop',
   'shop.sub': 'Works from anywhere in the world. On death you lose weapons and food!',
   'shop.level': '⭐ Level',
-  'shop.levelDesc': '+HP and +damage per level. Lost on death. Does not affect bosses.',
+  'shop.levelDesc': 'Level up by killing mobs and players. +HP and +damage, lost on death.',
+  'shop.levelProg': '{n} more to level ↑',
   'shop.tabWeapons': '⚔️ Weapons',
   'shop.tabBuildings': '🏰 Buildings',
   'shop.tabHats': '🎩 Hats',
@@ -320,7 +322,7 @@ const EN: Dict = {
   'note.ice_staff': 'freezes: slows the target',
   'note.farm': 'passive income',
   'note.mine': 'more income',
-  'note.turret': 'shoots enemies',
+  'note.turret': 'hits everyone: mobs, bosses, players · max 2',
 
   'src.common': 'drops from mobs',
   'src.rare': 'drops from bosses',

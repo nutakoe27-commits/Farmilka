@@ -12,7 +12,6 @@ import type { World } from './world.js';
 import type { Entity, Player, Boss, BotBrain } from './entities.js';
 import { tryBuyWeapon, tryBuyFood, tryEat, tryEquip } from './economy.js';
 import { tryPlaceBuilding } from './buildings.js';
-import { tryBuyLevel } from './levels.js';
 
 /** Filler bots per world. 0 disables the feature. */
 const BOTS_PER_WORLD = Number(process.env.BOTS_PER_WORLD ?? 5);
@@ -208,8 +207,7 @@ function botShop(world: World, p: Player, brain: BotBrain): void {
   }
   if (best !== p.equipped) tryEquip(world, p, best);
 
-  // spend spare gold on levels
-  if (p.money > brain.reserve && p.level < bal.levels.max && p.money >= bal.levels.cost) tryBuyLevel(world, p);
+  // (levels are earned from kills now — bots gain them automatically in combat)
 
   // occasionally set up a farm for a bit of income and world flavour
   if (p.money > 900 && p.buildingIds.size < 1 && Math.random() < 0.25) {

@@ -2,7 +2,7 @@ import { WebSocket } from 'ws';
 import { encode, type GameEvent, type ServerMsg } from '@shared/protocol.js';
 import type { MobId, BossId, WeaponId } from '@shared/types.js';
 import { clamp, dist } from '@shared/math.js';
-import { randomPointInBiome } from '@shared/biomes.js';
+import { randomPointInBiome, type BiomeId } from '@shared/biomes.js';
 import { getBalance } from './balance.js';
 import { SpatialGrid } from './grid.js';
 import { freshStatus } from './entities.js';
@@ -130,13 +130,15 @@ export class World {
 
   // ---------- spawning ----------
 
-  /** Spawn point: somewhere around the middle of the normal biome. */
+  /** Starter biomes players (and bots) can spawn in — spread out to avoid a single entry-point meatgrinder. */
+  private static readonly STARTER_BIOMES: BiomeId[] = ['normal', 'snow', 'desert'];
+
+  /** Spawn point: a random spot inside one of the three (newbie-friendly) starter biomes. */
   private spawnPoint(): { x: number; y: number } {
     const size = getBalance().world.size;
-    const pos = randomPointInBiome('normal', size, 200);
-    // bias toward the biome's middle so freshly spawned players are not on a border
-    const c = this.center;
-    return { x: (pos.x + c) / 2, y: (pos.y + c) / 2 };
+    const biomes = World.STARTER_BIOMES;
+    const b = biomes[Math.floor(Math.random() * biomes.length)];
+    return randomPointInBiome(b, size, 300);
   }
 
   spawnPlayer(name: string, ws: WebSocket | null, account?: { name: string; money: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number; level: number; food: number }, lang: 'ru' | 'en' = 'ru', bot = false): Player {
@@ -169,6 +171,7 @@ export class World {
       hat: account ? account.hat : null,
       prestige: account ? account.prestige : 0,
       level: account ? Math.max(1, Math.min(Math.floor(account.level), bal.levels.max)) : 1,
+      levelKills: 0,
       ...freshStatus(),
       invulnUntil: Date.now() + bal.player.spawnProtectSec * 1000,
       account: account ? account.name : null,
@@ -196,6 +199,7 @@ export class World {
     p.y = pos.y;
     Object.assign(p, freshStatus());
     p.level = 1; // levels are per-life — reset on death
+    p.levelKills = 0;
     p.maxHp = bal.player.hp;
     recomputeMaxHp(this, p); // fold in the equipped hat's HP bonus (level is 1)
     p.hp = p.maxHp; // respawn at full HP

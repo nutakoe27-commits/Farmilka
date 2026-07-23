@@ -13,7 +13,6 @@ import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip }
 import { tryPlaceBuilding, removePlayerBuildings } from '../game/buildings.js';
 import { tryLootbox, tryEquipHat, recomputeMaxHp } from '../game/hats.js';
 import { tryPrestige } from '../game/prestige.js';
-import { tryBuyLevel } from '../game/levels.js';
 import { tr, normalizeLang, type Lang } from '../game/i18n.js';
 import { telemetry } from '../db/telemetry.js';
 import { accountExists, login, register, loginYandex, saveProgress, claimDailyReward, type Account } from '../db/accounts.js';
@@ -255,11 +254,6 @@ export function startServer(worlds: WorldManager): http.Server {
         case 'prestige': {
           const res = tryPrestige(world, player);
           if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'prestige', reason: res.reason });
-          break;
-        }
-        case 'buyLevel': {
-          const res = tryBuyLevel(world, player);
-          if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'level', reason: res.reason });
           break;
         }
         case 'equipHat': {

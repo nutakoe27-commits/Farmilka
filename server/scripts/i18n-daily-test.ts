@@ -45,12 +45,11 @@ async function main() {
   const daily = en.events.find((e) => e.e === 'dailyReward');
   check('daily reward is day-1 (streak 1, 100 gold)', !!daily && daily.streak === 1 && daily.gold === 100, `gold=${daily?.gold} streak=${daily?.streak}`);
 
-  // spend all money then attempt a level-up to force an English "not enough money" / "need gold" reason
+  // spend money on food until broke to force an English purchase-rejection reason
   en.events.length = 0;
-  // buy levels until broke, then one more to get a reject reason
-  for (let i = 0; i < 60; i++) { en.send({ t: 'buyLevel' }); await sleep(40); }
-  const needGold = en.events.filter((e) => e.e === 'purchase' && e.item === 'level' && !e.ok).pop();
-  check('EN level reason is English', !!needGold && /(Need \d+ gold|Not enough|Max level)/.test(needGold.reason ?? ''), `reason=${needGold?.reason}`);
+  for (let i = 0; i < 80; i++) { en.send({ t: 'buy', item: 'food' }); await sleep(30); }
+  const rej = en.events.filter((e) => e.e === 'purchase' && !e.ok).pop();
+  check('EN purchase reason is English', !!rej && /(Not enough money|Max food)/.test(rej.reason ?? ''), `reason=${rej?.reason}`);
   en.ws.close();
   await sleep(900); // let saveProgress + logout run
 

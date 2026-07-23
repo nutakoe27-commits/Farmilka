@@ -2,7 +2,7 @@ import { dist } from '@shared/math.js';
 import type { BuildingId } from '@shared/types.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
-import type { Building, Player } from './entities.js';
+import type { Building, Player, Entity } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { hatEffects } from './hats.js';
 import { tr } from './i18n.js';
@@ -18,6 +18,13 @@ export function tryPlaceBuilding(world: World, p: Player, type: BuildingId, x: n
   if (p.money < cfg.price) return { ok: false, reason: tr(p.lang, 'noMoney') };
   if (p.buildingIds.size >= bal.economy.maxBuildingsPerPlayer) {
     return { ok: false, reason: tr(p.lang, 'buildLimit', { n: bal.economy.maxBuildingsPerPlayer }) };
+  }
+  if (type === 'turret') {
+    let turrets = 0;
+    for (const id of p.buildingIds) { const bd = world.buildings.get(id); if (bd && bd.buildingType === 'turret') turrets++; }
+    if (turrets >= bal.economy.maxTurretsPerPlayer) {
+      return { ok: false, reason: tr(p.lang, 'turretLimit', { n: bal.economy.maxTurretsPerPlayer }) };
+    }
   }
   const size = bal.world.size;
   if (x < cfg.radius || y < cfg.radius || x > size - cfg.radius || y > size - cfg.radius) {
@@ -84,12 +91,14 @@ export function updateBuildings(world: World, dt: number, now: number): void {
       telemetry.income(owner!.name, 'building', income);
     }
 
-    // turret AI
+    // turret AI — fires at the nearest hostile: players, mobs and bosses alike
     if (cfg.damage && cfg.range && cfg.attackRate && now >= b.attackReadyAt) {
-      let best: Player | null = null;
+      let best: Entity | null = null;
       let bestD = Infinity;
       for (const e of world.grid.queryCircle(b.x, b.y, cfg.range)) {
-        if (e.kind !== 'player' || e.dead || e.id === b.ownerId) continue;
+        if (e.dead || e.id === b.ownerId) continue;
+        if (e.kind !== 'player' && e.kind !== 'mob' && e.kind !== 'boss') continue;
+        if (e.kind === 'player' && (e as Player).invulnUntil > now) continue; // don't waste shots on protected spawns
         const d = dist(b.x, b.y, e.x, e.y);
         if (d < bestD) {
           best = e;

@@ -170,7 +170,7 @@ function writeSelf(w: Writer, s: SelfState): void {
   w.u8(s.hats.length); for (const h of s.hats) w.str(h);
   w.str(s.hat ?? '');
   w.u8(s.prestige); w.u32(s.prestigeCost);
-  w.u8(s.level); w.u32(s.levelCost);
+  w.u8(s.level); w.u32(s.levelKills);
   w.u16(s.food);
   w.f32(s.foodIn); w.f32(s.protIn); w.f32(s.chill);
   if (s.respawnIn !== undefined) { w.u8(1); w.f32(s.respawnIn); } else { w.u8(0); }
@@ -181,7 +181,7 @@ function readSelf(r: Reader): SelfState {
     x: r.f32(), y: r.f32(), hp: r.u16(), maxHp: r.u16(), money: r.u32(),
     equipped: r.str() as WeaponId,
     weapons: [], buildings: 0, hats: [], hat: null,
-    prestige: 0, prestigeCost: 0, level: 0, levelCost: 0,
+    prestige: 0, prestigeCost: 0, level: 0, levelKills: 0,
     food: 0, foodIn: 0, protIn: 0, chill: 1,
   };
   const wn = r.u8(); for (let i = 0; i < wn; i++) s.weapons.push(r.str() as WeaponId);
@@ -189,7 +189,7 @@ function readSelf(r: Reader): SelfState {
   const hn = r.u8(); for (let i = 0; i < hn; i++) s.hats.push(r.str());
   { const h = r.str(); s.hat = h || null; }
   s.prestige = r.u8(); s.prestigeCost = r.u32();
-  s.level = r.u8(); s.levelCost = r.u32();
+  s.level = r.u8(); s.levelKills = r.u32();
   s.food = r.u16();
   s.foodIn = r.f32(); s.protIn = r.f32(); s.chill = r.f32();
   if (r.u8()) s.respawnIn = r.f32();

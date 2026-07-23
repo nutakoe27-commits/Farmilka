@@ -1,32 +1,29 @@
-import { nextLevelCost } from '@shared/levels.js';
+import { levelForKills } from '@shared/levels.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Player } from './entities.js';
 import { recomputeMaxHp } from './hats.js';
-import { telemetry } from '../db/telemetry.js';
-import { tr } from './i18n.js';
 
-/** Gold cost for the player's NEXT level (0 = maxed out). */
-export function playerLevelCost(p: Player): number {
-  return nextLevelCost(p.level, getBalance().levels);
+/** Kill-points a victim is worth toward the killer's level. */
+export function killPoints(kind: 'player' | 'mob' | 'boss'): number {
+  return kind === 'boss' ? 3 : kind === 'player' ? 2 : 1;
 }
 
 /**
- * Buys one character level. Flat cost, no progression. Raises max HP and
- * outgoing damage (damage bonus does not apply against bosses — see combat).
- * Levels are per-life and reset on death.
+ * Credits a player with kill-points and levels them up when a threshold is
+ * crossed. Levels raise max HP and outgoing damage (the damage bonus does not
+ * apply against bosses — see combat). Levels are per-life and reset on death.
  */
-export function tryBuyLevel(world: World, p: Player): { ok: boolean; reason?: string } {
+export function awardKillPoints(world: World, p: Player, points: number): void {
   const cfg = getBalance().levels;
-  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
-  if (p.level >= cfg.max) return { ok: false, reason: tr(p.lang, 'levelMax') };
-  if (p.money < cfg.cost) return { ok: false, reason: tr(p.lang, 'needGold', { n: cfg.cost }) };
-  p.money -= cfg.cost;
-  p.level++;
-  p.hp += cfg.hpPerLevel; // the freshly gained HP is immediately available
+  if (p.dead || points <= 0) return;
+  p.levelKills += points;
+  const newLevel = levelForKills(p.levelKills, cfg);
+  if (newLevel <= p.level) { world.markDirty(p); return; } // progress bar moved, no level gained
+  const gained = newLevel - p.level;
+  p.level = newLevel;
+  p.hp += cfg.hpPerLevel * gained; // the freshly gained HP is immediately available
   recomputeMaxHp(world, p); // raises maxHp (folds in level + hat), clamps hp
   world.markDirty(p);
-  telemetry.purchase(p.name, 'level', cfg.cost);
   world.sendEvent(p, { e: 'level', level: p.level, max: cfg.max });
-  return { ok: true };
 }

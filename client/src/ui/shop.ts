@@ -2,6 +2,7 @@ import type { SelfState, WelcomeMsg } from '@shared/protocol.js';
 import type { WeaponId, BuildingId } from '@shared/types.js';
 import { WEAPON_ICONS, BUILDING_ICONS, HAT_EMOJI, TIER_NAMES, TIER_COLORS } from '../game/entities.js';
 import { prestigeTier } from '@shared/prestige.js';
+import { killsToNext } from '@shared/levels.js';
 import { t } from './i18n.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -35,12 +36,10 @@ export class Shop {
   onLootbox: () => void = () => {};
   onEquipHat: (hat: string | null) => void = () => {};
   onPrestige: () => void = () => {};
-  onBuyLevel: () => void = () => {};
 
   constructor(private welcome: WelcomeMsg) {
     $('shop-close').onclick = () => this.hide();
     ($('prestige-btn') as HTMLButtonElement).onclick = () => this.onPrestige();
-    ($('level-btn') as HTMLButtonElement).onclick = () => this.onBuyLevel();
     $('level-max').textContent = `/${this.welcome.levels.max}`;
     for (const tab of document.querySelectorAll<HTMLElement>('.shop-tab')) {
       tab.onclick = () => this.showTab(tab.dataset.tab!);
@@ -175,16 +174,10 @@ export class Shop {
     }
     $('build-count').textContent = t('shop.buildCount', { n: self.buildings, max: this.welcome.maxBuildings });
 
-    // level
+    // level — earned from kills; show progress to the next level
     $('level-cur').textContent = String(self.level);
-    const lvlBtn = $('level-btn') as HTMLButtonElement;
-    if (self.levelCost <= 0) {
-      lvlBtn.textContent = t('shop.max');
-      lvlBtn.disabled = true;
-    } else {
-      lvlBtn.textContent = `💰 ${self.levelCost}`;
-      lvlBtn.disabled = self.money < self.levelCost;
-    }
+    const toNext = killsToNext(self.levelKills, this.welcome.levels);
+    $('level-prog').textContent = self.level >= this.welcome.levels.max ? t('shop.max') : t('shop.levelProg', { n: toNext });
 
     // prestige
     const pcfg = this.welcome.prestige;

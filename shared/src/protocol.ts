@@ -62,8 +62,8 @@ export interface SelfState {
   prestigeCost: number;
   /** current player level (1..levels.max) */
   level: number;
-  /** gold cost of the next level-up (0 = maxed) */
-  levelCost: number;
+  /** kill-points accumulated this life (drives leveling) */
+  levelKills: number;
   food: number;
   /** seconds until food can be eaten again (0 = ready) */
   foodIn: number;
@@ -119,7 +119,6 @@ export type ClientMsg =
   | { t: 'eat' }
   | { t: 'lootbox' }
   | { t: 'prestige' }
-  | { t: 'buyLevel' }
   | { t: 'equipHat'; hat: string | null }
   | { t: 'place'; building: BuildingId; x: number; y: number }
   | { t: 'ping'; ts: number };

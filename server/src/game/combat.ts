@@ -8,6 +8,7 @@ import type { Entity, Player, Mob, Building } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { onBossDamaged, onBossKilled } from './boss.js';
 import { grantHat, hatEffects, randomHatOfTier } from './hats.js';
+import { awardKillPoints, killPoints } from './levels.js';
 
 export interface DamageSource {
   /** entity id of the attacker (player/boss/turret-owner) */
@@ -139,7 +140,7 @@ export function applyDamage(
     if (src.cause !== 'player' && src.cause !== 'turret') return false;
     if (target.ownerId === src.id) return false; // cannot damage own buildings
   }
-  if (target.kind === 'mob' && src.cause !== 'player') return false;
+  if (target.kind === 'mob' && src.cause !== 'player' && src.cause !== 'turret') return false;
 
   // player-dealt damage scales with the attacker's level for PvP and normal
   // PvE — but NOT against bosses, which stay a group fight regardless of level.
@@ -230,6 +231,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       });
       world.broadcast({ e: 'kill', killer: src.name, victim: target.name, weapon: src.weapon });
       if (killerPlayer) { killerPlayer.session.kills++; killerPlayer.killsThisLife++; }
+      if (killerPlayer && !killerPlayer.dead) awardKillPoints(world, killerPlayer, killPoints('player'));
       if (!killerBot && !target.bot) telemetry.kill(src.name, target.name, src.weapon, distance, 'player');
       break;
     }
@@ -243,6 +245,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
         const reward = Math.round(cfg.reward * killerFx.mobRewardMult);
         killerPlayer.money += reward;
         killerPlayer.session.moneyEarned += reward;
+        awardKillPoints(world, killerPlayer, killPoints('mob'));
         if (!killerBot) telemetry.income(killerPlayer.name, 'mob', reward);
       }
       if (Math.random() < bal.food.dropChance * (killerFx ? killerFx.foodFindMult : 1)) {
@@ -259,6 +262,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
     case 'boss': {
       target.dead = true;
       onBossKilled(world, target, src, now);
+      if (killerPlayer && !killerPlayer.dead) awardKillPoints(world, killerPlayer, killPoints('boss'));
       if (!killerBot) telemetry.kill(src.name, 'boss', src.weapon, distance, 'boss');
       break;
     }
@@ -296,7 +300,8 @@ export function updateProjectiles(world: World, dt: number, now: number): void {
     for (const t of candidates) {
       if (t.dead || t.id === proj.ownerId || !ATTACKABLE.has(t.kind)) continue;
       if (proj.ownerKind === 'boss' && t.kind !== 'player') continue;
-      if (proj.ownerKind === 'turret' && t.kind !== 'player') continue;
+      // turret fires at players, mobs and bosses — but not buildings
+      if (proj.ownerKind === 'turret' && t.kind !== 'player' && t.kind !== 'mob' && t.kind !== 'boss') continue;
       if (t.kind === 'building' && (t as Building).ownerId === proj.ownerId) continue;
       const d = dist(proj.x, proj.y, t.x, t.y);
       if (d > proj.radius + t.radius) continue;

@@ -164,6 +164,7 @@ export interface Balance {
   prestige: PrestigeCfg;
   economy: {
     maxBuildingsPerPlayer: number;
+    maxTurretsPerPlayer: number;
     buildingMinDist: number;
     raidLootFrac: number;
     sellFrac: number;
@@ -215,7 +216,7 @@ export function validateBalance(raw: unknown): Balance {
 
   const levels = section(root, 'levels');
   num(levels, 'max', 'levels', 1);
-  num(levels, 'cost', 'levels');
+  num(levels, 'killsPerLevel', 'levels', 1);
   num(levels, 'hpPerLevel', 'levels');
   num(levels, 'damagePerLevel', 'levels');
 
@@ -305,7 +306,7 @@ export function validateBalance(raw: unknown): Balance {
   }
 
   const economy = section(root, 'economy');
-  for (const k of ['maxBuildingsPerPlayer', 'buildingMinDist', 'raidLootFrac', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
+  for (const k of ['maxBuildingsPerPlayer', 'maxTurretsPerPlayer', 'buildingMinDist', 'raidLootFrac', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
     num(economy, k, 'economy');
   }
 

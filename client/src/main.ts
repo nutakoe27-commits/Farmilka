@@ -467,7 +467,6 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   shop.onLootbox = () => conn.send({ t: 'lootbox' });
   shop.onEquipHat = (hat) => conn.send({ t: 'equipHat', hat });
   shop.onPrestige = () => conn.send({ t: 'prestige' });
-  shop.onBuyLevel = () => conn.send({ t: 'buyLevel' });
   conn.onLeaderboard = (top, rank, total) => leaderboard.update(top, rank, total);
   settings.onExit = () => conn.ws.close();
   if (mobile) {
