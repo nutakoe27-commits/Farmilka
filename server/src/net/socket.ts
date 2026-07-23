@@ -52,6 +52,25 @@ export function startServer(worlds: WorldManager): http.Server {
   const server = http.createServer(app);
   const wss = new WebSocketServer({ server, path: '/ws' });
 
+  // --- heartbeat: reap half-open sockets ---
+  // A silent drop (mobile switching networks, TCP going half-open) never sends
+  // a close frame, so `ws.readyState` stays OPEN forever: 'close' never fires,
+  // the player lingers in the world as a "ghost" (duplicating on reconnect), the
+  // session is never closed, and — for accounts — the single-session check locks
+  // that account out permanently. We ping every client and terminate any that
+  // failed to pong since the previous tick; terminate() fires 'close', so all the
+  // normal cleanup (session end, remove player, drop buildings) runs.
+  const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS) || 30_000;
+  const alive = new WeakMap<WebSocket, boolean>();
+  const heartbeat = setInterval(() => {
+    for (const ws of wss.clients) {
+      if (alive.get(ws) === false) { ws.terminate(); continue; }
+      alive.set(ws, false);
+      try { ws.ping(); } catch { /* socket already gone */ }
+    }
+  }, HEARTBEAT_MS);
+  wss.on('close', () => clearInterval(heartbeat));
+
   // Spawns a player into a world and sends the welcome payload. Shared by the
   // direct-join path and the queue-admit path.
   function enterWorld(ws: WebSocket, world: World, name: string, account?: Account, lang: Lang = 'ru'): Player {
@@ -125,6 +144,10 @@ export function startServer(worlds: WorldManager): http.Server {
   wss.on('connection', (ws: WebSocket) => {
     let player: Player | null = null;
     let world: World | null = null;
+
+    // heartbeat liveness: browsers auto-reply to a protocol ping with a pong
+    alive.set(ws, true);
+    ws.on('pong', () => alive.set(ws, true));
 
     ws.on('message', (data) => {
       const msg = decode<ClientMsg>(data.toString());
