@@ -386,6 +386,22 @@ export function setLang(l: Lang): void {
 }
 
 /**
+ * Switch language live (no reload, not persisted). Used to follow the Yandex
+ * platform language (ysdk.environment.i18n.lang) when the player hasn't made a
+ * manual choice — so the interface auto-matches their locale (rule 2.14).
+ */
+export function setLangLive(l: Lang): void {
+  if (l === lang) return;
+  lang = l;
+  applyStaticI18n();
+}
+
+/** Whether the player has explicitly picked a language (which must win over the SDK). */
+export function hasManualLang(): boolean {
+  return localStorage.getItem(KEY) === 'ru' || localStorage.getItem(KEY) === 'en';
+}
+
+/**
  * Apply translations to static markup: elements with [data-i18n] get their
  * innerHTML set (HTML allowed so <br> works), [data-i18n-ph] get their input
  * placeholder set, [data-i18n-title] get their title attribute set.

@@ -6,6 +6,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { IS_SELF_HOST } from '../config.js';
+import { setLangLive, hasManualLang } from '../ui/i18n.js';
 
 interface State {
   available: boolean;
@@ -69,6 +70,8 @@ export async function initYandex(): Promise<void> {
     try {
       const l = state.sdk.environment?.i18n?.lang;
       state.lang = l === 'ru' ? 'ru' : 'en';
+      // follow the platform language unless the player picked one manually (rule 2.14)
+      if (!hasManualLang()) setLangLive(state.lang);
     } catch { /* no environment */ }
     await readPlayer();
   } catch {

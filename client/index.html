@@ -7,7 +7,9 @@
   <title>FarmClash</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0f14; font-family: 'Segoe UI', system-ui, sans-serif; color: #e8e8ef; touch-action: none; overscroll-behavior: none; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #0d0f14; font-family: 'Segoe UI', system-ui, sans-serif; color: #e8e8ef; touch-action: none; overscroll-behavior: none; -webkit-touch-callout: none; }
+    /* allow text entry/selection only in inputs */
+    input { -webkit-user-select: text; user-select: text; }
     canvas { display: block; }
     .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 20; }
     #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5; background: radial-gradient(125% 105% at 50% 44%, transparent 52%, rgba(0,0,0,.5) 100%); }

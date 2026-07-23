@@ -21,6 +21,10 @@ import { initYandex, yandex, promptYandexAuth, gameReady, gameplayStart, gamepla
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
+// Suppress the browser context menu across the whole game — right-click on
+// desktop and long-press on mobile (Yandex moderation 1.6.1.8 / 1.6.2.7).
+window.addEventListener('contextmenu', (e) => e.preventDefault());
+
 // translate all static markup up front, then wire the language switchers
 applyStaticI18n();
 for (const btn of document.querySelectorAll<HTMLButtonElement>('.lang-switch button')) {
@@ -93,6 +97,10 @@ function doStart(register: boolean): void {
 // "loaded", hide site/TG/share links on-platform, and auto-join a logged-in player.
 initYandex().then(() => {
   gameReady();
+  // the SDK may have switched the language (rule 2.14) — re-sync the RU/EN toggle
+  for (const btn of document.querySelectorAll<HTMLButtonElement>('.lang-switch button')) {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+  }
   if (!yandex.available) return;
   document.body.classList.add('on-yandex');
   const id = yandex.identity();
