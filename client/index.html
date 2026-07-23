@@ -41,6 +41,7 @@
     .lang-switch button { cursor: pointer; border: none; background: #0d0f14; color: #8a8fa3; font-size: 12px; font-weight: 700; padding: 5px 12px; }
     .lang-switch button.active { background: #2ea043; color: #fff; }
     .menu-lang { display: flex; justify-content: center; margin-top: 14px; }
+    body.on-yandex .yandex-hide { display: none !important; }
 
     /* HUD */
     #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
@@ -206,8 +207,8 @@
     <div class="set-row"><span data-i18n="set.shake">Тряска экрана</span><input type="checkbox" id="set-shake" checked></div>
     <div class="set-row"><span data-i18n="set.dmg">Числа урона</span><input type="checkbox" id="set-dmg" checked></div>
     <div class="set-row"><span data-i18n="set.feed">Лента убийств</span><input type="checkbox" id="set-feed" checked></div>
-    <button class="btn share-btn" id="settings-share" data-i18n="set.share">🔗 Поделиться игрой</button>
-    <a class="tg-link" href="https://t.me/farmclashonline" target="_blank" rel="noopener" data-i18n="set.tg">📢 Новости и чат — Telegram</a>
+    <button class="btn share-btn yandex-hide" id="settings-share" data-i18n="set.share">🔗 Поделиться игрой</button>
+    <a class="tg-link yandex-hide" href="https://t.me/farmclashonline" target="_blank" rel="noopener" data-i18n="set.tg">📢 Новости и чат — Telegram</a>
     <button class="btn alt" id="settings-close" data-i18n="set.continue">Продолжить игру</button>
     <button class="btn" id="exit-btn" data-i18n="set.exit">Выйти в меню</button>
   </div>
@@ -303,15 +304,15 @@
       </div>
       <p data-i18n="menu.tagline">Фарми мобов, строй фермы, покупай оружие,<br>охоться на боссов и других игроков.</p>
       <input id="name-input" class="field" maxlength="16" placeholder="Ваше имя" data-i18n-ph="menu.namePh" autocomplete="username" />
-      <input id="pass-input" class="field" type="password" maxlength="64" placeholder="Пароль (нужен только для аккаунта)" data-i18n-ph="menu.passPh" autocomplete="current-password" />
+      <input id="pass-input" class="field yandex-hide" type="password" maxlength="64" placeholder="Пароль (нужен только для аккаунта)" data-i18n-ph="menu.passPh" autocomplete="current-password" />
       <div id="btn-row">
         <button id="play-btn" class="btn" data-i18n="menu.play">Играть</button>
-        <button id="register-btn" class="btn alt" data-i18n="menu.register">Создать аккаунт</button>
+        <button id="register-btn" class="btn alt yandex-hide" data-i18n="menu.register">Создать аккаунт</button>
       </div>
       <div id="conn-error"></div>
-      <div id="acc-hint" data-i18n="menu.accHint">Без пароля — гостевой вход (прогресс не сохраняется).<br>С аккаунтом золото и оружие сохраняются между сеансами.</div>
-      <button class="btn share-btn" id="menu-share" data-i18n="menu.share">🔗 Поделиться игрой</button>
-      <a class="tg-link" href="https://t.me/farmclashonline" target="_blank" rel="noopener" data-i18n="menu.tg">📢 Новости и чат — Telegram-канал</a>
+      <div id="acc-hint" class="yandex-hide" data-i18n="menu.accHint">Без пароля — гостевой вход (прогресс не сохраняется).<br>С аккаунтом золото и оружие сохраняются между сеансами.</div>
+      <button class="btn share-btn yandex-hide" id="menu-share" data-i18n="menu.share">🔗 Поделиться игрой</button>
+      <a class="tg-link yandex-hide" href="https://t.me/farmclashonline" target="_blank" rel="noopener" data-i18n="menu.tg">📢 Новости и чат — Telegram-канал</a>
       <div class="lang-switch menu-lang"><button data-lang="ru">RU</button><button data-lang="en">EN</button></div>
     </div>
   </div>

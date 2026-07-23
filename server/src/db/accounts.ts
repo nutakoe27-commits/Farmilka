@@ -64,6 +64,50 @@ export function login(name: string, password: string, lang: Lang = 'ru'): { ok: 
   return { ok: true, account: { name: row.name, money: row.money, weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts } };
 }
 
+type AccountRow = {
+  name: string; money: number; weapons: string; hats: string | null; hat: string | null;
+  prestige: number | null; level: number | null; food: number | null; created_ts: number;
+};
+
+function rowToAccount(row: AccountRow): Account {
+  let weapons: WeaponId[];
+  try {
+    weapons = JSON.parse(row.weapons);
+    if (!Array.isArray(weapons) || !weapons.includes('fists')) weapons = ['fists'];
+  } catch { weapons = ['fists']; }
+  let hats: string[] = [];
+  try {
+    const parsed = JSON.parse(row.hats ?? '[]');
+    if (Array.isArray(parsed)) hats = parsed.filter((h) => typeof h === 'string');
+  } catch { hats = []; }
+  const hat = row.hat && hats.includes(row.hat) ? row.hat : null;
+  return { name: row.name, money: row.money, weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts };
+}
+
+const ACC_COLS = 'name, money, weapons, hats, hat, prestige, level, food, created_ts';
+
+/**
+ * Logs in (or transparently creates) an account tied to a Yandex Games player
+ * id. No password — identity is proven by the platform's signed player id
+ * (verified upstream in the socket handler). The in-game name comes from the
+ * Yandex profile, made unique on first creation.
+ */
+export function loginYandex(yandexId: string, displayName: string, startMoney = 0): Account {
+  const db = getDb();
+  const found = db.prepare(`SELECT ${ACC_COLS} FROM accounts WHERE yandex_id = ?`).get(yandexId) as AccountRow | undefined;
+  if (found) return rowToAccount(found);
+
+  const now = Date.now();
+  const salt = crypto.randomBytes(16).toString('hex');
+  const passHash = crypto.randomBytes(32).toString('hex'); // unusable — Yandex accounts never log in by password
+  let base = (displayName || 'Игрок').trim().slice(0, 16) || 'Игрок';
+  let name = base;
+  for (let i = 2; accountExists(name); i++) name = `${base.slice(0, 13)}#${i}`; // dodge name-uniqueness clashes
+  db.prepare('INSERT INTO accounts (name, pass_hash, salt, money, weapons, created_ts, last_seen_ts, yandex_id) VALUES (?,?,?,?,?,?,?,?)')
+    .run(name, passHash, salt, startMoney, JSON.stringify(['fists']), now, now, yandexId);
+  return { name, money: startMoney, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now };
+}
+
 const DAY_MS = 86_400_000;
 const REWARD_BASE = 100; // day-1 reward
 const REWARD_STEP = 50; // added per consecutive day

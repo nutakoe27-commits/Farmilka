@@ -16,7 +16,8 @@ import { tryPrestige } from '../game/prestige.js';
 import { tryBuyLevel } from '../game/levels.js';
 import { tr, normalizeLang, type Lang } from '../game/i18n.js';
 import { telemetry } from '../db/telemetry.js';
-import { accountExists, login, register, saveProgress, claimDailyReward, type Account } from '../db/accounts.js';
+import { accountExists, login, register, loginYandex, saveProgress, claimDailyReward, type Account } from '../db/accounts.js';
+import { verifyYandexSignature } from '../game/yandex-auth.js';
 import { adminRouter } from '../admin/stats.js';
 
 const sessionIds = new WeakMap<Player, number>();
@@ -130,18 +131,31 @@ export function startServer(worlds: WorldManager): http.Server {
 
         // authenticate first, so the same account can't queue/play twice
         let account: Account | undefined;
+        // one live session per account — across all worlds and the queue
+        const isLive = (accName: string): boolean => {
+          const acc = accName.toLowerCase();
+          return worlds.active().some((w) => [...w.players.values()].some((o) => o.ws && o.account?.toLowerCase() === acc))
+            || queue.some((e) => e.account?.name.toLowerCase() === acc);
+        };
         try {
-          if (password) {
+          if (typeof msg.yandexId === 'string' && msg.yandexId) {
+            // Yandex Games Player API: identity proven by the signed player id
+            if (!verifyYandexSignature(msg.yandexId, msg.yandexSig)) {
+              ws.send(encode({ t: 'reject', reason: tr(lang, 'authError') }));
+              return;
+            }
+            account = loginYandex(msg.yandexId, name, bal.player.startMoney);
+            if (isLive(account.name)) {
+              ws.send(encode({ t: 'reject', reason: tr(lang, 'accountInGame') }));
+              return;
+            }
+          } else if (password) {
             const res = msg.register ? register(name, password, bal.player.startMoney, lang) : login(name, password, lang);
             if (!res.ok) {
               ws.send(encode({ t: 'reject', reason: res.reason ?? tr(lang, 'authError') }));
               return;
             }
-            const acc = res.account!.name.toLowerCase();
-            // one live session per account — across all worlds and the queue
-            const live = worlds.active().some((w) => [...w.players.values()].some((o) => o.ws && o.account?.toLowerCase() === acc))
-              || queue.some((e) => e.account?.name.toLowerCase() === acc);
-            if (live) {
+            if (isLive(res.account!.name)) {
               ws.send(encode({ t: 'reject', reason: tr(lang, 'accountInGame') }));
               return;
             }

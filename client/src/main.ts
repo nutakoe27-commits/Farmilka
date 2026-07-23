@@ -17,6 +17,7 @@ import { Minimap } from './ui/minimap.js';
 import { Leaderboard } from './ui/leaderboard.js';
 import { Settings } from './ui/settings.js';
 import { t, tList, lang, setLang, applyStaticI18n, bossName } from './ui/i18n.js';
+import { initYandex, yandex, promptYandexAuth, gameReady, gameplayStart, gameplayStop, showInterstitial } from './net/yandex.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -54,7 +55,20 @@ nameInput.focus();
 
 let inGame = false;
 
+// On the Yandex platform, gate play behind the Player-API login (a user gesture),
+// then fall through to the normal start with the Yandex name pre-filled.
 function tryStart(register: boolean): void {
+  if (yandex.available && !yandex.identity()) {
+    promptYandexAuth().then((ok) => {
+      if (ok) nameInput.value = yandex.identity()!.name || nameInput.value;
+      doStart(register);
+    });
+    return;
+  }
+  doStart(register);
+}
+
+function doStart(register: boolean): void {
   const name = nameInput.value.trim();
   if (!name) {
     nameInput.focus();
@@ -74,6 +88,19 @@ function tryStart(register: boolean): void {
     showError(t('menu.startFailed'));
   });
 }
+
+// Yandex Games bootstrap: init the SDK (no-op on the standalone site), signal
+// "loaded", hide site/TG/share links on-platform, and auto-join a logged-in player.
+initYandex().then(() => {
+  gameReady();
+  if (!yandex.available) return;
+  document.body.classList.add('on-yandex');
+  const id = yandex.identity();
+  if (id) {
+    nameInput.value = id.name || nameInput.value;
+    doStart(false);
+  }
+});
 
 $('play-btn').onclick = () => tryStart(false);
 $('register-btn').onclick = () => tryStart(true);
@@ -174,6 +201,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   const input = new InputManager();
   const mobile = isTouchDevice() ? new MobileControls() : null;
   hud.show();
+  gameplayStart(); // Yandex: player is actively in the world
   runOnboarding(!!mobile);
 
   const views = new Map<string, EntityView>();
@@ -280,6 +308,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       if (self.respawnIn === undefined && self.hp > 0) {
         selfDead = false;
         hud.updateDeath(undefined);
+        gameplayStart(); // Yandex: back in the world after respawn
       }
     }
   };
@@ -354,6 +383,8 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       case 'death':
         selfDead = true;
         hud.showDeath(ev);
+        gameplayStop(); // Yandex: gameplay paused; a fullscreen ad may show at this break
+        showInterstitial();
         break;
       case 'bossWarn':
         bossWarnUntil = performance.now() + ev.inSec * 1000;

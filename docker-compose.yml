@@ -5,6 +5,8 @@ services:
     environment:
       - ADMIN_TOKEN=${ADMIN_TOKEN:-change-me}
       - BOTS_PER_WORLD=${BOTS_PER_WORLD:-5}   # server-driven filler bots per world (0 disables)
+      - YANDEX_GAME_SECRET=${YANDEX_GAME_SECRET:-}   # Yandex Games player-signature secret (optional)
+      - YANDEX_VERIFY_SIG=${YANDEX_VERIFY_SIG:-0}    # 1 = strictly verify Yandex player signatures
     volumes:
       - ./data:/app/data          # SQLite (game.db) — метрики баланса
       - ./balance:/app/balance    # balance.json — правится на хосте, применяется на лету
