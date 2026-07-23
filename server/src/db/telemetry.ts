@@ -52,6 +52,18 @@ export const telemetry = {
       .prepare('UPDATE sessions SET left_ts = ?, kills = ?, deaths = ?, money_earned = ? WHERE id = ?')
       .run(Date.now(), kills, deaths, moneyEarned, sessionId);
   },
+  /**
+   * Heals sessions orphaned by a previous crash/restart (left_ts still NULL).
+   * Their real end time is unknown, so they are closed at 0 length instead of
+   * being counted as "still running" (which inflated total playtime). Startup-only.
+   */
+  closeDanglingSessions(): void {
+    getDb().prepare('UPDATE sessions SET left_ts = joined_ts WHERE left_ts IS NULL').run();
+  },
+  /** Closes every still-open session at `ts` — for a graceful shutdown (SIGTERM). */
+  closeOpenSessions(ts: number): void {
+    getDb().prepare('UPDATE sessions SET left_ts = ? WHERE left_ts IS NULL').run(ts);
+  },
 };
 
 export function startTelemetryFlusher(): void {

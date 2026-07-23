@@ -8,7 +8,9 @@ export function updatePlayers(world: World, dt: number, now: number): void {
   const bal = getBalance();
   for (const p of world.players.values()) {
     if (p.dead) {
-      if (p.respawnAt && now >= p.respawnAt && (p.ws || p.bot)) world.respawnPlayer(p);
+      // bots auto-respawn once the timer is up; real players respawn on demand
+      // (via the 'respawn' message) so they can shop during the death break
+      if (p.bot && p.respawnAt && now >= p.respawnAt) world.respawnPlayer(p);
       continue;
     }
     if (!p.ws && !p.bot) continue;

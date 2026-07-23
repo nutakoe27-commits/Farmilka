@@ -340,11 +340,15 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     mobile?.setFoodCount(self.food);
     mobile?.setWeapon(WEAPON_ICONS[self.equipped] ?? '👊', self.equipped);
     if (selfDead) {
-      hud.updateDeath(self.respawnIn);
-      if (self.respawnIn === undefined && self.hp > 0) {
+      if (self.respawnIn === undefined) {
         selfDead = false;
-        hud.updateDeath(undefined);
+        hud.hideDeathScreen();
         gameplayStart(); // Yandex: back in the world after respawn
+      } else if (shop.visible) {
+        hud.hideDeathScreen(); // shopping during the death break — let the shop show
+      } else {
+        hud.showDeathScreen();
+        hud.setRespawn(self.respawnIn);
       }
     }
   };
@@ -486,6 +490,8 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   hud.onEquip = (w) => conn.send({ t: 'equip', weapon: w });
   hud.onEat = () => conn.send({ t: 'eat' });
   hud.onReorder = (weapons) => conn.send({ t: 'reorder', weapons });
+  hud.onRespawn = () => conn.send({ t: 'respawn' });
+  $('death-shop-btn').onclick = () => shop.show(); // shop from the death screen
   shop.onBuy = (item) => conn.send({ t: 'buy', item });
   shop.onSell = (item) => conn.send({ t: 'sell', weapon: item });
   shop.onLootbox = () => conn.send({ t: 'lootbox' });

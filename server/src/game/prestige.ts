@@ -17,7 +17,6 @@ export function nextPrestigeCost(p: Player): number {
  */
 export function tryPrestige(world: World, p: Player): { ok: boolean; reason?: string } {
   const cfg = getBalance().prestige;
-  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
   if (p.prestige >= cfg.maxLevel) return { ok: false, reason: tr(p.lang, 'prestigeMax') };
   const cost = prestigeCost(p.prestige, cfg);
   if (p.money < cost) return { ok: false, reason: tr(p.lang, 'needGold', { n: cost }) };

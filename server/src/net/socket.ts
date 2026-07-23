@@ -246,6 +246,10 @@ export function startServer(worlds: WorldManager): http.Server {
           tryEat(world, player, Date.now());
           break;
         }
+        case 'respawn': {
+          if (player.dead && Date.now() >= player.respawnAt) world.respawnPlayer(player);
+          break;
+        }
         case 'lootbox': {
           const res = tryLootbox(world, player);
           if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'lootbox', reason: res.reason });

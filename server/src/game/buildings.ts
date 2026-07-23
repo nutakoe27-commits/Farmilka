@@ -62,7 +62,7 @@ export function tryPlaceBuilding(world: World, p: Player, type: BuildingId, x: n
   };
   world.addEntity(building);
   p.buildingIds.add(building.id);
-  telemetry.purchase(p.name, type, cfg.price);
+  if (!p.bot) telemetry.purchase(p.name, type, cfg.price);
   return { ok: true };
 }
 
@@ -88,7 +88,7 @@ export function updateBuildings(world: World, dt: number, now: number): void {
       const income = Math.round(cfg.income * hatEffects(owner!.hat).incomeMult);
       owner!.money += income;
       owner!.session.moneyEarned += income;
-      telemetry.income(owner!.name, 'building', income);
+      if (!owner!.bot) telemetry.income(owner!.name, 'building', income);
     }
 
     // turret AI — fires at the nearest hostile: players, mobs and bosses alike

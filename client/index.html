@@ -120,8 +120,6 @@
     .dstat { background: #151926; border: 1px solid #2c3242; border-radius: 10px; padding: 10px 4px; }
     .dstat .dv { display: block; font-size: 20px; font-weight: 800; color: #ffd76e; }
     .dstat .dl { display: block; font-size: 10px; color: #8a8fa3; margin-top: 2px; }
-    #respawn-ring { width: 64px; height: 64px; margin: 8px auto 4px; border-radius: 50%; border: 3px solid #2ea043; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 18px rgba(46,160,67,.4); }
-    #respawn-count { font-size: 28px; font-weight: 800; color: #fff; }
 
     #place-hint { position: fixed; top: 100px; left: 50%; transform: translateX(-50%); background: rgba(20,40,20,.9); border: 1px solid #2ea043; padding: 6px 16px; border-radius: 8px; font-size: 13px; z-index: 16; max-width: 90vw; text-align: center; }
 
@@ -276,8 +274,11 @@
         <div class="dstat"><span class="dv" id="ds-dropped">0</span><span class="dl" data-i18n="death.dropped">💰 потеряно</span></div>
       </div>
       <p style="color:#ff9d8a;font-size:12px" data-i18n="death.lost">Оружие и еда потеряны, уровень сброшен.</p>
-      <div id="respawn-ring"><span id="respawn-count">4</span></div>
-      <p style="color:#8a8fa3;font-size:12px" data-i18n="death.respawn">Возвращаемся в бой… (3с защиты после спавна)</p>
+      <div id="death-actions" style="display:flex;gap:10px;justify-content:center;margin-top:8px">
+        <button id="respawn-btn" class="btn"></button>
+        <button id="death-shop-btn" class="btn alt" data-i18n="death.shop">🛒 Магазин</button>
+      </div>
+      <p style="color:#8a8fa3;font-size:12px;margin-top:10px" data-i18n="death.hint">Пока ты выбыл — можно закупиться в магазине (кроме построек).</p>
     </div>
   </div>
 

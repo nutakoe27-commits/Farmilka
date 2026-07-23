@@ -19,11 +19,13 @@ export class Hud {
   onEquip: (w: WeaponId) => void = () => {};
   onEat: () => void = () => {};
   onReorder: (weapons: WeaponId[]) => void = () => {};
+  onRespawn: () => void = () => {};
 
   private dragFrom: number | null = null;
 
   constructor() {
     $('food-slot').onclick = () => this.onEat();
+    $('respawn-btn').onclick = () => this.onRespawn();
   }
 
   setFoodCooldown(sec: number): void {
@@ -137,7 +139,7 @@ export class Hud {
     }
   }
 
-  showDeath(ev: { dropped: number; cause: string; kills: number; survivedSec: number; level: number }): void {
+  showDeath(ev: { dropped: number; cause: string; kills: number; survivedSec: number; level: number; respawnIn: number }): void {
     const causeText: Record<string, string> = {
       player: t('death.byPlayer'), mob: t('death.byMob'), boss: t('death.byBoss'), turret: t('death.byTurret'),
     };
@@ -146,14 +148,23 @@ export class Hud {
     $('ds-kills').textContent = String(ev.kills);
     $('ds-level').textContent = String(ev.level);
     $('ds-dropped').textContent = String(ev.dropped);
+    this.setRespawn(ev.respawnIn);
     $('death-screen').classList.remove('hidden');
   }
 
-  updateDeath(respawnIn: number | undefined): void {
-    if (respawnIn === undefined) {
-      $('death-screen').classList.add('hidden');
+  /** Respawn button: a countdown while the timer runs, then an enabled "Respawn". */
+  setRespawn(respawnIn: number): void {
+    const btn = $('respawn-btn') as HTMLButtonElement;
+    const wait = Math.ceil(respawnIn);
+    if (wait > 0) {
+      btn.disabled = true;
+      btn.textContent = t('death.respawnWait', { n: wait });
     } else {
-      $('respawn-count').textContent = Math.ceil(respawnIn).toString();
+      btn.disabled = false;
+      btn.textContent = t('death.respawnBtn');
     }
   }
+
+  showDeathScreen(): void { $('death-screen').classList.remove('hidden'); }
+  hideDeathScreen(): void { $('death-screen').classList.add('hidden'); }
 }

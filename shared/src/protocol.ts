@@ -117,6 +117,7 @@ export type ClientMsg =
   | { t: 'sell'; weapon: WeaponId }
   | { t: 'reorder'; weapons: WeaponId[] }
   | { t: 'eat' }
+  | { t: 'respawn' }
   | { t: 'lootbox' }
   | { t: 'prestige' }
   | { t: 'equipHat'; hat: string | null }
