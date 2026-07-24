@@ -1,15 +1,13 @@
 import { angleDiff, clamp, dist } from '@shared/math.js';
 import type { BossId } from '@shared/types.js';
 import type { BiomeId } from '@shared/biomes.js';
-import { biomeRect, randomPointInBiome } from '@shared/biomes.js';
+import { randomPointInBiome } from '@shared/biomes.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Boss, Player } from './entities.js';
 import { applyDamage, type DamageSource } from './combat.js';
 import { telemetry } from '../db/telemetry.js';
 import { grantHat, randomHatOfTier } from './hats.js';
-
-const CENTRAL: BiomeId[] = ['snow', 'normal', 'desert'];
 
 function scheduleNext(world: World, bossType: BossId, now: number): void {
   const cfg = getBalance().bosses[bossType];
@@ -37,14 +35,12 @@ export function updateBossTimers(world: World, now: number): void {
     if (timer.nextSpawnAt > maxAt) timer.nextSpawnAt = maxAt;
 
     if (!timer.warned && now >= timer.nextSpawnAt - cfg.warnSec * 1000) {
-      const biome: BiomeId = cfg.biome === 'central' ? CENTRAL[Math.floor(Math.random() * CENTRAL.length)] : cfg.biome;
-      timer.pos = randomPointInBiome(biome, bal.world.size, 250);
-      (timer as { biome?: BiomeId }).biome = biome;
+      timer.pos = randomPointInBiome(cfg.biome, bal.world.size, 250);
       timer.warned = true;
       world.broadcast({ e: 'bossWarn', boss: cfg.name, bossId: bossType, x: timer.pos.x, y: timer.pos.y, inSec: cfg.warnSec });
     }
     if (now >= timer.nextSpawnAt) {
-      spawnBoss(world, bossType, timer.pos.x, timer.pos.y, now, (timer as { biome?: BiomeId }).biome ?? 'normal');
+      spawnBoss(world, bossType, timer.pos.x, timer.pos.y, now, cfg.biome);
     }
   }
 }
@@ -68,7 +64,10 @@ export function spawnBoss(world: World, bossType: BossId, x: number, y: number, 
     dirtyTick: world.tickNo,
     targetId: null,
     attackReadyAt: now + 2000,
+    uniqueReadyAt: now + 6000,
     telegraph: null,
+    wanderAngle: Math.random() * Math.PI * 2,
+    nextWanderAt: 0,
     damageLedger: new Map(),
     despawnAt: now + cfg.despawnSec * 1000,
   };
@@ -138,8 +137,136 @@ export function updateBosses(world: World, dt: number, now: number): void {
   }
 }
 
+/** Players inside `range` of (x, y) take `damage` from the boss. */
+function damageCircle(world: World, boss: Boss, x: number, y: number, range: number, damage: number, now: number, weapon: string): Player[] {
+  const cfg = getBalance().bosses[boss.bossType];
+  const hitList: Player[] = [];
+  const targets = world.grid.queryCircle(x, y, range + 60);
+  for (const t of targets) {
+    if (t.kind !== 'player' || t.dead) continue;
+    const d = dist(x, y, t.x, t.y);
+    if (d > range + t.radius) continue;
+    if (applyDamage(world, t, damage, { id: boss.id, name: cfg.name, weapon, cause: 'boss' }, now, d)) hitList.push(t);
+  }
+  return hitList;
+}
+
+/** Fires the boss's signature ability: telegraph now, impact after telegraphSec. */
+function startUnique(world: World, boss: Boss, target: Player, now: number): void {
+  const cfg = getBalance().bosses[boss.bossType];
+  const u = cfg.unique;
+  const resolveAt = now + u.telegraphSec * 1000;
+  const tg = (x: number, y: number, angle: number, range: number, arc: number): void => {
+    world.sendNear(boss.x, boss.y, { e: 'bossTelegraph', kind: u.kind, x, y, angle, range, arc, sec: u.telegraphSec });
+  };
+
+  switch (u.kind) {
+    case 'charge': {
+      // dash lane from the boss toward the target's current position
+      const angle = Math.atan2(target.y - boss.y, target.x - boss.x);
+      const size = getBalance().world.size;
+      const ex = clamp(boss.x + Math.cos(angle) * u.range, boss.radius, size - boss.radius);
+      const ey = clamp(boss.y + Math.sin(angle) * u.range, boss.radius, size - boss.radius);
+      boss.telegraph = { kind: 'unique', resolveAt, angle, points: [{ x: ex, y: ey }] };
+      // a narrow long cone reads as a lane on the client
+      tg(boss.x, boss.y, angle, u.range, 18);
+      break;
+    }
+    case 'nova': {
+      boss.telegraph = { kind: 'unique', resolveAt, angle: 0 };
+      tg(boss.x, boss.y, 0, u.range, 360);
+      break;
+    }
+    case 'burrow':
+    case 'blink': {
+      // strike lands where the victim stood at cast time — they can dodge out
+      boss.telegraph = { kind: 'unique', resolveAt, angle: 0, points: [{ x: target.x, y: target.y }] };
+      tg(target.x, target.y, 0, u.range, 360);
+      break;
+    }
+    case 'spikes': {
+      // eruption under every nearby player (closest first, up to count)
+      const count = Math.max(1, Math.floor(u.count ?? 3));
+      const candidates: { p: Player; d: number }[] = [];
+      for (const p of world.players.values()) {
+        if (p.dead || (!p.ws && !p.bot)) continue;
+        const d = dist(boss.x, boss.y, p.x, p.y);
+        if (d < 1100) candidates.push({ p, d });
+      }
+      candidates.sort((a, b) => a.d - b.d);
+      const points = candidates.slice(0, count).map(({ p }) => ({ x: p.x, y: p.y }));
+      if (!points.length) return;
+      boss.telegraph = { kind: 'unique', resolveAt, angle: 0, points };
+      for (const pt of points) tg(pt.x, pt.y, 0, u.range, 360);
+      break;
+    }
+  }
+  boss.uniqueReadyAt = now + u.cooldownSec * 1000;
+  // hold regular attacks briefly so abilities don't overlap mid-telegraph
+  boss.attackReadyAt = Math.max(boss.attackReadyAt, resolveAt + 800);
+}
+
+/** Impact of the signature ability once its telegraph runs out. */
+function resolveUnique(world: World, boss: Boss, now: number): void {
+  const cfg = getBalance().bosses[boss.bossType];
+  const u = cfg.unique;
+  const tg = boss.telegraph!;
+  boss.telegraph = null;
+
+  switch (u.kind) {
+    case 'charge': {
+      const end = tg.points![0];
+      const width = u.width ?? 90;
+      // damage every player near the dash segment, then land at the endpoint
+      const midX = (boss.x + end.x) / 2;
+      const midY = (boss.y + end.y) / 2;
+      const half = dist(boss.x, boss.y, end.x, end.y) / 2;
+      const candidates = world.grid.queryCircle(midX, midY, half + width + 80);
+      const dx = end.x - boss.x;
+      const dy = end.y - boss.y;
+      const len2 = dx * dx + dy * dy || 1;
+      for (const t of candidates) {
+        if (t.kind !== 'player' || t.dead) continue;
+        const proj = clamp(((t.x - boss.x) * dx + (t.y - boss.y) * dy) / len2, 0, 1);
+        const cx = boss.x + dx * proj;
+        const cy = boss.y + dy * proj;
+        const d = dist(cx, cy, t.x, t.y);
+        if (d > width + t.radius) continue;
+        applyDamage(world, t, u.damage, { id: boss.id, name: cfg.name, weapon: 'boss-charge', cause: 'boss' }, now, d);
+      }
+      world.moveEntity(boss, end.x, end.y);
+      break;
+    }
+    case 'nova': {
+      const hit = damageCircle(world, boss, boss.x, boss.y, u.range, u.damage, now, 'boss-nova');
+      const chillUntil = now + (u.chillSec ?? 2.5) * 1000;
+      for (const p of hit) {
+        if (p.dead) continue;
+        p.chillUntil = chillUntil;
+        p.chillFactor = u.chillFactor ?? 0.5;
+        world.markDirty(p);
+      }
+      break;
+    }
+    case 'burrow':
+    case 'blink': {
+      const pt = tg.points![0];
+      world.moveEntity(boss, pt.x, pt.y);
+      damageCircle(world, boss, pt.x, pt.y, u.range, u.damage, now, `boss-${u.kind}`);
+      break;
+    }
+    case 'spikes': {
+      for (const pt of tg.points!) {
+        damageCircle(world, boss, pt.x, pt.y, u.range, u.damage, now, 'boss-spikes');
+      }
+      break;
+    }
+  }
+}
+
 function updateBoss(world: World, boss: Boss, dt: number, now: number): void {
   const cfg = getBalance().bosses[boss.bossType];
+  const size = getBalance().world.size;
 
   if (now >= boss.despawnAt) {
     world.removeEntity(boss);
@@ -152,6 +279,10 @@ function updateBoss(world: World, boss: Boss, dt: number, now: number): void {
   if (boss.telegraph) {
     if (now < boss.telegraph.resolveAt) return;
     const tg = boss.telegraph;
+    if (tg.kind === 'unique') {
+      resolveUnique(world, boss, now);
+      return;
+    }
     boss.telegraph = null;
     if (tg.kind === 'slam') {
       const atk = cfg.slam;
@@ -176,17 +307,27 @@ function updateBoss(world: World, boss: Boss, dt: number, now: number): void {
   }
 
   const target = pickTarget(world, boss);
-  if (!target) return;
+  if (!target) {
+    // nobody around: roam the map slowly — bosses are free to leave their biome
+    if (now >= boss.nextWanderAt) {
+      boss.nextWanderAt = now + 2500 + Math.random() * 3000;
+      boss.wanderAngle = Math.random() * Math.PI * 2;
+    }
+    const nx = clamp(boss.x + Math.cos(boss.wanderAngle) * cfg.speed * 0.45 * dt, boss.radius, size - boss.radius);
+    const ny = clamp(boss.y + Math.sin(boss.wanderAngle) * cfg.speed * 0.45 * dt, boss.radius, size - boss.radius);
+    boss.angle = boss.wanderAngle;
+    world.moveEntity(boss, nx, ny);
+    return;
+  }
 
   const d = dist(boss.x, boss.y, target.x, target.y);
   boss.angle = Math.atan2(target.y - boss.y, target.x - boss.x);
   boss.movedTick = world.tickNo;
 
   if (d > cfg.slam.range * 0.6) {
-    // bosses never leave their home biome while chasing
-    const rect = biomeRect(boss.homeBiome as never, getBalance().world.size);
-    const nx = clamp(boss.x + Math.cos(boss.angle) * cfg.speed * dt, rect.x0 + boss.radius, rect.x1 - boss.radius);
-    const ny = clamp(boss.y + Math.sin(boss.angle) * cfg.speed * dt, rect.y0 + boss.radius, rect.y1 - boss.radius);
+    // chases across the whole map (clamped to world bounds only)
+    const nx = clamp(boss.x + Math.cos(boss.angle) * cfg.speed * dt, boss.radius, size - boss.radius);
+    const ny = clamp(boss.y + Math.sin(boss.angle) * cfg.speed * dt, boss.radius, size - boss.radius);
     world.moveEntity(boss, nx, ny);
   }
 
@@ -194,6 +335,12 @@ function updateBoss(world: World, boss: Boss, dt: number, now: number): void {
   if (d < boss.radius + target.radius + 5 && now - target.lastBossContactAt > 1000) {
     target.lastBossContactAt = now;
     applyDamage(world, target, cfg.contactDamage, { id: boss.id, name: cfg.name, weapon: 'boss-contact', cause: 'boss' }, now, d);
+  }
+
+  // signature ability first (own cooldown), then the regular slam/burst kit
+  if (now >= boss.uniqueReadyAt && d <= 900) {
+    startUnique(world, boss, target, now);
+    return;
   }
 
   if (now >= boss.attackReadyAt) {

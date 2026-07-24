@@ -122,6 +122,18 @@ export class Effects {
     this.texts.push({ t, vy: -55, life: 0.9, maxLife: 0.9 });
   }
 
+  /** Grey floating "miss" label (mirror_blade dodges). */
+  missText(x: number, y: number, label: string): void {
+    const t = new Text({
+      text: label,
+      style: { fontFamily: 'system-ui', fontSize: 14, fontWeight: '700', fill: 0x9aa5b8, stroke: { color: 0x000000, width: 4 } },
+    });
+    t.anchor.set(0.5);
+    t.position.set(x + (Math.random() - 0.5) * 20, y - 24);
+    this.layer.addChild(t);
+    this.texts.push({ t, vy: -45, life: 0.8, maxLife: 0.8 });
+  }
+
   incomeNumber(x: number, y: number, amount: number): void {
     const t = new Text({
       text: `+${amount}`,

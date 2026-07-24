@@ -47,10 +47,16 @@ export function populateMobs(world: World): void {
   }
 }
 
+/** tamer_blade: mobs pretend its wielder does not exist. */
+function mobIgnores(p: Player): boolean {
+  return !!getBalance().weapons[p.equipped]?.mobIgnore;
+}
+
 function validTarget(world: World, id: string | null): Player | null {
   if (!id) return null;
   const p = world.players.get(id);
   if (!p || p.dead || !p.ws) return null;
+  if (mobIgnores(p)) return null;
   return p;
 }
 
@@ -177,6 +183,7 @@ function tryAggro(world: World, mob: Mob): boolean {
   let bestD = Infinity;
   for (const e of near) {
     if (e.kind !== 'player' || e.dead || !e.ws) continue;
+    if (mobIgnores(e)) continue;
     const d = dist(mob.x, mob.y, e.x, e.y);
     if (d < bestD) {
       best = e;

@@ -94,28 +94,48 @@ export function tryEquipHat(world: World, p: Player, hatId: string | null): void
   world.markDirty(p);
 }
 
+/**
+ * Hat lootbox. Every tier can drop; each tier's chance is the TOTAL for the
+ * tier (the specific hat is a uniform pick inside it), so 2% legendary means
+ * 2% split across all legendary hats. Also drops food and gold; the leftover
+ * probability is an empty box.
+ */
 export function tryLootbox(world: World, p: Player): { ok: boolean; reason?: string } {
   const bal = getBalance();
   if (p.money < bal.hats.lootboxPrice) return { ok: false, reason: tr(p.lang, 'noMoney') };
   p.money -= bal.hats.lootboxPrice;
   telemetry.purchase(p.name, 'lootbox', bal.hats.lootboxPrice);
 
-  const roll = Math.random();
   const lb = bal.hats.lootbox;
-  if (roll < lb.legendaryChance) {
-    const hat = randomHatOfTier('legendary');
-    if (hat) grantHat(world, p, hat, 'lootbox');
-  } else if (roll < lb.legendaryChance + lb.epicChance) {
-    const hat = randomHatOfTier('epic');
-    if (hat) grantHat(world, p, hat, 'lootbox');
-  } else if (roll < lb.legendaryChance + lb.epicChance + lb.goldChance) {
+  let roll = Math.random();
+  // rarest tiers first so their slices of the roll stay exact
+  const tiers: HatTier[] = ['legendary', 'epic', 'rare', 'common'];
+  for (const tier of tiers) {
+    const chance = lb.tierChances[tier];
+    if (roll < chance) {
+      const hat = randomHatOfTier(tier);
+      if (hat) grantHat(world, p, hat, 'lootbox');
+      return { ok: true };
+    }
+    roll -= chance;
+  }
+  if (roll < lb.foodChance) {
+    const n = Math.floor(lb.foodMin + Math.random() * (lb.foodMax - lb.foodMin + 1));
+    const granted = Math.min(n, bal.food.maxCarry - p.food);
+    p.food += granted;
+    world.markDirty(p);
+    world.sendEvent(p, { e: 'lootbox', result: 'food', gold: 0, food: granted });
+    return { ok: true };
+  }
+  roll -= lb.foodChance;
+  if (roll < lb.goldChance) {
     const gold = Math.round(lb.goldMin + Math.random() * (lb.goldMax - lb.goldMin));
     p.money += gold;
     p.session.moneyEarned += gold;
     telemetry.income(p.name, 'loot', gold);
     world.sendEvent(p, { e: 'lootbox', result: 'gold', gold });
-  } else {
-    world.sendEvent(p, { e: 'lootbox', result: 'nothing', gold: 0 });
+    return { ok: true };
   }
+  world.sendEvent(p, { e: 'lootbox', result: 'nothing', gold: 0 });
   return { ok: true };
 }

@@ -25,6 +25,21 @@ export interface WeaponCfg {
   poison?: { dps: number; durationSec: number };
   /** movement slow applied on hit (bosses are immune) */
   chill?: { slowFactor: number; durationSec: number };
+  // ---- unique lootbox-only weapons ----
+  /** unique tier: present only on lootbox weapons (never sold in the shop) */
+  tier?: 'epic' | 'legendary';
+  /** direct sell price for unique weapons (normal weapons use price * sellFrac) */
+  sellPrice?: number;
+  /** ranged: a hit drags the victim toward the shooter */
+  pull?: boolean;
+  /** while equipped: chance (0..1) that any attack on the owner misses */
+  missChance?: number;
+  /** while equipped: mobs never aggro on the owner */
+  mobIgnore?: boolean;
+  /** ranged: projectile passes through up to N extra targets */
+  pierce?: number;
+  /** melee: instantly finishes mobs left below this HP fraction by the hit */
+  executeFrac?: number;
 }
 
 export interface MobCfg {
@@ -59,10 +74,29 @@ export interface BossAttackBurst {
   cooldownSec: number;
 }
 
+export type BossUniqueKind = 'charge' | 'nova' | 'burrow' | 'blink' | 'spikes';
+
+/** Per-boss signature ability. Kind-specific extras are optional. */
+export interface BossUniqueCfg {
+  kind: BossUniqueKind;
+  damage: number;
+  /** effect radius (nova/burrow/blink/spikes) or dash length (charge) */
+  range: number;
+  telegraphSec: number;
+  cooldownSec: number;
+  /** nova: chill strength applied to victims */
+  chillFactor?: number;
+  chillSec?: number;
+  /** spikes: how many players get an eruption under them */
+  count?: number;
+  /** charge: half-width of the damage lane */
+  width?: number;
+}
+
 export interface BossCfg {
   name: string;
-  /** 'central' = random of snow/normal/desert; otherwise a specific biome */
-  biome: BiomeId | 'central';
+  /** home biome: the boss spawns here but roams the whole map when chasing */
+  biome: BiomeId;
   hp: number;
   speed: number;
   radius: number;
@@ -74,6 +108,7 @@ export interface BossCfg {
   minDamageForReward: number;
   slam: BossAttackSlam;
   burst: BossAttackBurst;
+  unique: BossUniqueCfg;
 }
 
 export interface BuildingCfg {
@@ -119,9 +154,37 @@ export interface HatsCfg {
   mobDropChance: number;
   bossDropChance: number;
   lootboxPrice: number;
-  lootbox: { legendaryChance: number; epicChance: number; goldChance: number; goldMin: number; goldMax: number };
+  /**
+   * Hat lootbox table. Each tier chance is the TOTAL chance for that tier —
+   * the specific hat is a uniform pick within it (2% legendary means 2%
+   * split across all legendary hats). Remaining probability = nothing.
+   */
+  lootbox: {
+    tierChances: Record<HatTier, number>;
+    foodChance: number;
+    foodMin: number;
+    foodMax: number;
+    goldChance: number;
+    goldMin: number;
+    goldMax: number;
+  };
   dupGold: Record<HatTier, number>;
   items: Record<string, HatCfg>;
+}
+
+/**
+ * Weapon lootbox: epic/legendary roll a unique weapon (tier chance is the
+ * total, split across that tier's uniques), weaponChance rolls a random
+ * shop weapon. Duplicates/full hotbar convert to the weapon's sell value.
+ */
+export interface WeaponLootboxCfg {
+  price: number;
+  legendaryChance: number;
+  epicChance: number;
+  weaponChance: number;
+  goldChance: number;
+  goldMin: number;
+  goldMax: number;
 }
 
 export interface Balance {
@@ -161,6 +224,7 @@ export interface Balance {
     despawnSec: number;
   };
   hats: HatsCfg;
+  weaponLootbox: WeaponLootboxCfg;
   prestige: PrestigeCfg;
   economy: {
     maxBuildingsPerPlayer: number;
@@ -176,9 +240,11 @@ export interface Balance {
 export const WEAPON_IDS: WeaponId[] = [
   'fists', 'sword', 'spear', 'hammer', 'bow', 'crossbow',
   'daggers', 'scythe', 'venom_blade', 'vampire_blade', 'triple_bow', 'ice_staff',
+  'hook_blade', 'mirror_blade', 'storm_hammer', 'tamer_blade', 'reaper_scythe', 'dragon_bow',
 ];
 export const MOB_IDS: MobId[] = ['slime', 'wolf', 'ice_slime', 'yeti', 'scorpion', 'sand_golem', 'shade', 'treant', 'wisp', 'crystal_golem'];
-export const BOSS_IDS: BossId[] = ['champion', 'shadow_lord', 'crystal_queen'];
+export const BOSS_IDS: BossId[] = ['champion', 'frost_titan', 'sand_worm', 'shadow_lord', 'crystal_queen'];
+export const BOSS_UNIQUE_KINDS = ['charge', 'nova', 'burrow', 'blink', 'spikes'];
 const BUILDING_IDS: BuildingId[] = ['farm', 'mine', 'turret'];
 const BIOME_IDS = ['normal', 'snow', 'desert', 'mystic_west', 'mystic_east'];
 
@@ -237,6 +303,13 @@ export function validateBalance(raw: unknown): Balance {
       num(ch, 'slowFactor', `weapons.${id}.chill`, 0.05);
       num(ch, 'durationSec', `weapons.${id}.chill`);
     }
+    if (w.tier !== undefined) {
+      if (w.tier !== 'epic' && w.tier !== 'legendary') throw new Error(`balance: weapons.${id}.tier must be epic|legendary`);
+      num(w, 'sellPrice', `weapons.${id}`);
+    }
+    if (w.missChance !== undefined) num(w, 'missChance', `weapons.${id}`);
+    if (w.pierce !== undefined) num(w, 'pierce', `weapons.${id}`);
+    if (w.executeFrac !== undefined) num(w, 'executeFrac', `weapons.${id}`);
   }
 
   const mobs = section(root, 'mobs');
@@ -253,8 +326,8 @@ export function validateBalance(raw: unknown): Balance {
   for (const id of BOSS_IDS) {
     const b = section(bosses, id);
     if (typeof b.name !== 'string' || !b.name) throw new Error(`balance: bosses.${id}.name must be a string`);
-    if (b.biome !== 'central' && !BIOME_IDS.includes(String(b.biome))) {
-      throw new Error(`balance: bosses.${id}.biome must be 'central' or one of ${BIOME_IDS.join('|')}`);
+    if (!BIOME_IDS.includes(String(b.biome))) {
+      throw new Error(`balance: bosses.${id}.biome must be one of ${BIOME_IDS.join('|')}`);
     }
     for (const k of ['hp', 'speed', 'radius', 'contactDamage', 'spawnIntervalSec', 'warnSec', 'despawnSec', 'reward', 'minDamageForReward']) {
       num(b, k, `bosses.${id}`);
@@ -263,6 +336,11 @@ export function validateBalance(raw: unknown): Balance {
     for (const k of ['damage', 'range', 'arc', 'telegraphSec', 'cooldownSec']) num(slam, k, `bosses.${id}.slam`);
     const burst = section(b, 'burst');
     for (const k of ['damage', 'count', 'projSpeed', 'projRange', 'telegraphSec', 'cooldownSec']) num(burst, k, `bosses.${id}.burst`);
+    const uniq = section(b, 'unique');
+    if (!BOSS_UNIQUE_KINDS.includes(String(uniq.kind))) {
+      throw new Error(`balance: bosses.${id}.unique.kind must be one of ${BOSS_UNIQUE_KINDS.join('|')}`);
+    }
+    for (const k of ['damage', 'range', 'telegraphSec', 'cooldownSec']) num(uniq, k, `bosses.${id}.unique`);
   }
 
   const buildings = section(root, 'buildings');
@@ -279,7 +357,14 @@ export function validateBalance(raw: unknown): Balance {
   const hats = section(root, 'hats');
   for (const k of ['mobDropChance', 'bossDropChance', 'lootboxPrice']) num(hats, k, 'hats');
   const lootbox = section(hats, 'lootbox');
-  for (const k of ['legendaryChance', 'epicChance', 'goldChance', 'goldMin', 'goldMax']) num(lootbox, k, 'hats.lootbox');
+  const tierChances = section(lootbox, 'tierChances');
+  for (const k of ['common', 'rare', 'epic', 'legendary']) num(tierChances, k, 'hats.lootbox.tierChances');
+  for (const k of ['foodChance', 'foodMin', 'foodMax', 'goldChance', 'goldMin', 'goldMax']) num(lootbox, k, 'hats.lootbox');
+  {
+    const total = (['common', 'rare', 'epic', 'legendary'] as const).reduce((s, k) => s + (tierChances[k] as number), 0)
+      + (lootbox.foodChance as number) + (lootbox.goldChance as number);
+    if (total > 1) throw new Error(`balance: hats.lootbox chances sum to ${total.toFixed(3)} — must be <= 1`);
+  }
   const dupGold = section(hats, 'dupGold');
   for (const k of ['common', 'rare', 'epic', 'legendary']) num(dupGold, k, 'hats.dupGold');
   const items = section(hats, 'items');
@@ -293,6 +378,13 @@ export function validateBalance(raw: unknown): Balance {
     for (const [ek, ev] of Object.entries(h.effect as Record<string, unknown>)) {
       if (typeof ev !== 'number' || !Number.isFinite(ev)) throw new Error(`balance: hats.items.${id}.effect.${ek} must be a number`);
     }
+  }
+
+  const wlb = section(root, 'weaponLootbox');
+  for (const k of ['price', 'legendaryChance', 'epicChance', 'weaponChance', 'goldChance', 'goldMin', 'goldMax']) num(wlb, k, 'weaponLootbox');
+  {
+    const total = (wlb.legendaryChance as number) + (wlb.epicChance as number) + (wlb.weaponChance as number) + (wlb.goldChance as number);
+    if (total > 1) throw new Error(`balance: weaponLootbox chances sum to ${total.toFixed(3)} — must be <= 1`);
   }
 
   const prestige = section(root, 'prestige');

@@ -9,7 +9,7 @@ import { getBalance } from '../game/balance.js';
 import type { World } from '../game/world.js';
 import type { WorldManager } from '../game/world-manager.js';
 import type { Player } from '../game/entities.js';
-import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip } from '../game/economy.js';
+import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip, tryWeaponLootbox } from '../game/economy.js';
 import { tryPlaceBuilding, removePlayerBuildings } from '../game/buildings.js';
 import { tryLootbox, tryEquipHat, recomputeMaxHp } from '../game/hats.js';
 import { tryPrestige } from '../game/prestige.js';
@@ -96,6 +96,7 @@ export function startServer(worlds: WorldManager): http.Server {
       buildings: bal.buildings,
       food: { heal: bal.food.heal, cooldownSec: bal.food.cooldownSec, maxCarry: bal.food.maxCarry, price: bal.food.price },
       hats: { items: bal.hats.items, lootboxPrice: bal.hats.lootboxPrice, dupGold: bal.hats.dupGold },
+      weaponLootboxPrice: bal.weaponLootbox.price,
       prestige: bal.prestige,
       levels: bal.levels,
       economy: { sellFrac: bal.economy.sellFrac },
@@ -276,6 +277,11 @@ export function startServer(worlds: WorldManager): http.Server {
         case 'lootbox': {
           const res = tryLootbox(world, player);
           if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'lootbox', reason: res.reason });
+          break;
+        }
+        case 'weaponLootbox': {
+          const res = tryWeaponLootbox(world, player);
+          if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'weaponLootbox', reason: res.reason });
           break;
         }
         case 'prestige': {

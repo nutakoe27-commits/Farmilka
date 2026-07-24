@@ -82,7 +82,7 @@ export type GameEvent =
   | { e: 'death'; dropped: number; respawnIn: number; cause: DeathCause; kills: number; survivedSec: number; level: number }
   | { e: 'bossWarn'; boss: string; bossId: BossId; x: number; y: number; inSec: number }
   | { e: 'bossSpawned'; boss: string; bossId: BossId; x: number; y: number }
-  | { e: 'bossTelegraph'; kind: 'slam' | 'burst'; x: number; y: number; angle: number; range: number; arc: number; sec: number }
+  | { e: 'bossTelegraph'; kind: string; x: number; y: number; angle: number; range: number; arc: number; sec: number }
   | { e: 'bossKilled'; boss: string; bossId: BossId; rewards: { name: string; amount: number }[] }
   | { e: 'bossGone'; boss: string; bossId: BossId }
   | { e: 'buildingAttacked'; id: string; x: number; y: number }
@@ -92,7 +92,8 @@ export type GameEvent =
   | { e: 'heal'; amount: number }
   | { e: 'swing'; id: string; x: number; y: number; angle: number; weapon: string }
   | { e: 'hat'; hat: string; name: string; tier: HatTier; source: 'mob' | 'boss' | 'lootbox'; dup: boolean; gold: number }
-  | { e: 'lootbox'; result: 'hat' | 'gold' | 'nothing'; gold: number }
+  | { e: 'lootbox'; result: 'hat' | 'gold' | 'food' | 'nothing'; gold: number; food?: number }
+  | { e: 'weaponLoot'; result: 'unique' | 'weapon' | 'gold' | 'nothing'; weapon?: WeaponId; tier?: 'epic' | 'legendary'; gold: number }
   | { e: 'prestige'; level: number; tier: string | null }
   | { e: 'level'; level: number; max: number }
   | { e: 'dailyReward'; gold: number; streak: number }
@@ -119,6 +120,7 @@ export type ClientMsg =
   | { t: 'eat' }
   | { t: 'respawn' }
   | { t: 'lootbox' }
+  | { t: 'weaponLootbox' }
   | { t: 'prestige' }
   | { t: 'equipHat'; hat: string | null }
   | { t: 'place'; building: BuildingId; x: number; y: number }
@@ -139,6 +141,7 @@ export interface WelcomeMsg {
   buildings: Record<BuildingId, BuildingCfg>;
   food: { heal: number; cooldownSec: number; maxCarry: number; price: number };
   hats: { items: Record<string, HatCfg>; lootboxPrice: number; dupGold: Record<HatTier, number> };
+  weaponLootboxPrice: number;
   prestige: PrestigeCfg;
   levels: LevelsCfg;
   economy: { sellFrac: number };

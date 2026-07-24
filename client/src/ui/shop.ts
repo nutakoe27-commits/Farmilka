@@ -34,6 +34,7 @@ export class Shop {
   onSell: (item: WeaponId) => void = () => {};
   onStartPlace: (b: BuildingId) => void = () => {};
   onLootbox: () => void = () => {};
+  onWeaponLootbox: () => void = () => {};
   onEquipHat: (hat: string | null) => void = () => {};
   onPrestige: () => void = () => {};
 
@@ -70,11 +71,11 @@ export class Shop {
     fel.querySelector('button')!.onclick = () => this.onBuy('food');
     fg.appendChild(fel);
 
-    // weapons
+    // weapons: shop weapons first (by price), then unique lootbox-only ones
     const wg = $('shop-weapons');
     wg.innerHTML = '';
     const weapons = Object.entries(this.welcome.weapons)
-      .filter(([id]) => id !== 'fists')
+      .filter(([id, cfg]) => id !== 'fists' && !cfg.tier)
       .sort((a, b) => a[1].price - b[1].price);
     for (const [id, cfg] of weapons) {
       const el = document.createElement('div');
@@ -85,6 +86,21 @@ export class Shop {
         : t('shop.dmgRanged', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate });
       el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${t('note.' + id)}</div></div><div class="btns"><button class="buy">💰 ${cfg.price}</button><button class="sell hidden">${t('shop.sell')}</button></div>`;
       (el.querySelector('.buy') as HTMLButtonElement).onclick = () => this.onBuy(id as WeaponId);
+      (el.querySelector('.sell') as HTMLButtonElement).onclick = () => this.onSell(id as WeaponId);
+      wg.appendChild(el);
+    }
+    const uniques = Object.entries(this.welcome.weapons)
+      .filter(([, cfg]) => !!cfg.tier)
+      .sort((a, b) => (a[1].tier === b[1].tier ? 0 : a[1].tier === 'epic' ? -1 : 1));
+    for (const [id, cfg] of uniques) {
+      const el = document.createElement('div');
+      el.className = 'shop-item unique-weapon';
+      el.dataset.item = id;
+      const stats = cfg.type === 'melee'
+        ? t('shop.dmg', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate })
+        : t('shop.dmgRanged', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate });
+      const tierBadge = `<span class="tier-badge" style="background:${TIER_COLORS[cfg.tier!]};color:#0d0f14">${TIER_NAMES[cfg.tier!]}</span>`;
+      el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${t('wname.' + id)} ${tierBadge}</div><div class="st">${stats}<br><b style="color:${TIER_COLORS[cfg.tier!]}">${t('note.' + id)}</b><br>${t('shop.uniqueSrc')}</div></div><div class="btns"><button class="sell hidden">${t('shop.sell')}</button></div>`;
       (el.querySelector('.sell') as HTMLButtonElement).onclick = () => this.onSell(id as WeaponId);
       wg.appendChild(el);
     }
@@ -107,7 +123,7 @@ export class Shop {
       bg.appendChild(el);
     }
 
-    // lootbox
+    // lootboxes: hat lootbox + weapon crate
     const lb = $('shop-lootbox');
     lb.innerHTML = '';
     const lbe = document.createElement('div');
@@ -115,6 +131,11 @@ export class Shop {
     lbe.innerHTML = `<div><div class="nm">${t('shop.lootbox')}</div><div class="st">${t('shop.lootboxDesc')}</div></div><div class="btns"><button id="lootbox-btn">💰 ${this.welcome.hats.lootboxPrice}</button></div>`;
     (lbe.querySelector('#lootbox-btn') as HTMLButtonElement).onclick = () => this.onLootbox();
     lb.appendChild(lbe);
+    const wle = document.createElement('div');
+    wle.className = 'shop-item';
+    wle.innerHTML = `<div><div class="nm">${t('shop.weaponLootbox')}</div><div class="st">${t('shop.weaponLootboxDesc')}</div></div><div class="btns"><button id="weapon-lootbox-btn">💰 ${this.welcome.weaponLootboxPrice}</button></div>`;
+    (wle.querySelector('#weapon-lootbox-btn') as HTMLButtonElement).onclick = () => this.onWeaponLootbox();
+    lb.appendChild(wle);
 
     // hat collection
     const hg = $('shop-hats');
@@ -150,19 +171,30 @@ export class Shop {
     for (const el of document.querySelectorAll<HTMLElement>('#shop-weapons .shop-item')) {
       const id = el.dataset.item as WeaponId;
       const cfg = this.welcome.weapons[id];
-      const buy = el.querySelector('.buy') as HTMLButtonElement;
+      const buy = el.querySelector('.buy') as HTMLButtonElement | null;
       const sell = el.querySelector('.sell') as HTMLButtonElement;
       const owned = self.weapons.includes(id);
+      const sellValue = cfg.sellPrice ?? Math.floor(cfg.price * sellFrac);
       el.classList.toggle('owned', owned);
+      if (cfg.tier) {
+        // unique: lootbox-only — dim until owned, then sell-only
+        el.style.opacity = owned ? '1' : '0.55';
+        sell.classList.toggle('hidden', !owned);
+        if (owned) {
+          sell.textContent = t('shop.sellFor', { n: sellValue });
+          sell.disabled = false;
+        }
+        continue;
+      }
       if (owned) {
-        buy.textContent = t('shop.bought');
-        buy.disabled = true;
+        buy!.textContent = t('shop.bought');
+        buy!.disabled = true;
         sell.classList.remove('hidden');
-        sell.textContent = t('shop.sellFor', { n: Math.floor(cfg.price * sellFrac) });
+        sell.textContent = t('shop.sellFor', { n: sellValue });
         sell.disabled = false;
       } else {
-        buy.textContent = `💰 ${cfg.price}`;
-        buy.disabled = self.money < cfg.price || self.weapons.length >= 4;
+        buy!.textContent = `💰 ${cfg.price}`;
+        buy!.disabled = self.money < cfg.price || self.weapons.length >= 4;
         sell.classList.add('hidden');
       }
     }
@@ -203,6 +235,7 @@ export class Shop {
 
     // hats
     ($('lootbox-btn') as HTMLButtonElement).disabled = self.money < this.welcome.hats.lootboxPrice;
+    ($('weapon-lootbox-btn') as HTMLButtonElement).disabled = self.money < this.welcome.weaponLootboxPrice;
     $('hat-count').textContent = t('shop.hatCount', { n: self.hats.length, total: Object.keys(this.welcome.hats.items).length });
     for (const el of document.querySelectorAll<HTMLElement>('#shop-hats .shop-item')) {
       const id = el.dataset.hat!;

@@ -11,6 +11,8 @@ import { tr } from './i18n.js';
 export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boolean; reason?: string } {
   const bal = getBalance();
   if (!WEAPON_IDS.includes(item)) return { ok: false, reason: tr(p.lang, 'unknownItem') };
+  // unique weapons never sell in the shop — weapon lootbox only
+  if (bal.weapons[item].tier) return { ok: false, reason: tr(p.lang, 'uniqueNoBuy') };
   // buying is allowed while dead (stock up during the respawn break)
   if (p.weapons.includes(item)) return { ok: false, reason: tr(p.lang, 'owned') };
   if (p.weapons.length >= 4) return { ok: false, reason: tr(p.lang, 'hotbarFull') };
@@ -39,12 +41,85 @@ export function trySellWeapon(world: World, p: Player, weapon: WeaponId): { ok: 
   if (weapon === 'fists') return { ok: false, reason: tr(p.lang, 'fistsNoSell') };
   const idx = p.weapons.indexOf(weapon);
   if (idx < 0) return { ok: false, reason: tr(p.lang, 'noWeapon') };
-  const refund = Math.floor(bal.weapons[weapon].price * bal.economy.sellFrac);
+  const cfg = bal.weapons[weapon];
+  // unique weapons carry their own (higher) sell price
+  const refund = cfg.sellPrice ?? Math.floor(cfg.price * bal.economy.sellFrac);
   p.weapons.splice(idx, 1);
   if (p.equipped === weapon) p.equipped = 'fists';
   p.money += refund;
   world.markDirty(p);
   if (!p.bot) telemetry.purchase(p.name, `sell:${weapon}`, -refund);
+  return { ok: true };
+}
+
+function grantWeaponLoot(world: World, p: Player, id: WeaponId, tier: 'epic' | 'legendary' | undefined): void {
+  const bal = getBalance();
+  const cfg = bal.weapons[id];
+  const sellValue = cfg.sellPrice ?? Math.floor(cfg.price * bal.economy.sellFrac);
+  // duplicate or full hotbar: convert to the weapon's sell value
+  if (p.weapons.includes(id) || p.weapons.length >= 4) {
+    p.money += sellValue;
+    p.session.moneyEarned += sellValue;
+    if (!p.bot) telemetry.income(p.name, 'loot', sellValue);
+    world.sendEvent(p, { e: 'weaponLoot', result: 'gold', weapon: id, tier, gold: sellValue });
+    return;
+  }
+  p.weapons.push(id);
+  p.equipped = id;
+  world.markDirty(p);
+  if (!p.bot) telemetry.purchase(p.name, `wloot:${id}`, 0);
+  world.sendEvent(p, { e: 'weaponLoot', result: tier ? 'unique' : 'weapon', weapon: id, tier, gold: 0 });
+}
+
+function randomWeaponOfTier(tier: 'epic' | 'legendary' | null): WeaponId | null {
+  const bal = getBalance();
+  const ids = WEAPON_IDS.filter((id) => {
+    const cfg = bal.weapons[id];
+    return tier ? cfg.tier === tier : !cfg.tier && cfg.price > 0;
+  });
+  if (!ids.length) return null;
+  return ids[Math.floor(Math.random() * ids.length)];
+}
+
+/**
+ * Weapon lootbox: unique epic/legendary weapons (tier chance = the total,
+ * split across that tier's uniques), a random shop weapon, gold, or nothing.
+ */
+export function tryWeaponLootbox(world: World, p: Player): { ok: boolean; reason?: string } {
+  const bal = getBalance();
+  const lb = bal.weaponLootbox;
+  if (p.money < lb.price) return { ok: false, reason: tr(p.lang, 'noMoney') };
+  p.money -= lb.price;
+  if (!p.bot) telemetry.purchase(p.name, 'weaponLootbox', lb.price);
+
+  let roll = Math.random();
+  if (roll < lb.legendaryChance) {
+    const id = randomWeaponOfTier('legendary');
+    if (id) grantWeaponLoot(world, p, id, 'legendary');
+    return { ok: true };
+  }
+  roll -= lb.legendaryChance;
+  if (roll < lb.epicChance) {
+    const id = randomWeaponOfTier('epic');
+    if (id) grantWeaponLoot(world, p, id, 'epic');
+    return { ok: true };
+  }
+  roll -= lb.epicChance;
+  if (roll < lb.weaponChance) {
+    const id = randomWeaponOfTier(null);
+    if (id) grantWeaponLoot(world, p, id, undefined);
+    return { ok: true };
+  }
+  roll -= lb.weaponChance;
+  if (roll < lb.goldChance) {
+    const gold = Math.round(lb.goldMin + Math.random() * (lb.goldMax - lb.goldMin));
+    p.money += gold;
+    p.session.moneyEarned += gold;
+    if (!p.bot) telemetry.income(p.name, 'loot', gold);
+    world.sendEvent(p, { e: 'weaponLoot', result: 'gold', gold });
+    return { ok: true };
+  }
+  world.sendEvent(p, { e: 'weaponLoot', result: 'nothing', gold: 0 });
   return { ok: true };
 }
 

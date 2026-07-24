@@ -124,11 +124,22 @@ export interface Mob extends BaseEntity, StatusEffects {
 export interface Boss extends BaseEntity {
   kind: 'boss';
   bossType: BossId;
-  /** biome the boss is bound to; it will not chase beyond it */
+  /** biome the boss spawned in (it roams the whole map afterwards) */
   homeBiome: string;
   targetId: string | null;
   attackReadyAt: number;
-  telegraph: { kind: 'slam' | 'burst'; resolveAt: number; angle: number } | null;
+  /** signature ability cooldown gate */
+  uniqueReadyAt: number;
+  telegraph: {
+    kind: 'slam' | 'burst' | 'unique';
+    resolveAt: number;
+    angle: number;
+    /** unique abilities: impact points (charge endpoint, burrow/blink target, spike positions) */
+    points?: { x: number; y: number }[];
+  } | null;
+  /** wander heading while no player is around */
+  wanderAngle: number;
+  nextWanderAt: number;
   damageLedger: Map<string, number>;
   despawnAt: number;
 }
@@ -143,6 +154,10 @@ export interface Projectile extends BaseEntity {
   vy: number;
   maxDist: number;
   traveled: number;
+  /** extra targets this projectile may pass through (dragon_bow) */
+  pierceLeft: number;
+  /** entities already hit — a piercing shot must not hit one twice */
+  hitIds: Set<string> | null;
 }
 
 export interface Coin extends BaseEntity {

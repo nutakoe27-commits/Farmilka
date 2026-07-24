@@ -6,7 +6,7 @@ import type { WelcomeMsg } from '@shared/protocol.js';
 import { Connection } from './net/connection.js';
 import { sample, type Sampled } from './net/interpolation.js';
 import { Scene } from './game/scene.js';
-import { EntityView, WEAPON_ICONS, setPrestigeCfg } from './game/entities.js';
+import { EntityView, WEAPON_ICONS, TIER_COLORS, setPrestigeCfg } from './game/entities.js';
 import { prestigeTier } from '@shared/prestige.js';
 import { Effects } from './game/effects.js';
 import { InputManager } from './game/input.js';
@@ -377,6 +377,11 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       }
       case 'damage': {
+        // amount 0 = the attack missed (mirror_blade) — show it, no hit feedback
+        if (ev.amount === 0) {
+          effects.missText(ev.x, ev.y, t('ev.miss'));
+          break;
+        }
         audio.hit();
         if (settings.values.damageNumbers) effects.damageNumber(ev.x, ev.y, ev.amount);
         views.get(ev.target)?.flash();
@@ -408,7 +413,27 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       }
       case 'lootbox': {
         if (ev.result === 'gold') { audio.reward(); hud.notice(t('ev.lootGold', { gold: ev.gold })); }
+        else if (ev.result === 'food') { audio.reward(); hud.notice(t('ev.lootFood', { n: ev.food ?? 0 })); }
         else if (ev.result === 'nothing') hud.notice(t('ev.lootNothing'));
+        break;
+      }
+      case 'weaponLoot': {
+        const name = ev.weapon ? (ev.tier ? t('wname.' + ev.weapon) : ev.weapon) : '';
+        if (ev.result === 'unique') {
+          audio.reward();
+          const color = TIER_COLORS[ev.tier ?? 'epic'];
+          hud.bossBanner(t('ev.wlootUnique', { name: escapeHtml(name), color }));
+          setTimeout(() => hud.bossBanner(null), 5000);
+          hud.notice(t('ev.wlootUnique', { name: escapeHtml(name), color }));
+        } else if (ev.result === 'weapon') {
+          audio.reward();
+          hud.notice(t('ev.wlootWeapon', { name: escapeHtml(name) }));
+        } else if (ev.result === 'gold') {
+          audio.reward();
+          hud.notice(t('ev.wlootGold', { gold: ev.gold }));
+        } else {
+          hud.notice(t('ev.wlootNothing'));
+        }
         break;
       }
       case 'prestige': {
@@ -495,6 +520,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   shop.onBuy = (item) => conn.send({ t: 'buy', item });
   shop.onSell = (item) => conn.send({ t: 'sell', weapon: item });
   shop.onLootbox = () => conn.send({ t: 'lootbox' });
+  shop.onWeaponLootbox = () => conn.send({ t: 'weaponLootbox' });
   shop.onEquipHat = (hat) => conn.send({ t: 'equipHat', hat });
   shop.onPrestige = () => conn.send({ t: 'prestige' });
   conn.onLeaderboard = (top, rank, total) => leaderboard.update(top, rank, total);

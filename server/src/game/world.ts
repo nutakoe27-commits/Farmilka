@@ -289,6 +289,7 @@ export class World {
     speed: number,
     damage: number,
     maxDist: number,
+    pierce = 0,
   ): Projectile {
     const proj: Projectile = {
       id: this.id('pr'),
@@ -311,6 +312,8 @@ export class World {
       vy: Math.sin(angle) * speed,
       maxDist,
       traveled: 0,
+      pierceLeft: pierce,
+      hitIds: pierce > 0 ? new Set() : null,
     };
     this.addEntity(proj);
     return proj;

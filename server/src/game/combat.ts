@@ -35,7 +35,7 @@ export function performAttack(world: World, p: Player, w: WeaponCfg, now: number
     const spread = ((w.spreadDeg ?? 0) * Math.PI) / 180;
     for (let i = 0; i < count; i++) {
       const offset = count > 1 ? (i / (count - 1) - 0.5) * spread : 0;
-      world.spawnProjectile(p.id, 'player', p.equipped, sx, sy, p.angle + offset, speed, w.damage * dmgMult, w.range);
+      world.spawnProjectile(p.id, 'player', p.equipped, sx, sy, p.angle + offset, speed, w.damage * dmgMult, w.range, w.pierce ?? 0);
     }
     return;
   }
@@ -57,6 +57,10 @@ export function performAttack(world: World, p: Player, w: WeaponCfg, now: number
     const src: DamageSource = { id: p.id, name: p.name, weapon: p.equipped, cause: 'player' };
     const hit = applyDamage(world, t, dmg, src, now, d);
     if (hit) applyWeaponOnHit(world, p, t, w, dmg, now);
+    // execute (reaper_scythe): finish a mob the hit left below the threshold
+    if (hit && !t.dead && w.executeFrac && t.kind === 'mob' && t.hp / t.maxHp <= w.executeFrac) {
+      applyDamage(world, t, t.hp, src, now, d);
+    }
     // Knockback only a still-living target — a dead one has already been removed
     // from the world, and moveEntity would re-insert it into the grid as a 0-HP ghost.
     if (hit && !t.dead && w.knockback && t.kind !== 'building' && t.kind !== 'boss') {
@@ -135,6 +139,12 @@ export function applyDamage(
     // spawn protection: fresh spawns are immune until the timer runs out
     // (their own first attack drops it — see performAttack)
     if (target.invulnUntil > now) return false;
+    // mirror_blade: attacks on the owner have a chance to simply miss
+    const missChance = getBalance().weapons[target.equipped]?.missChance;
+    if (missChance && Math.random() < missChance) {
+      world.sendNear(target.x, target.y, { e: 'damage', target: target.id, amount: 0, x: target.x, y: target.y });
+      return false;
+    }
   }
   if (target.kind === 'building') {
     if (src.cause !== 'player' && src.cause !== 'turret') return false;
@@ -299,6 +309,7 @@ export function updateProjectiles(world: World, dt: number, now: number): void {
     let hit = false;
     for (const t of candidates) {
       if (t.dead || t.id === proj.ownerId || !ATTACKABLE.has(t.kind)) continue;
+      if (proj.hitIds?.has(t.id)) continue; // a piercing shot hits each target once
       if (proj.ownerKind === 'boss' && t.kind !== 'player') continue;
       // turret fires at players, mobs and bosses — but not buildings
       if (proj.ownerKind === 'turret' && t.kind !== 'player' && t.kind !== 'mob' && t.kind !== 'boss') continue;
@@ -315,7 +326,19 @@ export function updateProjectiles(world: World, dt: number, now: number): void {
           if (wcfg) {
             const owner = world.players.get(proj.ownerId) ?? null;
             applyWeaponOnHit(world, owner, t, wcfg, proj.damage, now);
+            // hook_blade: the hit drags the victim toward the shooter
+            if (wcfg.pull && owner && !t.dead && (t.kind === 'player' || t.kind === 'mob')) {
+              const ang = Math.atan2(t.y - owner.y, t.x - owner.x);
+              const hold = owner.radius + t.radius + 30;
+              world.moveEntity(t, owner.x + Math.cos(ang) * hold, owner.y + Math.sin(ang) * hold);
+            }
           }
+        }
+        // dragon_bow: pass through up to `pierce` extra targets
+        if (proj.pierceLeft > 0) {
+          proj.pierceLeft--;
+          proj.hitIds?.add(t.id);
+          continue;
         }
         hit = true;
         break;

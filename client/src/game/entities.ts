@@ -15,6 +15,7 @@ function hexColor(css: string): number {
 export const WEAPON_ICONS: Record<string, string> = {
   fists: '👊', sword: '🗡️', spear: '🔱', hammer: '🔨', bow: '🏹', crossbow: '🎯',
   daggers: '🔪', scythe: '🌪️', venom_blade: '🐍', vampire_blade: '🩸', triple_bow: '🪃', ice_staff: '❄️',
+  hook_blade: '⛓️', mirror_blade: '🪞', storm_hammer: '⚡', tamer_blade: '🐺', reaper_scythe: '💀', dragon_bow: '🐉',
 };
 export const BUILDING_ICONS: Record<string, string> = { farm: '🌾', mine: '⛏️', turret: '🗼' };
 
@@ -42,6 +43,8 @@ const MOB_STYLE: Record<string, { color: number; shape: 'blob' | 'beast' | 'gole
 
 const BOSS_STYLE: Record<string, { body: number; glow: number; ring: number; label: string }> = {
   champion: { body: 0x7a2f9e, glow: 0xb565d8, ring: 0x9b4fc4, label: '💀 ЧЕМПИОН' },
+  frost_titan: { body: 0x2a5a8a, glow: 0x9fd8ff, ring: 0x5aa8e0, label: '🧊 ЛЕДЯНОЙ ИСПОЛИН' },
+  sand_worm: { body: 0x8a6a2a, glow: 0xe8c878, ring: 0xc49a4a, label: '🐛 ПЕСЧАНЫЙ ЧЕРВЬ' },
   shadow_lord: { body: 0x241436, glow: 0x8a2be2, ring: 0x5a2a8a, label: '👁 ВЛАДЫКА ТЕНЕЙ' },
   crystal_queen: { body: 0x1a6a70, glow: 0x6ee8e0, ring: 0x4fd8c8, label: '💎 КРИСТАЛЬНАЯ КОРОЛЕВА' },
 };
