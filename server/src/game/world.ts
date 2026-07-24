@@ -37,17 +37,17 @@ export class World {
   grid: SpatialGrid<Entity>;
   mobRespawnQueue: { mobType: MobId; at: number }[] = [];
 
-  bossTimers = new Map<BossId, { nextSpawnAt: number; warned: boolean; pos: { x: number; y: number } }>();
+  /**
+   * Single boss rotation: one random boss at a time. The next one is picked
+   * (and its timer started) only after the current boss dies or despawns.
+   */
+  bossRotation: { bossType: BossId; nextSpawnAt: number; warned: boolean; pos: { x: number; y: number } } | null = null;
 
   private nextId = 1;
 
   constructor(public readonly serverId: number = 1) {
     const bal = getBalance();
     this.grid = new SpatialGrid<Entity>(bal.world.size, 200);
-    const now = Date.now();
-    for (const [id, cfg] of Object.entries(bal.bosses)) {
-      this.bossTimers.set(id as BossId, { nextSpawnAt: now + cfg.spawnIntervalSec * 1000, warned: false, pos: { x: 0, y: 0 } });
-    }
     populateMobs(this);
   }
 

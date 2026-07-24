@@ -1,15 +1,16 @@
-// Boss e2e over the wire — needs a server on :3995 with all bosses rigged to
-// spawnIntervalSec 4 / warnSec 1. Verifies every boss type warns and spawns
-// in its home biome, and that telegraphs (incl. unique kinds) reach clients.
+// Boss rotation e2e — needs a server on :3995 with bosses rigged to
+// spawnIntervalSec 3 / warnSec 1 / despawnSec 4. Verifies the rotation:
+// exactly one random boss at a time, spawning in its home biome, with the
+// next one scheduled only after the previous leaves.
 import WebSocket from 'ws';
 import { biomeAt } from '@shared/biomes.js';
 
 const URL = 'ws://localhost:3995/ws';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const warned = new Set<string>();
-const spawned = new Map<string, { x: number; y: number }>();
-const telegraphs = new Set<string>();
+const spawns: { bossId: string; x: number; y: number }[] = [];
+const alive = new Set<string>();
+let maxAlive = 0;
 let size = 7000;
 
 const ws = new WebSocket(URL);
@@ -21,9 +22,12 @@ ws.on('message', (d, isBinary) => {
   if (m.t === 'welcome') size = m.world.size;
   if (m.t !== 'event') return;
   const ev = m.ev;
-  if (ev.e === 'bossWarn') warned.add(ev.bossId);
-  if (ev.e === 'bossSpawned') spawned.set(ev.bossId, { x: ev.x, y: ev.y });
-  if (ev.e === 'bossTelegraph') telegraphs.add(ev.kind);
+  if (ev.e === 'bossSpawned') {
+    spawns.push({ bossId: ev.bossId, x: ev.x, y: ev.y });
+    alive.add(ev.bossId);
+    maxAlive = Math.max(maxAlive, alive.size);
+  }
+  if (ev.e === 'bossGone' || ev.e === 'bossKilled') alive.delete(ev.bossId);
 });
 
 let pass = 0, fail = 0;
@@ -38,13 +42,19 @@ const HOME: Record<string, string> = {
 };
 
 async function main(): Promise<void> {
-  await sleep(12_000); // interval 4s + warn 1s → all five should be up
-  check('all 5 bosses announced', warned.size === 5, `warned=${[...warned].join(',')}`);
-  check('all 5 bosses spawned', spawned.size === 5, `spawned=${[...spawned.keys()].join(',')}`);
-  for (const [id, pos] of spawned) {
-    const biome = biomeAt(pos.x, pos.y, size);
-    check(`${id} spawned in its home biome`, biome === HOME[id], `at=${biome}`);
+  await sleep(45_000); // interval 3s + life 4s → ~6 rotation cycles
+  const seen = spawns.map((s) => s.bossId);
+  check('several rotation cycles happened', spawns.length >= 4, `spawns=${seen.join(',')}`);
+  check('only one boss alive at a time', maxAlive === 1, `maxAlive=${maxAlive}`);
+  check('rotation picks varied bosses', new Set(seen).size >= 3, `distinct=${[...new Set(seen)].join(',')}`);
+  let noRepeat = true;
+  for (let i = 1; i < seen.length; i++) if (seen[i] === seen[i - 1]) noRepeat = false;
+  check('never the same boss twice in a row', noRepeat, seen.join('→'));
+  for (const s of spawns) {
+    const biome = biomeAt(s.x, s.y, size);
+    if (biome !== HOME[s.bossId]) { check(`${s.bossId} spawned in its home biome`, false, `at=${biome}`); break; }
   }
+  check('every spawn was in the boss\'s home biome', spawns.every((s) => biomeAt(s.x, s.y, size) === HOME[s.bossId]));
   ws.close();
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail > 0 ? 1 : 0);

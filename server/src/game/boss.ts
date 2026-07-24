@@ -9,39 +9,42 @@ import { applyDamage, type DamageSource } from './combat.js';
 import { telemetry } from '../db/telemetry.js';
 import { grantHat, randomHatOfTier } from './hats.js';
 
-function scheduleNext(world: World, bossType: BossId, now: number): void {
-  const cfg = getBalance().bosses[bossType];
-  world.bossTimers.set(bossType, { nextSpawnAt: now + cfg.spawnIntervalSec * 1000, warned: false, pos: { x: 0, y: 0 } });
-}
-
-function liveBossOfType(world: World, bossType: BossId): Boss | null {
-  for (const b of world.bosses.values()) {
-    if (b.bossType === bossType) return b;
-  }
-  return null;
+/**
+ * Picks the next boss of the rotation at random (never the same one twice in
+ * a row) and arms its timer using that boss's own spawn interval.
+ */
+function scheduleNext(world: World, now: number, exclude: BossId | null): void {
+  const bal = getBalance();
+  let ids = Object.keys(bal.bosses) as BossId[];
+  if (exclude && ids.length > 1) ids = ids.filter((id) => id !== exclude);
+  const bossType = ids[Math.floor(Math.random() * ids.length)];
+  world.bossRotation = {
+    bossType,
+    nextSpawnAt: now + bal.bosses[bossType].spawnIntervalSec * 1000,
+    warned: false,
+    pos: { x: 0, y: 0 },
+  };
 }
 
 export function updateBossTimers(world: World, now: number): void {
+  // one boss at a time: while one is alive the rotation is paused
+  if (world.bosses.size > 0) return;
+  if (!world.bossRotation) scheduleNext(world, now, null);
   const bal = getBalance();
-  for (const [bossType, cfg] of Object.entries(bal.bosses) as [BossId, (typeof bal.bosses)[BossId]][]) {
-    if (liveBossOfType(world, bossType)) continue;
-    let timer = world.bossTimers.get(bossType);
-    if (!timer) {
-      timer = { nextSpawnAt: now + cfg.spawnIntervalSec * 1000, warned: false, pos: { x: 0, y: 0 } };
-      world.bossTimers.set(bossType, timer);
-    }
-    // live balance tuning: a shortened spawn interval takes effect immediately
-    const maxAt = now + cfg.spawnIntervalSec * 1000;
-    if (timer.nextSpawnAt > maxAt) timer.nextSpawnAt = maxAt;
+  const rot = world.bossRotation!;
+  const cfg = bal.bosses[rot.bossType];
 
-    if (!timer.warned && now >= timer.nextSpawnAt - cfg.warnSec * 1000) {
-      timer.pos = randomPointInBiome(cfg.biome, bal.world.size, 250);
-      timer.warned = true;
-      world.broadcast({ e: 'bossWarn', boss: cfg.name, bossId: bossType, x: timer.pos.x, y: timer.pos.y, inSec: cfg.warnSec });
-    }
-    if (now >= timer.nextSpawnAt) {
-      spawnBoss(world, bossType, timer.pos.x, timer.pos.y, now, cfg.biome);
-    }
+  // live balance tuning: a shortened spawn interval takes effect immediately
+  const maxAt = now + cfg.spawnIntervalSec * 1000;
+  if (rot.nextSpawnAt > maxAt) rot.nextSpawnAt = maxAt;
+
+  if (!rot.warned && now >= rot.nextSpawnAt - cfg.warnSec * 1000) {
+    rot.pos = randomPointInBiome(cfg.biome, bal.world.size, 250);
+    rot.warned = true;
+    world.broadcast({ e: 'bossWarn', boss: cfg.name, bossId: rot.bossType, x: rot.pos.x, y: rot.pos.y, inSec: cfg.warnSec });
+  }
+  if (now >= rot.nextSpawnAt) {
+    spawnBoss(world, rot.bossType, rot.pos.x, rot.pos.y, now, cfg.biome);
   }
 }
 
@@ -114,7 +117,7 @@ export function onBossKilled(world: World, boss: Boss, src: DamageSource, now: n
     }
   }
   world.broadcast({ e: 'bossKilled', boss: cfg.name, bossId: boss.bossType, rewards });
-  scheduleNext(world, boss.bossType, now);
+  scheduleNext(world, now, boss.bossType);
 }
 
 function pickTarget(world: World, boss: Boss): Player | null {
@@ -271,7 +274,7 @@ function updateBoss(world: World, boss: Boss, dt: number, now: number): void {
   if (now >= boss.despawnAt) {
     world.removeEntity(boss);
     world.broadcast({ e: 'bossGone', boss: cfg.name, bossId: boss.bossType });
-    scheduleNext(world, boss.bossType, now);
+    scheduleNext(world, now, boss.bossType);
     return;
   }
 
