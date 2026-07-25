@@ -15,8 +15,9 @@ import { tryLootbox, tryEquipHat, recomputeMaxHp } from '../game/hats.js';
 import { tryPrestige } from '../game/prestige.js';
 import { tr, normalizeLang, type Lang } from '../game/i18n.js';
 import { telemetry } from '../db/telemetry.js';
-import { accountExists, login, register, loginYandex, saveProgress, claimDailyReward, type Account } from '../db/accounts.js';
+import { accountExists, login, register, loginYandex, loginCrazyGames, saveProgress, claimDailyReward, type Account } from '../db/accounts.js';
 import { verifyYandexSignature } from '../game/yandex-auth.js';
+import { verifyCrazyGamesToken } from '../game/crazygames-auth.js';
 import { adminRouter } from '../admin/stats.js';
 
 const sessionIds = new WeakMap<Player, number>();
@@ -170,7 +171,19 @@ export function startServer(worlds: WorldManager): http.Server {
             || queue.some((e) => e.account?.name.toLowerCase() === acc);
         };
         try {
-          if (typeof msg.yandexId === 'string' && msg.yandexId) {
+          if (typeof msg.cgToken === 'string' && msg.cgToken) {
+            // CrazyGames: identity proven by the signed user token
+            const cgUser = verifyCrazyGamesToken(msg.cgToken);
+            if (!cgUser) {
+              ws.send(encode({ t: 'reject', reason: tr(lang, 'authError') }));
+              return;
+            }
+            account = loginCrazyGames(cgUser.userId, cgUser.username || name, bal.player.startMoney);
+            if (isLive(account.name)) {
+              ws.send(encode({ t: 'reject', reason: tr(lang, 'accountInGame') }));
+              return;
+            }
+          } else if (typeof msg.yandexId === 'string' && msg.yandexId) {
             // Yandex Games Player API: identity proven by the signed player id
             if (!verifyYandexSignature(msg.yandexId, msg.yandexSig)) {
               ws.send(encode({ t: 'reject', reason: tr(lang, 'authError') }));

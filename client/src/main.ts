@@ -17,7 +17,11 @@ import { Minimap } from './ui/minimap.js';
 import { Leaderboard } from './ui/leaderboard.js';
 import { Settings } from './ui/settings.js';
 import { t, tList, lang, setLang, applyStaticI18n, bossName } from './ui/i18n.js';
-import { initYandex, yandex, promptYandexAuth, gameReady, gameplayStart, gameplayStop, showInterstitial } from './net/yandex.js';
+import {
+  initPlatform, onPlatform, platformBodyClass, identity as platformIdentity, promptAuth,
+  wantsInstantPlay, invitedRoom, gameReady, gameplayStart, gameplayStop, showInterstitial,
+  happytime, enterRoom, leaveRoom,
+} from './net/platform.js';
 import { audio } from './game/audio.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -69,12 +73,12 @@ nameInput.focus();
 
 let inGame = false;
 
-// On the Yandex platform, gate play behind the Player-API login (a user gesture),
-// then fall through to the normal start with the Yandex name pre-filled.
+// On a portal, gate play behind the platform login (a user gesture), then fall
+// through to the normal start with the platform name pre-filled.
 function tryStart(register: boolean): void {
-  if (yandex.available && !yandex.identity()) {
-    promptYandexAuth().then((ok) => {
-      if (ok) nameInput.value = yandex.identity()!.name || nameInput.value;
+  if (onPlatform() && !platformIdentity()) {
+    promptAuth().then((ok) => {
+      if (ok) nameInput.value = platformIdentity()!.name || nameInput.value;
       doStart(register);
     });
     return;
@@ -96,28 +100,29 @@ function doStart(register: boolean): void {
   localStorage.setItem('farmclash-name', name);
   $('conn-error').textContent = '';
   $('name-screen').classList.add('hidden');
-  const serverPref = Number(localStorage.getItem('farmclash-server')) || undefined;
+  // a followed invite must land in the friend's world, overriding any saved pick
+  const serverPref = invitedRoom() ?? (Number(localStorage.getItem('farmclash-server')) || undefined);
   startGame(name, password, register, serverPref).catch((err) => {
     console.error(err);
     showError(t('menu.startFailed'));
   });
 }
 
-// Yandex Games bootstrap: init the SDK (no-op on the standalone site), signal
-// "loaded", hide site/TG/share links on-platform, and auto-join a logged-in player.
-initYandex().then(() => {
+// Portal bootstrap: init the SDK (no-op on the standalone site), signal
+// "loaded", hide site/TG/share links on-platform, and auto-join when the
+// platform already knows the player or sent us in through an invite.
+initPlatform().then(() => {
   gameReady();
   // the SDK may have switched the language (rule 2.14) — re-sync the RU/EN toggle
   for (const btn of document.querySelectorAll<HTMLButtonElement>('.lang-switch button')) {
     btn.classList.toggle('active', btn.dataset.lang === lang);
   }
-  if (!yandex.available) return;
-  document.body.classList.add('on-yandex');
-  const id = yandex.identity();
-  if (id) {
-    nameInput.value = id.name || nameInput.value;
-    doStart(false);
-  }
+  if (!onPlatform()) return;
+  document.body.classList.add(platformBodyClass());
+  const id = platformIdentity();
+  if (id) nameInput.value = id.name || nameInput.value;
+  // an invite link / instant-multiplayer launch must land straight in gameplay
+  if (id || wantsInstantPlay()) doStart(false);
 });
 
 $('play-btn').onclick = () => tryStart(false);
@@ -153,6 +158,7 @@ $('retry-btn').onclick = () => {
 async function startGame(name: string, password: string, register: boolean, server?: number): Promise<void> {
   const conn = new Connection(name, password, register, server);
   conn.onClose = (reason) => {
+    leaveRoom();
     if (inGame) {
       // hard reload keeps state clean after a real session
       sessionStorage.setItem('farmclash-msg', reason);
@@ -170,6 +176,7 @@ async function startGame(name: string, password: string, register: boolean, serv
   conn.onWelcome = (w) => {
     inGame = true;
     $('queue-screen').classList.add('hidden');
+    enterRoom(w.server); // portal Join/Invite: friends can join this world
     initGame(conn, w).catch((err) => {
       console.error(err);
       showError(t('menu.initFailed'));
@@ -405,6 +412,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
           hud.notice(t('ev.hatDup', { name: escapeHtml(ev.name), gold: ev.gold }));
         } else {
           audio.reward();
+          happytime();
           hud.bossBanner(t('ev.hatNewBanner', { name: escapeHtml(ev.name) }));
           setTimeout(() => hud.bossBanner(null), 5000);
           hud.notice(t('ev.hatNew', { name: escapeHtml(ev.name) }));
@@ -421,6 +429,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         const name = ev.weapon ? (ev.tier ? t('wname.' + ev.weapon) : ev.weapon) : '';
         if (ev.result === 'unique') {
           audio.reward();
+          happytime();
           const color = TIER_COLORS[ev.tier ?? 'epic'];
           hud.bossBanner(t('ev.wlootUnique', { name: escapeHtml(name), color }));
           setTimeout(() => hud.bossBanner(null), 5000);
@@ -444,6 +453,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       }
       case 'level': {
         audio.level();
+        happytime(); // portal celebration on a real achievement
         effects.levelBurst(dispX, dispY);
         const maxed = ev.level >= ev.max;
         hud.notice(maxed ? t('ev.levelMax', { n: ev.level }) : t('ev.level', { n: ev.level }));
@@ -475,6 +485,8 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         effects.telegraph(ev.x, ev.y, ev.angle, ev.range, ev.arc, ev.sec);
         break;
       case 'bossKilled': {
+        const myName = views.get(welcome.id)?.state.name ?? '';
+        if (myName && ev.rewards.some((r) => r.name === myName)) happytime();
         const top = ev.rewards.slice(0, 3).map((r) => `${escapeHtml(r.name)}: +${r.amount}`).join(' · ');
         hud.bossBanner(t('ev.bossKilled', { boss: bossName(ev.bossId, ev.boss), top }));
         setTimeout(() => hud.bossBanner(null), 8000);

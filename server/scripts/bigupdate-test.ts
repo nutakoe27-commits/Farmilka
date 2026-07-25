@@ -199,9 +199,14 @@ for (const type of Object.keys(bal.bosses) as BossId[]) bossAbilityProbe(type);
   let now = 2_000_000;
   for (let i = 0; i < 20; i++) { now += 300; updateMobs(world, 0.3, now); }
   const ignored = wolf.state !== 'chase';
+  // control case: with the blade off it must aggro again. Reset the mob to a
+  // clean idle at its home first — 'return' only re-scans once it gets home,
+  // which would otherwise make this leg timing-dependent.
   p.equipped = 'fists';
+  wolf.state = 'idle';
+  world.moveEntity(wolf, wolf.homeX, wolf.homeY);
   wolf.nextThinkAt = 0;
-  for (let i = 0; i < 20 && wolf.state !== 'chase'; i++) { now += 300; updateMobs(world, 0.3, now); }
+  for (let i = 0; i < 40 && wolf.state !== 'chase'; i++) { now += 300; updateMobs(world, 0.3, now); }
   check('tamer_blade: mobs ignore the wielder (but chase without it)', ignored && wolf.state === 'chase', `ignored=${ignored} then=${wolf.state}`);
 }
 {

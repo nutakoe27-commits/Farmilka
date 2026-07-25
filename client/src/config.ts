@@ -6,8 +6,19 @@
 // Override at build time with VITE_SERVER_ORIGIN (e.g. https://farmclash.online).
 
 const SELF_HOSTS = ['farmclash.online', 'www.farmclash.online', 'localhost', '127.0.0.1'];
-const OVERRIDE = ((import.meta as unknown as { env?: Record<string, string> }).env?.VITE_SERVER_ORIGIN || '').trim();
+const ENV = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
+const OVERRIDE = (ENV.VITE_SERVER_ORIGIN || '').trim();
 const DEFAULT_ORIGIN = 'https://farmclash.online';
+
+/**
+ * Which portal this build targets, set at build time with VITE_PLATFORM
+ * ('yandex' | 'crazygames'). Empty = the standalone site. Only the matching
+ * SDK is ever loaded, so each archive stays clean of the other portal's code.
+ */
+export type PlatformId = '' | 'yandex' | 'crazygames';
+const RAW_PLATFORM = (ENV.VITE_PLATFORM || '').trim().toLowerCase();
+export const PLATFORM: PlatformId =
+  RAW_PLATFORM === 'crazygames' ? 'crazygames' : RAW_PLATFORM === 'yandex' ? 'yandex' : '';
 
 const onSelf = SELF_HOSTS.includes(location.hostname);
 const useRelative = onSelf && !OVERRIDE;

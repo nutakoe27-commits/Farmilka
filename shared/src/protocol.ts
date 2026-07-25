@@ -111,7 +111,7 @@ export interface InputMsg {
 }
 
 export type ClientMsg =
-  | { t: 'join'; name: string; password?: string; register?: boolean; server?: number; lang?: 'ru' | 'en'; yandexId?: string; yandexName?: string; yandexSig?: string }
+  | { t: 'join'; name: string; password?: string; register?: boolean; server?: number; lang?: 'ru' | 'en'; yandexId?: string; yandexName?: string; yandexSig?: string; cgToken?: string }
   | InputMsg
   | { t: 'buy'; item: WeaponId | BuildingId | 'food' }
   | { t: 'equip'; weapon: WeaponId }

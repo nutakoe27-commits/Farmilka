@@ -1,7 +1,7 @@
 import { decode, encode, type ClientMsg, type ServerMsg, type WelcomeMsg, type SnapshotMsg, type GameEvent, type EntityState, type LeaderEntry } from '@shared/protocol.js';
 import { decodeSnapshot } from '@shared/snapshot-codec.js';
 import { lang, t } from '../ui/i18n.js';
-import { yandex } from './yandex.js';
+import { identity as platformIdentity } from './platform.js';
 import { WS_URL } from '../config.js';
 
 export interface Remote {
@@ -44,8 +44,11 @@ export class Connection {
     this.ws = new WebSocket(WS_URL);
     this.ws.binaryType = 'arraybuffer';
     this.ws.onopen = () => {
-      const y = yandex.identity();
-      this.send({ t: 'join', name, password: password || undefined, register: register || undefined, server, lang, yandexId: y?.id, yandexName: y?.name, yandexSig: y?.sig });
+      const id = platformIdentity();
+      this.send({
+        t: 'join', name, password: password || undefined, register: register || undefined, server, lang,
+        yandexId: id?.yandexId, yandexName: id?.name, yandexSig: id?.yandexSig, cgToken: id?.cgToken,
+      });
     };
     this.ws.onclose = () => this.onClose(this.closeReason ?? t('net.lost'));
     this.ws.onerror = () => this.onClose(t('net.error'));

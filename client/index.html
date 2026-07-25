@@ -43,7 +43,9 @@
     .lang-switch button { cursor: pointer; border: none; background: #0d0f14; color: #8a8fa3; font-size: 12px; font-weight: 700; padding: 5px 12px; }
     .lang-switch button.active { background: #2ea043; color: #fff; }
     .menu-lang { display: flex; justify-content: center; margin-top: 14px; }
-    body.on-yandex .yandex-hide { display: none !important; }
+    /* portals forbid links off-site: hide site/Telegram/share on any of them */
+    body.on-yandex .yandex-hide,
+    body.on-crazygames .yandex-hide { display: none !important; }
 
     /* HUD */
     #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }

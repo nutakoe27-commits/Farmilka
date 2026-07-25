@@ -86,26 +86,39 @@ function rowToAccount(row: AccountRow): Account {
 
 const ACC_COLS = 'name, money, weapons, hats, hat, prestige, level, food, created_ts';
 
+/** Account columns that hold a third-party portal's player id. */
+type PlatformIdColumn = 'yandex_id' | 'cg_id';
+
 /**
- * Logs in (or transparently creates) an account tied to a Yandex Games player
- * id. No password — identity is proven by the platform's signed player id
- * (verified upstream in the socket handler). The in-game name comes from the
- * Yandex profile, made unique on first creation.
+ * Logs in (or transparently creates) an account tied to a portal player id.
+ * No password — identity is proven by the platform (signature/token verified
+ * upstream in the socket handler). The in-game name comes from the portal
+ * profile, made unique on first creation.
  */
-export function loginYandex(yandexId: string, displayName: string, startMoney = 0): Account {
+function loginPlatform(column: PlatformIdColumn, platformId: string, displayName: string, startMoney = 0): Account {
   const db = getDb();
-  const found = db.prepare(`SELECT ${ACC_COLS} FROM accounts WHERE yandex_id = ?`).get(yandexId) as AccountRow | undefined;
+  const found = db.prepare(`SELECT ${ACC_COLS} FROM accounts WHERE ${column} = ?`).get(platformId) as AccountRow | undefined;
   if (found) return rowToAccount(found);
 
   const now = Date.now();
   const salt = crypto.randomBytes(16).toString('hex');
-  const passHash = crypto.randomBytes(32).toString('hex'); // unusable — Yandex accounts never log in by password
-  let base = (displayName || 'Игрок').trim().slice(0, 16) || 'Игрок';
+  const passHash = crypto.randomBytes(32).toString('hex'); // unusable — portal accounts never log in by password
+  const base = (displayName || 'Игрок').trim().slice(0, 16) || 'Игрок';
   let name = base;
   for (let i = 2; accountExists(name); i++) name = `${base.slice(0, 13)}#${i}`; // dodge name-uniqueness clashes
-  db.prepare('INSERT INTO accounts (name, pass_hash, salt, money, weapons, created_ts, last_seen_ts, yandex_id) VALUES (?,?,?,?,?,?,?,?)')
-    .run(name, passHash, salt, startMoney, JSON.stringify(['fists']), now, now, yandexId);
+  db.prepare(`INSERT INTO accounts (name, pass_hash, salt, money, weapons, created_ts, last_seen_ts, ${column}) VALUES (?,?,?,?,?,?,?,?)`)
+    .run(name, passHash, salt, startMoney, JSON.stringify(['fists']), now, now, platformId);
   return { name, money: startMoney, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now };
+}
+
+/** Yandex Games player id → account. */
+export function loginYandex(yandexId: string, displayName: string, startMoney = 0): Account {
+  return loginPlatform('yandex_id', yandexId, displayName, startMoney);
+}
+
+/** CrazyGames user id (from the verified user token) → account. */
+export function loginCrazyGames(cgId: string, displayName: string, startMoney = 0): Account {
+  return loginPlatform('cg_id', cgId, displayName, startMoney);
 }
 
 const DAY_MS = 86_400_000;
