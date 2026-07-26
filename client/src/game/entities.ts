@@ -3,6 +3,7 @@ import type { EntityState } from '@shared/protocol.js';
 import { GLOW } from './textures.js';
 import { drawMob } from './mob-art.js';
 import { prestigeTier, type PrestigeCfg } from '@shared/prestige.js';
+import { bossLabel } from '../ui/i18n.js';
 
 let PRESTIGE_CFG: PrestigeCfg | null = null;
 export function setPrestigeCfg(cfg: PrestigeCfg): void {
@@ -41,12 +42,12 @@ const MOB_STYLE: Record<string, { color: number; shape: 'blob' | 'beast' | 'gole
   crystal_golem: { color: 0x7fd4e8, shape: 'golem', glow: 0x4fd8c8 },
 };
 
-const BOSS_STYLE: Record<string, { body: number; glow: number; ring: number; label: string }> = {
-  champion: { body: 0x7a2f9e, glow: 0xb565d8, ring: 0x9b4fc4, label: '💀 ЧЕМПИОН' },
-  frost_titan: { body: 0x2a5a8a, glow: 0x9fd8ff, ring: 0x5aa8e0, label: '🧊 ЛЕДЯНОЙ ИСПОЛИН' },
-  sand_worm: { body: 0x8a6a2a, glow: 0xe8c878, ring: 0xc49a4a, label: '🐛 ПЕСЧАНЫЙ ЧЕРВЬ' },
-  shadow_lord: { body: 0x241436, glow: 0x8a2be2, ring: 0x5a2a8a, label: '👁 ВЛАДЫКА ТЕНЕЙ' },
-  crystal_queen: { body: 0x1a6a70, glow: 0x6ee8e0, ring: 0x4fd8c8, label: '💎 КРИСТАЛЬНАЯ КОРОЛЕВА' },
+const BOSS_STYLE: Record<string, { body: number; glow: number; ring: number; icon: string }> = {
+  champion: { body: 0x7a2f9e, glow: 0xb565d8, ring: 0x9b4fc4, icon: '💀' },
+  frost_titan: { body: 0x2a5a8a, glow: 0x9fd8ff, ring: 0x5aa8e0, icon: '🧊' },
+  sand_worm: { body: 0x8a6a2a, glow: 0xe8c878, ring: 0xc49a4a, icon: '🐛' },
+  shadow_lord: { body: 0x241436, glow: 0x8a2be2, ring: 0x5a2a8a, icon: '👁' },
+  crystal_queen: { body: 0x1a6a70, glow: 0x6ee8e0, ring: 0x4fd8c8, icon: '💎' },
 };
 
 const BUILDING_COLORS: Record<string, number> = { farm: 0x3f8f4a, mine: 0x5b6478, turret: 0x8a5fb0 };
@@ -199,7 +200,8 @@ export class EntityView {
           ]).fill(bs.ring);
         }
         g.circle(r * 0.35, 0, r * 0.14).fill(0xffe08a);
-        const name = new Text({ text: bs.label, style: { fontFamily: 'system-ui', fontSize: 16, fontWeight: '800', fill: 0xf0c8ff, stroke: { color: 0x000000, width: 4 } } });
+        const label = `${bs.icon} ${bossLabel(s.bossType ?? 'champion')}`;
+        const name = new Text({ text: label, style: { fontFamily: 'system-ui', fontSize: 16, fontWeight: '800', fill: 0xf0c8ff, stroke: { color: 0x000000, width: 4 } } });
         name.anchor.set(0.5);
         name.position.set(0, -r - 30);
         this.top.addChild(name);

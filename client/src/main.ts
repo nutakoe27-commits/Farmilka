@@ -431,7 +431,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
           audio.reward();
           happytime();
           const color = TIER_COLORS[ev.tier ?? 'epic'];
-          hud.bossBanner(t('ev.wlootUnique', { name: escapeHtml(name), color }));
+          hud.bossBanner(t('ev.wlootUniqueBanner', { name })); // banner is plain text
           setTimeout(() => hud.bossBanner(null), 5000);
           hud.notice(t('ev.wlootUnique', { name: escapeHtml(name), color }));
         } else if (ev.result === 'weapon') {

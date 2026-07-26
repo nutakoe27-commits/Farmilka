@@ -16,8 +16,16 @@ Covers are generated from vector sources by `make-crazygames-covers.mjs`, so if
 the portal asks for different pixel sizes they can be re-rendered exactly —
 change the numbers at the bottom of that script and re-run it.
 
-**Still needed from the portal:** a gameplay preview video (hover preview).
-Record ~15–30 s of live play — boss fight, a lootbox opening, a PvP kill.
+| `farmclash-preview.mp4` | 28 s gameplay preview, 1920×1080 (hover preview) |
+| `farmclash-preview-vertical.mp4` | the same cut at 9:16, for mobile/social |
+
+The preview is recorded from real play, not mocked: `record-preview.mjs` drives
+a browser against a local server started with `video-rig-balance.json` (denser
+mobs, a fast boss, a guaranteed legendary crate) and steers the hero by reading
+the minimap canvas, so it stays off the world edge and walks into the boss
+fight. The take is then cut into three beats — mob combat, the unique-weapon
+reveal, the boss fight — and encoded to H.264. It has no audio: headless
+Chromium has no audio device, and the portal plays hover previews muted.
 
 ## Store text (English)
 

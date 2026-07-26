@@ -9,7 +9,7 @@ import { spawnMob, updateMobs } from '../src/game/mobs.js';
 import { performAttack, updateProjectiles, applyDamage } from '../src/game/combat.js';
 import { tryBuyWeapon, trySellWeapon, tryWeaponLootbox } from '../src/game/economy.js';
 import { tryLootbox } from '../src/game/hats.js';
-import type { Player } from '../src/game/entities.js';
+import type { Player, MobState } from '../src/game/entities.js';
 import type { WeaponId, BossId } from '@shared/types.js';
 
 loadBalance();
@@ -203,7 +203,7 @@ for (const type of Object.keys(bal.bosses) as BossId[]) bossAbilityProbe(type);
   // clean idle at its home first — 'return' only re-scans once it gets home,
   // which would otherwise make this leg timing-dependent.
   p.equipped = 'fists';
-  wolf.state = 'idle';
+  wolf.state = 'idle' as MobState; // keep the union type — it is compared to 'chase' below
   world.moveEntity(wolf, wolf.homeX, wolf.homeY);
   wolf.nextThinkAt = 0;
   for (let i = 0; i < 40 && wolf.state !== 'chase'; i++) { now += 300; updateMobs(world, 0.3, now); }

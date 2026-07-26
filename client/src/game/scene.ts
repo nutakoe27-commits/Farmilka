@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Text } from 'pixi.js';
 import { lerp } from '@shared/math.js';
 import { biomeRect, BIOME_NAMES, type BiomeId } from '@shared/biomes.js';
+import { biomeLabel } from '../ui/i18n.js';
 
 export const BIOME_COLORS: Record<BiomeId, number> = {
   normal: 0x131c14,
@@ -105,7 +106,7 @@ export class Scene {
     for (const b of biomes) {
       const r = biomeRect(b, size);
       const label = new Text({
-        text: BIOME_NAMES[b],
+        text: biomeLabel(b, BIOME_NAMES[b]),
         style: { fontFamily: 'system-ui', fontSize: 64, fontWeight: '800', fill: BIOME_ACCENTS[b] },
       });
       label.alpha = 0.13;

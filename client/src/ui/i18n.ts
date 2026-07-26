@@ -139,6 +139,7 @@ const RU: Dict = {
   'ev.lootNothing': '🎁 Лутбокс: пусто… не повезло',
   'ev.lootFood': '🎁 Лутбокс: <b style="color:#7ee787">+{n} еды!</b>',
   'ev.wlootUnique': '⚔️ Сундук: <b style="color:{color}">{name}</b> — уникальное оружие!',
+  'ev.wlootUniqueBanner': '⚔️ {name} — уникальное оружие!',
   'ev.wlootWeapon': '⚔️ Сундук: выпало оружие — <b>{name}</b>',
   'ev.wlootGold': '⚔️ Сундук: <b style="color:#ffd76e">+{gold} золота</b>',
   'ev.wlootNothing': '⚔️ Сундук: пусто… не повезло',
@@ -330,6 +331,7 @@ const EN: Dict = {
   'ev.lootNothing': '🎁 Lootbox: empty… no luck',
   'ev.lootFood': '🎁 Lootbox: <b style="color:#7ee787">+{n} food!</b>',
   'ev.wlootUnique': '⚔️ Crate: <b style="color:{color}">{name}</b> — a unique weapon!',
+  'ev.wlootUniqueBanner': '⚔️ {name} — a unique weapon!',
   'ev.wlootWeapon': '⚔️ Crate: you got a weapon — <b>{name}</b>',
   'ev.wlootGold': '⚔️ Crate: <b style="color:#ffd76e">+{gold} gold</b>',
   'ev.wlootNothing': '⚔️ Crate: empty… no luck',
@@ -417,6 +419,36 @@ export function t(key: string, params?: Record<string, string | number>): string
 export function tList(key: string): string[] {
   const v = DICTS[lang][key] ?? DICTS.ru[key];
   return Array.isArray(v) ? v : [];
+}
+
+// Biome names painted onto the ground. Localised here rather than taken from
+// the shared BIOME_NAMES map, which is Russian-only.
+const BIOME_EN: Record<string, string> = {
+  normal: 'Plains',
+  snow: 'Snowlands',
+  desert: 'Desert',
+  mystic_west: 'Dark Forest',
+  mystic_east: 'Crystal Wastes',
+};
+
+/** Ground label for a biome in the current UI language. */
+export function biomeLabel(id: string, ruName: string): string {
+  return lang === 'en' ? BIOME_EN[id] ?? ruName : ruName;
+}
+
+// Boss names shown on the world label above each boss. Kept here (not in
+// balance.json) because the label must follow the UI language, not the server.
+const BOSS_RU: Record<string, string> = {
+  champion: 'ЧЕМПИОН',
+  frost_titan: 'ЛЕДЯНОЙ ИСПОЛИН',
+  sand_worm: 'ПЕСЧАНЫЙ ЧЕРВЬ',
+  shadow_lord: 'ВЛАДЫКА ТЕНЕЙ',
+  crystal_queen: 'КРИСТАЛЬНАЯ КОРОЛЕВА',
+};
+
+/** Uppercase boss name in the current UI language, for the in-world label. */
+export function bossLabel(id: string): string {
+  return (lang === 'en' ? BOSS_EN[id] ?? id : BOSS_RU[id] ?? id).toUpperCase();
 }
 
 // English boss names (RU names come from balance.json via the event payload).
