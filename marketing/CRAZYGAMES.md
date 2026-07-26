@@ -11,13 +11,12 @@ Everything needed for the developer portal, plus what the build does on-platform
 | `crazygames-cover-square.png` | 1080×1080 (1:1) square cover |
 | `screen-1-combat.png` … `screen-4-buildings.png` | desktop gameplay stills |
 | `mobile-1-combat.png` … `mobile-3-shop.png` | mobile gameplay stills |
+| `farmclash-preview.mp4` | 28 s gameplay preview, 1920×1080 (hover preview) |
+| `farmclash-preview-vertical.mp4` | the same cut at 9:16, for mobile/social |
 
 Covers are generated from vector sources by `make-crazygames-covers.mjs`, so if
 the portal asks for different pixel sizes they can be re-rendered exactly —
 change the numbers at the bottom of that script and re-run it.
-
-| `farmclash-preview.mp4` | 28 s gameplay preview, 1920×1080 (hover preview) |
-| `farmclash-preview-vertical.mp4` | the same cut at 9:16, for mobile/social |
 
 The preview is recorded from real play, not mocked: `record-preview.mjs` drives
 a browser against a local server started with `video-rig-balance.json` (denser
