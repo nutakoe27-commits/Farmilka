@@ -10,12 +10,12 @@ import { writeFileSync } from 'node:fs';
 
 const OUT = '/tmp/claude-0/-home-user-Farmilka/9e0a0f6e-42bb-5164-af32-dc77ab722252/scratchpad';
 const BASE = 'http://localhost:3993/';
-const W = 1920, H = 1080;
+const W = 1280, H = 720;   // upscaled at encode time; 720p renders ~3x faster here
 const CX = W / 2, CY = H / 2;
 
 const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium',
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-webgl', '--hide-scrollbars'],
+  args: ['--disable-gpu-vsync', '--disable-frame-rate-limit', '--enable-webgl', '--hide-scrollbars'],
 });
 const ctx = await browser.newContext({
   viewport: { width: W, height: H },
@@ -97,7 +97,7 @@ async function driveTo(target, ms, { attack = true, spin = false, stopAt = 0.02 
       spinA += 0.5;
       await aimAt(spinA);
     }
-    await sleep(120);
+    await sleep(100);
   }
   if (attack) await page.mouse.up();
   await releaseAll();
@@ -114,12 +114,12 @@ beat('start');
 const CENTER = { x: 0.5, y: 0.5 };
 
 // --- 1. head for the middle of the map, killing whatever is on the way ---
-await driveTo(CENTER, 7000, { spin: true });
+await driveTo(CENTER, 17000, { spin: true });
 beat('recentred');
 
 // --- 2. orbit the centre so the fight stays framed and away from the edges ---
-await driveTo({ x: 0.56, y: 0.44 }, 3000, { spin: true });
-await driveTo({ x: 0.44, y: 0.56 }, 3000, { spin: true });
+await driveTo({ x: 0.56, y: 0.44 }, 7500, { spin: true });
+await driveTo({ x: 0.44, y: 0.56 }, 7500, { spin: true });
 beat('mobs-done');
 
 // --- 3. shop: buy a weapon that reads well on video ---
@@ -143,19 +143,19 @@ await page.keyboard.press('Digit2');
 await page.waitForTimeout(300);
 
 // --- 5. show off the new kit near the centre ---
-await driveTo({ x: 0.52, y: 0.52 }, 4000, { spin: true });
+await driveTo({ x: 0.52, y: 0.52 }, 10000, { spin: true });
 beat('showing-off');
 
 // --- 6. hunt the boss: walk it down as soon as the minimap shows it ---
 const hunt = Date.now();
 let sawBoss = false;
-while (Date.now() - hunt < 50_000) {
+while (Date.now() - hunt < 110_000) {
   const m = await readMap();
   if (m?.boss) {
     if (!sawBoss) { sawBoss = true; beat('boss-spotted'); }
-    await driveTo('boss', 3000, { spin: false });
+    await driveTo('boss', 4000, { spin: false });
   } else {
-    await driveTo(CENTER, 2500, { spin: true }); // keep the frame busy until it shows up
+    await driveTo(CENTER, 4000, { spin: true }); // keep the frame busy until it shows up
   }
 }
 beat('end');

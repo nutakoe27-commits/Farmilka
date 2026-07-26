@@ -16,7 +16,7 @@ import { Shop } from './ui/shop.js';
 import { Minimap } from './ui/minimap.js';
 import { Leaderboard } from './ui/leaderboard.js';
 import { Settings } from './ui/settings.js';
-import { t, tList, lang, setLang, applyStaticI18n, bossName } from './ui/i18n.js';
+import { t, tList, lang, setLang, applyStaticI18n, bossName, hatName } from './ui/i18n.js';
 import {
   initPlatform, onPlatform, platformBodyClass, identity as platformIdentity, promptAuth,
   wantsInstantPlay, invitedRoom, gameReady, gameplayStart, gameplayStop, showInterstitial,
@@ -408,14 +408,15 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       }
       case 'hat': {
+        const hName = hatName(ev.hat, ev.name);
         if (ev.dup) {
-          hud.notice(t('ev.hatDup', { name: escapeHtml(ev.name), gold: ev.gold }));
+          hud.notice(t('ev.hatDup', { name: escapeHtml(hName), gold: ev.gold }));
         } else {
           audio.reward();
           happytime();
-          hud.bossBanner(t('ev.hatNewBanner', { name: escapeHtml(ev.name) }));
+          hud.bossBanner(t('ev.hatNewBanner', { name: hName }));
           setTimeout(() => hud.bossBanner(null), 5000);
-          hud.notice(t('ev.hatNew', { name: escapeHtml(ev.name) }));
+          hud.notice(t('ev.hatNew', { name: escapeHtml(hName) }));
         }
         break;
       }

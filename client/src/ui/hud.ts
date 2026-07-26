@@ -1,7 +1,7 @@
 import type { SelfState } from '@shared/protocol.js';
 import type { WeaponId } from '@shared/types.js';
 import { WEAPON_ICONS } from '../game/entities.js';
-import { t } from './i18n.js';
+import { t, weaponName } from './i18n.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -82,7 +82,7 @@ export class Hud {
     self.weapons.forEach((w, i) => {
       const slot = document.createElement('div');
       slot.className = 'slot' + (w === self.equipped ? ' active' : '');
-      slot.innerHTML = `<span class="key">${i + 1}</span><span class="icon">${WEAPON_ICONS[w] ?? ''}</span><span>${w}</span>`;
+      slot.innerHTML = `<span class="key">${i + 1}</span><span class="icon">${WEAPON_ICONS[w] ?? ''}</span><span>${weaponName(w)}</span>`;
       slot.style.pointerEvents = 'auto';
       slot.draggable = true;
       slot.onclick = () => this.onEquip(w);

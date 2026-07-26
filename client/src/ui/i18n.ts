@@ -421,6 +421,31 @@ export function tList(key: string): string[] {
   return Array.isArray(v) ? v : [];
 }
 
+// Hat names come from balance.json in Russian only, so the English build needs
+// its own table; anything missing falls back to the server-sent name.
+const HAT_EN: Record<string, string> = {
+  straw_hat: 'Straw Hat', cap: 'Cap', miner_helmet: "Miner's Helmet", bandana: 'Bandana',
+  chef_hat: "Chef's Hat", champion_crown: "Champion's Crown", shadow_hood: 'Shadow Hood',
+  crystal_circlet: 'Crystal Circlet', hunter_hood: "Hunter's Hood", skull_mask: 'Skull Mask',
+  dragon_helm: 'Dragon Helm', wizard_hat: 'Wizard Hat', titan_guard: 'Titan Guard',
+  golden_crown: 'Golden Crown', phoenix_plume: 'Phoenix Plume', slayer_crown: "Slayer's Crown",
+};
+
+/** Hat name in the current UI language. */
+export function hatName(id: string, ruName: string): string {
+  return lang === 'en' ? HAT_EN[id] ?? ruName : ruName;
+}
+
+/**
+ * Weapon label for the hotbar and shop. Unique weapons have proper names;
+ * ordinary ones use their id with underscores turned into spaces.
+ */
+export function weaponName(id: string): string {
+  const unique = t(`wname.${id}`);
+  if (!unique.startsWith('wname.')) return unique;
+  return id.replace(/_/g, ' ');
+}
+
 // Biome names painted onto the ground. Localised here rather than taken from
 // the shared BIOME_NAMES map, which is Russian-only.
 const BIOME_EN: Record<string, string> = {

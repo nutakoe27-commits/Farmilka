@@ -3,7 +3,7 @@ import type { WeaponId, BuildingId } from '@shared/types.js';
 import { WEAPON_ICONS, BUILDING_ICONS, HAT_EMOJI, TIER_NAMES, TIER_COLORS } from '../game/entities.js';
 import { prestigeTier } from '@shared/prestige.js';
 import { killsToNext } from '@shared/levels.js';
-import { t } from './i18n.js';
+import { t, hatName, weaponName } from './i18n.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -84,7 +84,7 @@ export class Shop {
       const stats = cfg.type === 'melee'
         ? t('shop.dmg', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate })
         : t('shop.dmgRanged', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate });
-      el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${t('note.' + id)}</div></div><div class="btns"><button class="buy">💰 ${cfg.price}</button><button class="sell hidden">${t('shop.sell')}</button></div>`;
+      el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${weaponName(id)}</div><div class="st">${stats}<br>${t('note.' + id)}</div></div><div class="btns"><button class="buy">💰 ${cfg.price}</button><button class="sell hidden">${t('shop.sell')}</button></div>`;
       (el.querySelector('.buy') as HTMLButtonElement).onclick = () => this.onBuy(id as WeaponId);
       (el.querySelector('.sell') as HTMLButtonElement).onclick = () => this.onSell(id as WeaponId);
       wg.appendChild(el);
@@ -100,7 +100,7 @@ export class Shop {
         ? t('shop.dmg', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate })
         : t('shop.dmgRanged', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate });
       const tierBadge = `<span class="tier-badge" style="background:${TIER_COLORS[cfg.tier!]};color:#0d0f14">${TIER_NAMES[cfg.tier!]}</span>`;
-      el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${t('wname.' + id)} ${tierBadge}</div><div class="st">${stats}<br><b style="color:${TIER_COLORS[cfg.tier!]}">${t('note.' + id)}</b><br>${t('shop.uniqueSrc')}</div></div><div class="btns"><button class="sell hidden">${t('shop.sell')}</button></div>`;
+      el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${weaponName(id)} ${tierBadge}</div><div class="st">${stats}<br><b style="color:${TIER_COLORS[cfg.tier!]}">${t('note.' + id)}</b><br>${t('shop.uniqueSrc')}</div></div><div class="btns"><button class="sell hidden">${t('shop.sell')}</button></div>`;
       (el.querySelector('.sell') as HTMLButtonElement).onclick = () => this.onSell(id as WeaponId);
       wg.appendChild(el);
     }
@@ -151,7 +151,7 @@ export class Shop {
       el.className = 'shop-item';
       el.dataset.hat = id;
       const fx = describeEffect(cfg.effect);
-      el.innerHTML = `<div><div class="nm">${HAT_EMOJI[id] ?? '🎩'} ${cfg.name} <span class="tier-badge" style="background:${TIER_COLORS[cfg.tier]};color:#0d0f14">${TIER_NAMES[cfg.tier]}</span></div><div class="st">${fx}<br>${sourceText[cfg.tier]}</div></div><div class="btns"><button class="hat-btn"></button></div>`;
+      el.innerHTML = `<div><div class="nm">${HAT_EMOJI[id] ?? '🎩'} ${hatName(id, cfg.name)} <span class="tier-badge" style="background:${TIER_COLORS[cfg.tier]};color:#0d0f14">${TIER_NAMES[cfg.tier]}</span></div><div class="st">${fx}<br>${sourceText[cfg.tier]}</div></div><div class="btns"><button class="hat-btn"></button></div>`;
       (el.querySelector('.hat-btn') as HTMLButtonElement).onclick = () => {
         const btn = el.querySelector('.hat-btn') as HTMLButtonElement;
         this.onEquipHat(btn.dataset.equipped === '1' ? null : id);

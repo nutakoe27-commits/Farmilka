@@ -22,9 +22,19 @@ The preview is recorded from real play, not mocked: `record-preview.mjs` drives
 a browser against a local server started with `video-rig-balance.json` (denser
 mobs, a fast boss, a guaranteed legendary crate) and steers the hero by reading
 the minimap canvas, so it stays off the world edge and walks into the boss
-fight. The take is then cut into three beats — mob combat, the unique-weapon
-reveal, the boss fight — and encoded to H.264. It has no audio: headless
-Chromium has no audio device, and the portal plays hover previews muted.
+fight. The take is cut into three beats — mob combat, the unique-weapon reveal,
+the boss fight — and encoded to H.264.
+
+Headless Chromium has no GPU, so WebGL falls back to software rasterisation and
+the game renders at only ~5 fps at 1080p. The recording works around that: the
+world runs at 2/5 speed (every rate and duration in the rig is scaled) and is
+captured at 720p, then the video is sped back up 2.5x and upscaled. That yields
+~29 of 30 frames per second genuinely distinct instead of ~5. If a re-take ever
+looks choppy, check that the rig is still the slow-motion one and that the
+`setpts=(PTS-STARTPTS)/2.5` factor matches it.
+
+The preview has no audio: headless Chromium has no audio device, and the portal
+plays hover previews muted.
 
 ## Store text (English)
 
