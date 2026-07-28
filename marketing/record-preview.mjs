@@ -248,10 +248,10 @@ function cut() {
     const a = s0(from), b = s0(to);
     win.push([Math.max(a, b - max), b]);
   };
-  push(at('start'), walled, 20);            // walling the base in
-  push(walled, mobs, 15);                   // a fight in the field
-  push(raid ? raid - 22_000 : null, looted ?? raid, 26); // breaking into a base
-  push(bossAt, end, 16);                    // the boss
+  push(at('start'), walled, 32);            // walling the base in
+  push(walled, mobs, 24);                   // a fight in the field
+  push(raid ? raid - 30_000 : null, looted ?? raid, 36); // breaking into a base
+  push(bossAt, end, 34);                    // the boss
   return win;
 }
 

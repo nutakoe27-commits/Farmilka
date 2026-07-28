@@ -16,6 +16,7 @@ you earn, break into everyone else's.** Every asset in this folder says that.
 | `screen-2-raid.png` | breaking into someone else's base |
 | `screen-3-combat.png` | field combat with the local wildlife |
 | `screen-4-shop.png` | the shop: vault, Base Rank, buildings |
+| `screen-5-boss.png` | a boss telegraphing its signature attack |
 | `mobile-1-play.png`, `mobile-2-shop.png` | mobile gameplay stills |
 | `farmclash-preview.mp4` | gameplay preview, 1920×1080 (hover preview) |
 | `farmclash-preview-vertical.mp4` | the same cut at 9:16, for mobile/social |
@@ -56,12 +57,23 @@ shoulder-to-shoulder instead of approximately.
 ### Why the video is recorded in slow motion
 
 Headless Chromium has no GPU, so WebGL falls back to software rasterisation and
-the game renders at only ~5 fps at 1080p. The recording works around that: the
-world runs at 2/5 speed (every rate and duration in the rig is scaled) and is
-captured at 720p, then the video is sped back up 2.5× and upscaled. That yields
-~29 of 30 frames per second genuinely distinct instead of ~5. If a re-take ever
-looks choppy, check that the rig is still the slow-motion one and that the
-`setpts=(PTS-STARTPTS)/2.5` factor matches it.
+the game renders at only ~4-5 fps at 1080p. The recording works around that: the
+world runs at 1/S speed (make-video-rig.mjs scales every rate and duration) and
+is captured at 720p, then the video is sped back up by S and upscaled, so each
+frame the browser did manage to draw lands on a distinct moment.
+
+S is the `SLOWMO` env var and must be the same for the rig and the recorder:
+
+```
+SLOWMO=5 node make-video-rig.mjs
+SLOWMO=5 node record-preview.mjs
+```
+
+The current preview is S=5: 25 s at 1920×1080, of which ~520 of 751 frames are
+genuinely distinct (~21 effective fps). S=2.5 gave a longer clip but only ~10
+effective fps. Higher S is smoother but shorter — the cut windows are measured
+in raw capture seconds and get divided by S — so raising S means widening the
+windows in `cut()` to keep the clip around 25-30 s.
 
 The preview has no audio: headless Chromium has no audio device, and the portal
 plays hover previews muted.
@@ -120,7 +132,10 @@ plays hover previews muted.
 ## What the CrazyGames build does
 
 Built with `npm run build:crazygames -w client` (sets `VITE_PLATFORM=crazygames`).
-Only the CrazyGames SDK is loaded — the Yandex code path is never touched.
+Only the CrazyGames SDK is ever fetched — the Yandex init never runs. (Both
+adapters are still linked into the bundle: the platform choice resolves through
+a runtime host check, so the bundler cannot drop one. It is a couple of kB of
+dead code and nothing is loaded from it.)
 
 - **SDK init** — `SDK.init()` is awaited before anything else (v3 requirement).
 - **Gameplay markers** — `gameplayStart()` on entering the world and after
