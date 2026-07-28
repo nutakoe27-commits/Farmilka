@@ -30,10 +30,12 @@ function describeEffect(effect: Record<string, number | undefined>): string {
 export class Shop {
   visible = false;
   placing: BuildingId | null = null;
+  demolishing = false;
 
   onBuy: (item: WeaponId | 'food') => void = () => {};
   onSell: (item: WeaponId) => void = () => {};
   onStartPlace: (b: BuildingId) => void = () => {};
+  onStartDemolish: () => void = () => {};
   onLootbox: () => void = () => {};
   onWeaponLootbox: () => void = () => {};
   onWithdraw: () => void = () => {};
@@ -121,6 +123,15 @@ export class Shop {
     rankRow.id = 'shop-rank';
     rankRow.innerHTML = `<div><div class="nm">★ <span id="rank-title"></span></div><div class="st" id="rank-perks"></div></div><div class="btns"></div>`;
     bg.appendChild(rankRow);
+    const dem = document.createElement('div');
+    dem.className = 'shop-item';
+    dem.id = 'shop-demolish';
+    dem.innerHTML = `<div><div class="nm">${t('shop.demolish')}</div><div class="st">${t('shop.demolishDesc')}</div></div><div class="btns"><button id="demolish-btn">${t('shop.demolishBtn')}</button></div>`;
+    (dem.querySelector('#demolish-btn') as HTMLButtonElement).onclick = () => {
+      this.hide();
+      this.onStartDemolish();
+    };
+    bg.appendChild(dem);
     for (const [id, cfg] of Object.entries(this.welcome.buildings)) {
       if (id === 'vault') continue; // comes free with the base
       const el = document.createElement('div');
@@ -140,7 +151,17 @@ export class Shop {
       bg.appendChild(el);
     }
 
-    // lootboxes: hat lootbox + weapon crate
+    // The weapon crate lives with the weapons it drops, not under Hats — that is
+    // where players went looking for it and never found it.
+    const wc = $('shop-weapon-crate');
+    wc.innerHTML = '';
+    const wle = document.createElement('div');
+    wle.className = 'shop-item';
+    wle.innerHTML = `<div><div class="nm">${t('shop.weaponLootbox')}</div><div class="st">${t('shop.weaponLootboxDesc')}</div></div><div class="btns"><button id="weapon-lootbox-btn">💰 ${this.welcome.weaponLootboxPrice}</button></div>`;
+    (wle.querySelector('#weapon-lootbox-btn') as HTMLButtonElement).onclick = () => this.onWeaponLootbox();
+    wc.appendChild(wle);
+
+    // hat lootbox stays on the hats tab
     const lb = $('shop-lootbox');
     lb.innerHTML = '';
     const lbe = document.createElement('div');
@@ -148,11 +169,6 @@ export class Shop {
     lbe.innerHTML = `<div><div class="nm">${t('shop.lootbox')}</div><div class="st">${t('shop.lootboxDesc')}</div></div><div class="btns"><button id="lootbox-btn">💰 ${this.welcome.hats.lootboxPrice}</button></div>`;
     (lbe.querySelector('#lootbox-btn') as HTMLButtonElement).onclick = () => this.onLootbox();
     lb.appendChild(lbe);
-    const wle = document.createElement('div');
-    wle.className = 'shop-item';
-    wle.innerHTML = `<div><div class="nm">${t('shop.weaponLootbox')}</div><div class="st">${t('shop.weaponLootboxDesc')}</div></div><div class="btns"><button id="weapon-lootbox-btn">💰 ${this.welcome.weaponLootboxPrice}</button></div>`;
-    (wle.querySelector('#weapon-lootbox-btn') as HTMLButtonElement).onclick = () => this.onWeaponLootbox();
-    lb.appendChild(wle);
 
     // hat collection
     const hg = $('shop-hats');
@@ -318,6 +334,26 @@ export class Shop {
 
   setPlacing(b: BuildingId | null): void {
     this.placing = b;
-    $('place-hint').classList.toggle('hidden', b === null);
+    if (b) this.demolishing = false;
+    this.updateBuildHint();
+  }
+
+  setDemolishing(on: boolean): void {
+    this.demolishing = on;
+    if (on) this.placing = null;
+    this.updateBuildHint();
+  }
+
+  /** One toolbar for both build modes — with a Done button, since touch has no Esc. */
+  private updateBuildHint(): void {
+    const hint = $('place-hint');
+    const active = this.placing !== null || this.demolishing;
+    hint.classList.toggle('hidden', !active);
+    hint.classList.toggle('demolish', this.demolishing);
+    if (!active) return;
+    const touch = document.body.classList.contains('touch');
+    $('place-hint-text').textContent = this.demolishing
+      ? t(touch ? 'hud.demolishHintTouch' : 'hud.demolishHint')
+      : t(touch ? 'hud.placeHintTouch' : 'hud.placeHint', { b: `${BUILDING_ICONS[this.placing!] ?? ''} ${this.placing}` });
   }
 }

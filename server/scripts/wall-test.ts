@@ -3,7 +3,7 @@
 // walk around inside their own base.
 import { loadBalance, getBalance } from '../src/game/balance.js';
 import { World } from '../src/game/world.js';
-import { makeBuilding, tryPlaceBuilding, canPlaceAt, minSpacing, countBuildings, grantStarterBase } from '../src/game/buildings.js';
+import { makeBuilding, tryPlaceBuilding, canPlaceAt, minSpacing, countBuildings, grantStarterBase, tryDemolish } from '../src/game/buildings.js';
 import { updatePlayers } from '../src/game/player.js';
 import { resolveSolids } from '@shared/collision.js';
 import { restoreBase, captureBase } from '../src/game/base.js';
@@ -178,6 +178,43 @@ function walk(world: World, p: Player, mx: number, my: number, steps = 60): void
   check('a packed base rebuilds without dropping its own walls', fits === stub.buildings.length,
     `${fits}/${stub.buildings.length}`);
   void restoreBase;
+}
+
+// ---------- demolition gives the slot (and some gold) back ----------
+{
+  const world = new World(1);
+  const p = addPlayer(world, 'Rebuilder', 2000, 2000);
+  grantStarterBase(world, p);
+  const now = Date.now();
+  const farm = [...p.buildingIds].map((id) => world.buildings.get(id)!).find((b) => b.buildingType === 'farm')!;
+  const vault = [...p.buildingIds].map((id) => world.buildings.get(id)!).find((b) => b.buildingType === 'vault')!;
+  farm.stored = 90;
+  const before = countBuildings(world, p).other;
+  p.money = 0;
+
+  check('the vault cannot be torn down', !tryDemolish(world, p, vault.id).ok);
+
+  const res = tryDemolish(world, p, farm.id);
+  const expected = Math.floor(bal.buildings.farm.price * bal.economy.sellFrac) + 90;
+  check('demolishing refunds part of the price plus the silo', res.ok && res.refund === expected,
+    `refund=${res.refund} expected=${expected}`);
+  check('the refund lands in the pocket', p.money === expected, `money=${p.money}`);
+  check('the slot comes back', countBuildings(world, p).other === before - 1,
+    `${countBuildings(world, p).other} vs ${before}`);
+  check('the structure is gone from the world', !world.buildings.has(farm.id));
+
+  // and a stranger's base is not yours to tear down
+  const q = addPlayer(world, 'Neighbour', 5000, 5000);
+  const theirs = makeBuilding(world, 'farm', 5000, 5200, { id: q.id, name: q.name, account: null }, now);
+  q.buildingIds.add(theirs.id);
+  check("you cannot demolish someone else's building", !tryDemolish(world, p, theirs.id).ok);
+
+  // walls free their own budget
+  const w = makeBuilding(world, 'wall', 2400, 2000, { id: p.id, name: p.name, account: null }, now);
+  p.buildingIds.add(w.id);
+  const walls = countBuildings(world, p).walls;
+  tryDemolish(world, p, w.id);
+  check('demolishing a wall frees a wall slot', countBuildings(world, p).walls === walls - 1);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -10,7 +10,7 @@ import type { World } from '../game/world.js';
 import type { WorldManager } from '../game/world-manager.js';
 import type { Player } from '../game/entities.js';
 import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip, tryWeaponLootbox } from '../game/economy.js';
-import { tryPlaceBuilding, removePlayerBuildings, tryWithdraw } from '../game/buildings.js';
+import { tryPlaceBuilding, removePlayerBuildings, tryWithdraw, tryDemolish } from '../game/buildings.js';
 import { restoreBase, storeBase } from '../game/base.js';
 import { releaseBase } from '../game/offline-bases.js';
 import { tryLootbox, tryEquipHat, recomputeMaxHp } from '../game/hats.js';
@@ -325,6 +325,12 @@ export function startServer(worlds: WorldManager): http.Server {
         case 'place': {
           const res = tryPlaceBuilding(world, player, msg.building, Number(msg.x), Number(msg.y));
           world.sendEvent(player, { e: 'placed', ok: res.ok, reason: res.reason });
+          break;
+        }
+        case 'demolish': {
+          if (typeof msg.id !== 'string') return;
+          const res = tryDemolish(world, player, msg.id);
+          world.sendEvent(player, { e: 'demolished', ok: res.ok, refund: res.refund, reason: res.reason });
           break;
         }
         case 'ping': {

@@ -176,6 +176,29 @@ export function tryPlaceBuilding(world: World, p: Player, type: BuildingId, x: n
 }
 
 /**
+ * Tears down one of your own structures: part of the price comes back, the silo
+ * is emptied into your pocket, and the slot is free again. A base you cannot
+ * rearrange is a base you stop caring about.
+ *
+ * The vault is the anchor of the base (it is where banking happens and where a
+ * relogin puts you) so it is not removable.
+ */
+export function tryDemolish(world: World, p: Player, id: string): { ok: boolean; reason?: string; refund?: number } {
+  if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
+  const b = world.buildings.get(id);
+  if (!b || b.ownerId !== p.id) return { ok: false, reason: tr(p.lang, 'notYourBuilding') };
+  if (b.buildingType === 'vault') return { ok: false, reason: tr(p.lang, 'vaultNoDemolish') };
+  const bal = getBalance();
+  const refund = Math.floor(bal.buildings[b.buildingType].price * bal.economy.sellFrac) + Math.floor(b.stored);
+  p.money += refund;
+  p.buildingIds.delete(b.id);
+  world.removeEntity(b);
+  world.markDirty(p);
+  if (!p.bot) telemetry.income(p.name, 'building', refund);
+  return { ok: true, refund };
+}
+
+/**
  * Grants the free starter base — a vault plus one farm — so a new player has
  * something to defend within seconds of spawning instead of an empty field.
  */

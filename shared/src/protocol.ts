@@ -100,6 +100,7 @@ export type GameEvent =
   | { e: 'buildingDestroyed'; id: string; byName: string; own: boolean }
   | { e: 'purchase'; ok: boolean; item: string; reason?: string }
   | { e: 'placed'; ok: boolean; reason?: string }
+  | { e: 'demolished'; ok: boolean; refund?: number; reason?: string }
   | { e: 'heal'; amount: number }
   | { e: 'bank'; action: 'deposit' | 'withdraw'; amount: number; banked: number }
   | { e: 'collect'; amount: number; x: number; y: number }
@@ -139,6 +140,7 @@ export type ClientMsg =
   | { t: 'prestige' }
   | { t: 'equipHat'; hat: string | null }
   | { t: 'place'; building: BuildingId; x: number; y: number }
+  | { t: 'demolish'; id: string }
   | { t: 'ping'; ts: number };
 
 // ---------- Server -> Client ----------

@@ -29,6 +29,7 @@ npm install                 # playwright + ffmpeg-static, kept out of the game b
 npm run covers              # vector covers -> SVG -> PNG
 npm run shots               # screenshots, needs the capture server (below)
 npm run preview             # the video, needs the video server (below)
+npm run ux                  # UI smoke check for the build/demolish flow (not a store asset)
 ```
 
 Covers are vector (`make-crazygames-covers.mjs`), so if the portal ever asks for

@@ -267,6 +267,11 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   let bossWarnName = '';
 
   let ghost: Graphics | null = null;
+  /** building the demolish marker is currently snapped to */
+  let ghostForId: string | null = null;
+  /** last finger position while in build mode; -1 = pointer is a mouse */
+  let touchX = -1;
+  let touchY = -1;
 
   const layerFor = (kind: string) => {
     switch (kind) {
@@ -371,6 +376,16 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
 
     if (lastMoney >= 0 && self.money > lastMoney) audio.coin(); // income (coins, mob/boss reward)
     lastMoney = self.money;
+
+    // build mode ends by itself when the next one is no longer affordable or
+    // the slots are full — otherwise you keep tapping into a red error toast
+    if (shop.placing) {
+      const cfg = welcome.buildings[shop.placing];
+      const atLimit = shop.placing === 'wall'
+        ? self.walls >= welcome.maxWalls
+        : self.buildings >= welcome.maxBuildings;
+      if (self.money < cfg.price || atLimit) endBuildMode();
+    }
 
     hud.update(self);
     shop.refresh(self);
@@ -559,6 +574,10 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       case 'placed':
         if (!ev.ok && ev.reason) hud.notice(`🚫 ${escapeHtml(ev.reason)}`);
         break;
+      case 'demolished':
+        if (ev.ok) hud.notice(t('ev.demolished', { n: ev.refund ?? 0 }));
+        else if (ev.reason) hud.notice(`🚫 ${escapeHtml(ev.reason)}`);
+        break;
       case 'notice':
         hud.notice(escapeHtml(ev.text));
         break;
@@ -599,42 +618,99 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     };
   }
 
+  /** Redraws the build ghost: green square to place, red outline to demolish. */
+  function setGhost(radius: number | null, demolish = false): void {
+    if (ghost) {
+      ghost.destroy();
+      ghost = null;
+    }
+    if (radius === null) return;
+    ghost = new Graphics();
+    if (demolish) {
+      ghost.roundRect(-radius, -radius, radius * 2, radius * 2, 8)
+        .fill({ color: 0xe0574f, alpha: 0.25 }).stroke({ width: 3, color: 0xff8a80 });
+    } else {
+      ghost.roundRect(-radius, -radius, radius * 2, radius * 2, 8)
+        .fill({ color: 0x2ea043, alpha: 0.35 }).stroke({ width: 2, color: 0x7ee787 });
+    }
+    scene.layers.effects.addChild(ghost);
+  }
+
+  /** Leaves whichever build mode is active. */
+  function endBuildMode(): void {
+    shop.setPlacing(null);
+    shop.setDemolishing(false);
+    ghostForId = null;
+    setGhost(null);
+  }
+
+  /** Our own building under a world point, if any. Buildings are drawn as squares. */
+  function ownBuildingAt(wx: number, wy: number): { id: string; radius: number } | null {
+    let best: { id: string; radius: number } | null = null;
+    let bestD = Infinity;
+    for (const [id, r] of conn.entities) {
+      const st = r.state;
+      if (st.kind !== 'building' || st.owner !== welcome.id) continue;
+      const d = Math.max(Math.abs(st.x - wx), Math.abs(st.y - wy));
+      if (d <= st.radius && d < bestD) {
+        bestD = d;
+        best = { id, radius: st.radius };
+      }
+    }
+    return best;
+  }
+
   shop.onStartPlace = (b) => {
     shop.setPlacing(b);
-    if (ghost) ghost.destroy();
-    ghost = new Graphics();
-    const r = welcome.buildings[b].radius;
-    ghost.roundRect(-r, -r, r * 2, r * 2, 8).fill({ color: 0x2ea043, alpha: 0.35 }).stroke({ width: 2, color: 0x7ee787 });
-    scene.layers.effects.addChild(ghost);
+    setGhost(welcome.buildings[b].radius);
   };
+  shop.onStartDemolish = () => {
+    shop.setDemolishing(true);
+    ghostForId = null;
+    setGhost(null); // the ghost appears once a building of ours is under the cursor
+  };
+  ($('place-done') as HTMLButtonElement).onclick = () => endBuildMode();
   input.onCancel = () => {
-    shop.setPlacing(null);
+    endBuildMode();
     shop.hide();
     settings.hide();
-    if (ghost) {
-      ghost.destroy();
-      ghost = null;
-    }
   };
   input.onWorldClick = (sx, sy) => {
-    if (!shop.placing) return false;
     const pos = scene.screenToWorld(sx, sy);
-    conn.send({ t: 'place', building: shop.placing, x: Math.round(pos.x), y: Math.round(pos.y) });
-    shop.setPlacing(null);
-    if (ghost) {
-      ghost.destroy();
-      ghost = null;
+    if (shop.demolishing) {
+      const target = ownBuildingAt(pos.x, pos.y);
+      if (target) conn.send({ t: 'demolish', id: target.id });
+      return true;
     }
+    if (!shop.placing) return false;
+    conn.send({ t: 'place', building: shop.placing, x: Math.round(pos.x), y: Math.round(pos.y) });
+    // Stay in build mode: a wall line is a dozen blocks, and reopening the shop
+    // between each one was the whole complaint. It ends on Done/Esc/right-click,
+    // or by itself once gold or slots run out (see the snapshot handler).
     return true;
   };
-  // placement by tap on mobile
-  window.addEventListener('touchstart', (e) => {
-    if (!shop.placing) return;
-    const t = e.touches[0];
-    if (t && !(e.target as HTMLElement).closest('.panel,.joy-zone,#mob-buttons')) {
-      input.onWorldClick(t.clientX, t.clientY);
-    }
-  });
+
+  // Touch: drag to aim the ghost, lift to place. A plain tap still works, so
+  // this is strictly more control than the old place-on-touch behaviour.
+  {
+    const overUi = (target: EventTarget | null): boolean =>
+      target instanceof HTMLElement && !!target.closest('.panel,.joy-zone,#mob-buttons,#place-hint');
+    const track = (e: TouchEvent): void => {
+      if ((!shop.placing && !shop.demolishing) || overUi(e.target)) return;
+      const t = e.touches[0];
+      if (t) {
+        touchX = t.clientX;
+        touchY = t.clientY;
+      }
+    };
+    window.addEventListener('touchstart', track, { passive: true });
+    window.addEventListener('touchmove', track, { passive: true });
+    window.addEventListener('touchend', (e) => {
+      if ((!shop.placing && !shop.demolishing) || overUi(e.target)) return;
+      const t = e.changedTouches[0];
+      if (t) input.onWorldClick(t.clientX, t.clientY);
+    });
+  }
 
   // input send loop: 20 Hz, mirrors server tick rate
   setInterval(() => {
@@ -704,9 +780,24 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     frame++;
     updateMotes(dt);
 
-    if (ghost) {
-      const pos = scene.screenToWorld(input.mouseX, input.mouseY);
-      ghost.position.set(pos.x, pos.y);
+    if (shop.placing || shop.demolishing) {
+      const px = touchX >= 0 ? touchX : input.mouseX;
+      const py = touchX >= 0 ? touchY : input.mouseY;
+      const pos = scene.screenToWorld(px, py);
+      if (shop.demolishing) {
+        // snap the marker onto whichever of our buildings is under the pointer
+        const target = ownBuildingAt(pos.x, pos.y);
+        if (target?.id !== ghostForId) {
+          ghostForId = target?.id ?? null;
+          setGhost(target ? target.radius : null, true);
+        }
+        if (ghost && target) {
+          const st = conn.entities.get(target.id)!.state;
+          ghost.position.set(st.x, st.y);
+        }
+      } else if (ghost) {
+        ghost.position.set(pos.x, pos.y);
+      }
     }
 
     if (bossWarnUntil > now) {
