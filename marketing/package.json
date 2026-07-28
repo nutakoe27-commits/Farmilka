@@ -8,7 +8,8 @@
     "covers": "node make-crazygames-covers.mjs && node render-svg.mjs",
     "preview": "node record-preview.mjs",
     "shots": "node capture-screens.mjs",
-    "ux": "node ux-check.mjs"
+    "ux": "node ux-check.mjs",
+    "fs": "node fs-check.mjs"
   },
   "dependencies": {
     "ffmpeg-static": "^5.2.0",

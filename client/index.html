@@ -81,7 +81,10 @@
     #minimap { position: fixed; right: 14px; bottom: 14px; border: 1px solid #2c3242; border-radius: 8px; background: rgba(10,12,18,.85); }
 
     /* settings */
-    #settings-btn { position: fixed; top: 10px; right: 12px; width: 38px; height: 38px; border-radius: 10px; background: rgba(14,17,25,.85); border: 1px solid #2c3242; color: #bfc4d4; font-size: 20px; cursor: pointer; pointer-events: auto; z-index: 12; }
+    #settings-btn, #fullscreen-btn { position: fixed; top: 10px; width: 38px; height: 38px; border-radius: 10px; background: rgba(14,17,25,.85); border: 1px solid #2c3242; color: #bfc4d4; font-size: 20px; cursor: pointer; pointer-events: auto; z-index: 12; }
+    #settings-btn { right: 12px; }
+    #fullscreen-btn { right: 58px; }
+    #fullscreen-btn.active { background: rgba(35,134,54,.85); border-color: #2ea043; color: #e6ffe9; }
     #settings { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 18; width: 320px; max-width: 92vw; pointer-events: auto; }
     #settings h2 { font-size: 17px; color: #9ecbff; margin-bottom: 14px; }
     .set-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 14px; }
@@ -171,6 +174,7 @@
     body.touch #minimap { right: 12px; top: 12px; bottom: auto; width: 110px; height: 110px; }
     body.touch #killfeed { top: 130px; right: 12px; }
     body.touch #settings-btn { left: 12px; right: auto; }
+    body.touch #fullscreen-btn { left: 58px; right: auto; }
     body.touch #food-slot { display: none; } /* mobile uses the side button */
     body.touch #leaderboard { top: 58px; left: 8px; width: 150px; font-size: 11px; padding: 6px 8px; }
     body.touch #leaderboard .lb-row:nth-child(n+5) { display: none; } /* top 3 + title on phones */
@@ -201,6 +205,7 @@
     <div id="boss-banner" class="hidden"></div>
     <div id="hint" data-i18n="hud.hint">WASD — движение · мышь — прицел · ЛКМ — атака<br>B — магазин · Q — еда · 1–4 — оружие · перетаскивай слоты</div>
     <canvas id="minimap" width="160" height="160"></canvas>
+    <button id="fullscreen-btn" data-i18n-title="hud.fullscreenTitle" title="Полный экран">⛶</button>
     <button id="settings-btn" data-i18n-title="hud.settingsTitle" title="Настройки">⚙</button>
   </div>
 
@@ -213,6 +218,7 @@
       <div id="server-list" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
     <div class="set-row"><span data-i18n="set.lang">Язык / Language</span><span class="lang-switch"><button data-lang="ru">RU</button><button data-lang="en">EN</button></span></div>
+    <div class="set-row" id="set-fullscreen-row"><span data-i18n="set.fullscreen">Полный экран</span><button class="srv-btn" id="set-fullscreen-btn"></button></div>
     <div class="set-row"><span data-i18n="set.sound">Звук</span><input type="checkbox" id="set-sound" checked></div>
     <div class="set-row"><span data-i18n="set.shake">Тряска экрана</span><input type="checkbox" id="set-shake" checked></div>
     <div class="set-row"><span data-i18n="set.dmg">Числа урона</span><input type="checkbox" id="set-dmg" checked></div>

@@ -1,6 +1,7 @@
 import { t } from './i18n.js';
 import { API_ORIGIN } from '../config.js';
 import { audio } from '../game/audio.js';
+import { fullscreenSupported, isFullscreen, toggleFullscreen, onFullscreenChange } from './fullscreen.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -15,6 +16,8 @@ const KEY = 'farmclash-settings';
 export class Settings {
   values: GameSettings = { shake: true, damageNumbers: true, killFeed: true };
   onExit: () => void = () => {};
+  /** surfaced through the HUD notice line */
+  onNotice: (text: string) => void = () => {};
   /** current game server id, set after welcome */
   currentServer = 0;
 
@@ -48,6 +51,40 @@ export class Settings {
     $('settings-btn').onclick = () => this.toggle();
     $('settings-close').onclick = () => this.hide();
     $('exit-btn').onclick = () => this.onExit();
+    this.wireFullscreen();
+  }
+
+  /**
+   * Fullscreen from the HUD and from the settings panel. Both are hidden where
+   * the browser has no fullscreen API at all (iPhone Safari), so the player is
+   * never offered a button that does nothing.
+   */
+  private wireFullscreen(): void {
+    const hudBtn = $('fullscreen-btn');
+    const row = $('set-fullscreen-row');
+    if (!fullscreenSupported()) {
+      hudBtn.style.display = 'none';
+      row.style.display = 'none';
+      return;
+    }
+    const sync = (): void => {
+      // Same glyph either way — the state reads from the highlight, which beats
+      // gambling on an "exit fullscreen" symbol that renders as tofu somewhere.
+      const on = isFullscreen();
+      hudBtn.title = t(on ? 'hud.fullscreenExitTitle' : 'hud.fullscreenTitle');
+      hudBtn.classList.toggle('active', on);
+      $('set-fullscreen-btn').textContent = t(on ? 'set.fullscreenOff' : 'set.fullscreenOn');
+    };
+    const go = async (): Promise<void> => {
+      // Inside a portal iframe the request can simply be refused; say so rather
+      // than leaving the button looking broken.
+      if (!(await toggleFullscreen())) this.onNotice(t('set.fullscreenFail'));
+      sync();
+    };
+    hudBtn.onclick = go;
+    ($('set-fullscreen-btn') as HTMLButtonElement).onclick = go;
+    onFullscreenChange(sync);
+    sync();
   }
 
   get visible(): boolean {

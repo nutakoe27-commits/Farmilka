@@ -606,6 +606,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   shop.onPrestige = () => conn.send({ t: 'prestige' });
   conn.onLeaderboard = (top, rank, total) => leaderboard.update(top, rank, total);
   settings.onExit = () => conn.ws.close();
+  settings.onNotice = (text) => hud.notice(escapeHtml(text));
   if (mobile) {
     mobile.onEat = () => conn.send({ t: 'eat' });
     mobile.onShop = () => shop.toggle();
@@ -694,7 +695,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   // this is strictly more control than the old place-on-touch behaviour.
   {
     const overUi = (target: EventTarget | null): boolean =>
-      target instanceof HTMLElement && !!target.closest('.panel,.joy-zone,#mob-buttons,#place-hint');
+      target instanceof HTMLElement && !!target.closest('.panel,.joy-zone,#mob-buttons,#place-hint,#settings-btn,#fullscreen-btn');
     const track = (e: TouchEvent): void => {
       if ((!shop.placing && !shop.demolishing) || overUi(e.target)) return;
       const t = e.touches[0];

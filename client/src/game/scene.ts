@@ -44,6 +44,8 @@ export class Scene {
   /** Everyone sees the same world area regardless of screen size (fair play). */
   static readonly VIEW_W = 1600;
   static readonly VIEW_H = 900;
+  /** ceiling for viewScale on a wide screen — see update() */
+  static readonly LANDSCAPE_VIEW_SCALE = 1.15;
 
   constructor(app: Application) {
     this.app = app;
@@ -125,8 +127,12 @@ export class Scene {
 
     const w = this.app.renderer.width;
     const h = this.app.renderer.height;
-    // cover-fit the design viewport; viewScale widens it (touch devices see more)
-    this.zoom = Math.max(w / (Scene.VIEW_W * this.viewScale), h / (Scene.VIEW_H * this.viewScale));
+    // Cover-fit the design viewport; viewScale widens it (touch devices see
+    // more). The phone bonus only applies while the device is upright: turned
+    // sideways it is already wide, and keeping the full bonus would show a
+    // rotated phone roughly twice the world a desktop player gets.
+    const vs = w > h ? Math.min(this.viewScale, Scene.LANDSCAPE_VIEW_SCALE) : this.viewScale;
+    this.zoom = Math.max(w / (Scene.VIEW_W * vs), h / (Scene.VIEW_H * vs));
 
     const sx = (Math.random() - 0.5) * this.shake;
     const sy = (Math.random() - 0.5) * this.shake;
