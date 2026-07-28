@@ -72,6 +72,8 @@ export interface Player extends BaseEntity, StatusEffects {
   money: number;
   /** gold deposited in the vault: survives death, only a raid can touch it */
   banked: number;
+  /** lifetime deposits — the Base Rank score, never decreases */
+  bankedTotal: number;
   weapons: WeaponId[];
   equipped: WeaponId;
   food: number;

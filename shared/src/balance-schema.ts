@@ -2,6 +2,7 @@ import type { WeaponId, MobId, BossId, BuildingId } from './types.js';
 import type { BiomeId } from './biomes.js';
 import type { PrestigeCfg } from './prestige.js';
 import type { LevelsCfg } from './levels.js';
+import type { RankCfg } from './rank.js';
 
 export interface WeaponCfg {
   type: 'melee' | 'ranged';
@@ -229,6 +230,7 @@ export interface Balance {
   hats: HatsCfg;
   weaponLootbox: WeaponLootboxCfg;
   prestige: PrestigeCfg;
+  rank: RankCfg;
   economy: {
     maxBuildingsPerPlayer: number;
     maxTurretsPerPlayer: number;
@@ -239,6 +241,8 @@ export interface Balance {
     vaultRaidFrac: number;
     /** minutes a base is immune after being raided */
     raidShieldSec: number;
+    /** production multiplier for farms built in the dangerous mystic biomes */
+    dangerBiomeMult: number;
     sellFrac: number;
     coinDespawnSec: number;
     coinPickupRadius: number;
@@ -406,8 +410,15 @@ export function validateBalance(raw: unknown): Balance {
   }
 
   const economy = section(root, 'economy');
-  for (const k of ['maxBuildingsPerPlayer', 'maxTurretsPerPlayer', 'buildingMinDist', 'raidLootFrac', 'vaultRaidFrac', 'raidShieldSec', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
+  for (const k of ['maxBuildingsPerPlayer', 'maxTurretsPerPlayer', 'buildingMinDist', 'raidLootFrac', 'vaultRaidFrac', 'raidShieldSec', 'dangerBiomeMult', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
     num(economy, k, 'economy');
+  }
+
+  const rank = section(root, 'rank');
+  for (const k of ['baseBanked', 'growth', 'siloCapPerRank', 'siloCapMax', 'productionPerRank', 'productionMax',
+    'ranksPerSlot', 'slotsMax', 'respawnPerRank', 'respawnMax', 'magnetPerRank', 'magnetMax',
+    'vaultProtPerRank', 'vaultProtMax']) {
+    num(rank, k, 'rank', k === 'growth' ? 1.01 : 0);
   }
 
   return raw as Balance;

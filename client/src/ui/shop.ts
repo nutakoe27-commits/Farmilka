@@ -4,6 +4,7 @@ import { WEAPON_ICONS, BUILDING_ICONS, HAT_EMOJI, TIER_NAMES, TIER_COLORS } from
 import { prestigeTier } from '@shared/prestige.js';
 import { killsToNext } from '@shared/levels.js';
 import { t, hatName, weaponName } from './i18n.js';
+import { rankFromBanked, bankedForRank, rankPerks } from '@shared/rank.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -115,6 +116,11 @@ export class Shop {
     bank.innerHTML = `<div><div class="nm">🏦 <span id="bank-total"></span></div><div class="st">${t('shop.bankHint')}</div></div><div class="btns"><button id="withdraw-btn">${t('shop.withdraw')}</button></div>`;
     (bank.querySelector('#withdraw-btn') as HTMLButtonElement).onclick = () => this.onWithdraw();
     bg.appendChild(bank);
+    const rankRow = document.createElement('div');
+    rankRow.className = 'shop-item';
+    rankRow.id = 'shop-rank';
+    rankRow.innerHTML = `<div><div class="nm">★ <span id="rank-title"></span></div><div class="st" id="rank-perks"></div></div><div class="btns"></div>`;
+    bg.appendChild(rankRow);
     for (const [id, cfg] of Object.entries(this.welcome.buildings)) {
       if (id === 'vault') continue; // comes free with the base
       const el = document.createElement('div');
@@ -216,6 +222,21 @@ export class Shop {
     $('build-count').textContent = t('shop.buildCount', { n: self.buildings, max: this.welcome.maxBuildings });
     $('bank-total').textContent = t('shop.bankRow', { n: self.banked });
     ($('withdraw-btn') as HTMLButtonElement).disabled = self.banked <= 0;
+
+    // Base Rank: earned by banking, and it only ever buys economy perks
+    const rcfg = this.welcome.rank;
+    const rank = rankFromBanked(self.bankedTotal, rcfg);
+    const need = bankedForRank(rank + 1, rcfg);
+    const perks = rankPerks(rank, rcfg);
+    $('rank-title').textContent = t('shop.rankTitle', { n: rank, need: Math.max(0, need - self.bankedTotal) });
+    $('rank-perks').innerHTML = t('shop.rankPerks', {
+      silo: Math.round((perks.siloCapMult - 1) * 100),
+      prod: Math.round((perks.productionMult - 1) * 100),
+      slots: perks.extraSlots,
+      respawn: Math.round((1 - perks.respawnMult) * 100),
+      magnet: Math.round(perks.magnetAdd),
+      prot: Math.round(perks.vaultProtection * 100),
+    });
 
     // level — earned from kills; show progress to the next level
     $('level-cur').textContent = String(self.level);

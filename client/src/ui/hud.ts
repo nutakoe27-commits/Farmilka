@@ -2,6 +2,7 @@ import type { SelfState } from '@shared/protocol.js';
 import type { WeaponId } from '@shared/types.js';
 import { WEAPON_ICONS } from '../game/entities.js';
 import { t, weaponName } from './i18n.js';
+import { rankFromBanked, type RankCfg } from '@shared/rank.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -13,6 +14,8 @@ function fmtTime(sec: number): string {
 export class Hud {
   private lastMoney = -1;
   private lastBanked = -1;
+  private rankCfg: RankCfg | null = null;
+  private lastRank = -1;
   private lastLevel = -1;
   private maxLevel = 10;
   private foodCooldownSec = 2;
@@ -37,6 +40,10 @@ export class Hud {
     this.maxLevel = max;
   }
 
+  setRankCfg(cfg: RankCfg): void {
+    this.rankCfg = cfg;
+  }
+
   show(): void {
     $('hud').classList.remove('hidden');
   }
@@ -59,7 +66,10 @@ export class Hud {
       // carried gold is what a death costs you — it turns orange once the
       // stack is worth a trip home; the vault total sits next to it
       const risk = self.money >= 500 ? ' risk' : '';
-      $('money').innerHTML = `<span class="carry${risk}">💰 ${self.money}</span> <span class="vault">🏦 ${self.banked}</span>`;
+      const rank = this.rankCfg ? rankFromBanked(self.bankedTotal, this.rankCfg) : 0;
+      const badge = rank > 0 ? ` <span class="rank">★${rank}</span>` : '';
+      $('money').innerHTML = `<span class="carry${risk}">💰 ${self.money}</span> <span class="vault">🏦 ${self.banked}</span>${badge}`;
+      this.lastRank = rank;
     }
     if (self.protIn > 0) {
       $('zone-label').textContent = t('hud.protectSec', { n: Math.ceil(self.protIn) });

@@ -2,6 +2,7 @@ import type { EntityKind, WeaponId, MobId, BossId, BuildingId, DeathCause } from
 import type { WeaponCfg, BuildingCfg, HatCfg, HatTier } from './balance-schema.js';
 import type { PrestigeCfg } from './prestige.js';
 import type { LevelsCfg } from './levels.js';
+import type { RankCfg } from './rank.js';
 
 // ---------- Entity state as seen by clients ----------
 
@@ -58,6 +59,8 @@ export interface SelfState {
   money: number;
   /** gold safe in the vault — untouched by death */
   banked: number;
+  /** lifetime deposits; the client derives Base Rank from it */
+  bankedTotal: number;
   weapons: WeaponId[];
   equipped: WeaponId;
   buildings: number;
@@ -153,6 +156,7 @@ export interface WelcomeMsg {
   weaponLootboxPrice: number;
   prestige: PrestigeCfg;
   levels: LevelsCfg;
+  rank: RankCfg;
   economy: { sellFrac: number };
   maxBuildings: number;
 }

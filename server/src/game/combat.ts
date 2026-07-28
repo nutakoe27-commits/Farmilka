@@ -8,7 +8,7 @@ import type { Entity, Player, Mob, Building } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { onBossDamaged, onBossKilled } from './boss.js';
 import { grantHat, hatEffects, randomHatOfTier } from './hats.js';
-import { lootFromDestroyed } from './buildings.js';
+import { lootFromDestroyed, perksOf } from './buildings.js';
 import { awardKillPoints, killPoints } from './levels.js';
 
 export interface DamageSource {
@@ -221,6 +221,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
   switch (target.kind) {
     case 'player': {
       const victimFx = hatEffects(target.hat);
+      const victimRank = perksOf(target); // rank shortens the walk back, nothing else
       // extraction rule: everything carried is lost, banked gold is untouched
       const dropped = Math.floor(target.money * bal.player.dropMoneyFrac * (1 - victimFx.dropSaveFrac));
       target.money -= dropped;
@@ -231,14 +232,14 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       target.equipped = 'fists';
       target.food = 0;
       target.dead = true;
-      target.respawnAt = now + bal.player.respawnSec * 1000 * victimFx.respawnMult;
+      target.respawnAt = now + bal.player.respawnSec * 1000 * victimFx.respawnMult * victimRank.respawnMult;
       target.session.deaths++;
       world.removeEntity(target);
       if (!target.bot) telemetry.death(target.name, src.cause, src.weapon, equippedAtDeath, dropped);
       world.sendEvent(target, {
         e: 'death',
         dropped,
-        respawnIn: bal.player.respawnSec * victimFx.respawnMult,
+        respawnIn: bal.player.respawnSec * victimFx.respawnMult * victimRank.respawnMult,
         cause: src.cause,
         kills: target.killsThisLife,
         survivedSec: Math.max(0, (now - target.lifeStartAt) / 1000),

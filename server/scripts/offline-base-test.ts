@@ -8,6 +8,8 @@ import { openDb, getDb } from '../src/db/db.js';
 import { World } from '../src/game/world.js';
 import { seedOfflineBases, releaseBase, releaseWorld } from '../src/game/offline-bases.js';
 import { saveBase } from '../src/db/accounts.js';
+import { makeBuilding } from '../src/game/buildings.js';
+import { restoreBase } from '../src/game/base.js';
 
 loadBalance();
 openDb();
@@ -68,6 +70,31 @@ const w3 = new World(3);
 releaseWorld(w1); releaseWorld(w2);
 seedOfflineBases(w3, new Set(['Absent1', 'Absent2']));
 check('players who are online are not seeded as targets', w3.buildings.size === 0, `n=${w3.buildings.size}`);
+
+// ---------- a returning player whose plot was taken keeps their base ----------
+{
+  const w = new World(4);
+  const squatter = w.spawnPlayer('Squatter', null);
+  const now2 = Date.now();
+  // wall off the exact coordinates Absent2's base was saved at
+  for (let i = 0; i < 4; i++) {
+    const b = makeBuilding(w, 'wall', 1900 + (i % 2) * 110, 1000 + Math.floor(i / 2) * 110,
+      { id: squatter.id, name: 'Squatter', account: null }, now2);
+    squatter.buildingIds.add(b.id);
+  }
+  const before = w.buildings.size;
+  const owner = w.spawnPlayer('Absent2', null);
+  owner.account = 'Absent2';
+  const restored = restoreBase(w, owner);
+  const mine = [...owner.buildingIds].map((id) => w.buildings.get(id)).filter(Boolean);
+  check('a blocked plot relocates the base instead of losing it', restored && mine.length >= 2,
+    `restored=${restored} mine=${mine.length}`);
+  check('the relocated base keeps its vault', mine.some((b) => b!.buildingType === 'vault'));
+  check('the squatter keeps their own buildings', w.buildings.size >= before, `${w.buildings.size} >= ${before}`);
+  const vault = mine.find((b) => b!.buildingType === 'vault')!;
+  check('the owner spawns next to their relocated vault', Math.hypot(owner.x - vault.x, owner.y - vault.y) < 400,
+    `dist=${Math.hypot(owner.x - vault.x, owner.y - vault.y).toFixed(0)}`);
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

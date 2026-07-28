@@ -6,6 +6,7 @@ import type { World } from './world.js';
 import type { Player } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { hatEffects } from './hats.js';
+import { perksOf } from './buildings.js';
 import { tr } from './i18n.js';
 
 export function tryBuyWeapon(world: World, p: Player, item: WeaponId): { ok: boolean; reason?: string } {
@@ -164,7 +165,7 @@ export function updateCoins(world: World, now: number): void {
   }
   for (const p of world.players.values()) {
     if (p.dead || (!p.ws && !p.bot)) continue;
-    const magnet = hatEffects(p.hat).coinMagnetAdd;
+    const magnet = hatEffects(p.hat).coinMagnetAdd + perksOf(p).magnetAdd;
     const pickupR = Math.max(bal.economy.coinPickupRadius + magnet, bal.food.pickupRadius);
     const near = world.grid.queryCircle(p.x, p.y, pickupR + 20);
     for (const e of near) {

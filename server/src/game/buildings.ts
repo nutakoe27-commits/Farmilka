@@ -7,6 +7,26 @@ import type { Building, Player, Entity } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { hatEffects } from './hats.js';
 import { tr } from './i18n.js';
+import { biomeAt } from '@shared/biomes.js';
+import { rankFromBanked, rankPerks } from '@shared/rank.js';
+
+/** Base Rank perks for a player (rank 0 for guests, who have no account). */
+export function perksOf(p: Player | undefined) {
+  const cfg = getBalance().rank;
+  return rankPerks(p ? rankFromBanked(p.bankedTotal, cfg) : 0, cfg);
+}
+
+/** Farms out in the mystic biomes produce more — that is what pulls bases there. */
+function biomeBonus(x: number, y: number): number {
+  const b = biomeAt(x, y, getBalance().world.size);
+  return b === 'mystic_west' || b === 'mystic_east' ? getBalance().economy.dangerBiomeMult : 1;
+}
+
+/** Silo capacity for a building, widened by its owner's rank. */
+export function siloCap(b: Building, owner: Player | undefined): number {
+  const cap = getBalance().buildings[b.buildingType].storeCap ?? 0;
+  return cap * perksOf(owner).siloCapMult;
+}
 
 const PLACE_RANGE = 300;
 /** How close the owner must be to scoop a silo / bank at the vault. */
@@ -59,8 +79,9 @@ export function tryPlaceBuilding(world: World, p: Player, type: BuildingId, x: n
   if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
   const cfg = bal.buildings[type];
   if (p.money < cfg.price) return { ok: false, reason: tr(p.lang, 'noMoney') };
-  if (p.buildingIds.size >= bal.economy.maxBuildingsPerPlayer) {
-    return { ok: false, reason: tr(p.lang, 'buildLimit', { n: bal.economy.maxBuildingsPerPlayer }) };
+  const slots = bal.economy.maxBuildingsPerPlayer + perksOf(p).extraSlots;
+  if (p.buildingIds.size >= slots) {
+    return { ok: false, reason: tr(p.lang, 'buildLimit', { n: slots }) };
   }
   if (type === 'turret') {
     let turrets = 0;
@@ -130,6 +151,7 @@ export function depositAll(world: World, p: Player): number {
   if (amount <= 0) return 0;
   p.money -= amount;
   p.banked += amount;
+  p.bankedTotal += amount; // lifetime score behind Base Rank
   world.markDirty(p);
   world.sendEvent(p, { e: 'bank', action: 'deposit', amount, banked: p.banked });
   return amount;
@@ -171,7 +193,9 @@ export function lootFromDestroyed(world: World, b: Building, owner: Player | und
   loot += Math.floor(b.stored);
   b.stored = 0;
   if (b.buildingType === 'vault' && owner) {
-    const taken = Math.floor(owner.banked * bal.economy.vaultRaidFrac);
+    // high rank shaves the raider's cut, but never to zero
+    const frac = Math.max(0.01, bal.economy.vaultRaidFrac - perksOf(owner).vaultProtection);
+    const taken = Math.floor(owner.banked * frac);
     if (taken > 0) {
       owner.banked -= taken;
       loot += taken;
@@ -192,9 +216,10 @@ export function updateBuildings(world: World, dt: number, now: number): void {
     // to collect.
     if (cfg.income > 0 && now >= b.incomeAt) {
       b.incomeAt = now + cfg.incomeIntervalSec * 1000;
-      const cap = cfg.storeCap ?? 0;
+      const cap = siloCap(b, owner);
       if (b.stored < cap) {
-        const mult = owner ? hatEffects(owner.hat).incomeMult : 1;
+        const perks = perksOf(owner);
+        const mult = (owner ? hatEffects(owner.hat).incomeMult : 1) * perks.productionMult * biomeBonus(b.x, b.y);
         b.stored = Math.min(cap, b.stored + cfg.income * mult);
         b.dirtyTick = world.tickNo;
       }

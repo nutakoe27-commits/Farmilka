@@ -5,7 +5,7 @@
 import WebSocket from 'ws';
 import { decodeSnapshot } from '@shared/snapshot-codec.js';
 
-const URL = 'ws://localhost:3992/ws';
+const URL = 'ws://localhost:3991/ws';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 let pass = 0, fail = 0;

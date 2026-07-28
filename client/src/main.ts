@@ -233,6 +233,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   const hud = new Hud();
   hud.setFoodCooldown(welcome.food.cooldownSec);
   hud.setMaxLevel(welcome.levels.max);
+  hud.setRankCfg(welcome.rank);
   hud.killFeedEnabled = settings.values.killFeed;
   const shop = new Shop(welcome);
   const minimap = new Minimap(welcome.world.size);

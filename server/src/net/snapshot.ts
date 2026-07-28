@@ -121,6 +121,7 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     maxHp: p.maxHp,
     money: p.money,
     banked: p.banked,
+    bankedTotal: p.bankedTotal,
     weapons: p.weapons,
     equipped: p.equipped,
     buildings: p.buildingIds.size,

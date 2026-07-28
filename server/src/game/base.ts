@@ -92,22 +92,54 @@ export function restoreBase(world: World, p: Player): boolean {
   // Log the player back in at their own base rather than a random spawn — the
   // base is home, and waking up on the far side of the map makes it useless.
   const anchor = saved.buildings.find((b) => b.t === 'vault') ?? saved.buildings[0];
+
+  const free = (x: number, y: number): boolean => {
+    for (const e of world.grid.queryCircle(x, y, bal.economy.buildingMinDist)) {
+      if (e.kind === 'building') return false;
+    }
+    return true;
+  };
+
+  // Someone may have built over our old plot while we were away. Rather than
+  // dropping the base (which would wipe the player's investment), shift the
+  // whole layout by a shared offset until it fits somewhere nearby.
+  const anchorX = anchor?.x ?? p.x;
+  const anchorY = anchor?.y ?? p.y;
+  let offX = 0, offY = 0;
+  const fits = (ox: number, oy: number): boolean =>
+    saved.buildings.every((sb) => {
+      const cfg = bal.buildings[sb.t];
+      if (!cfg) return true;
+      const x = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.x + ox));
+      const y = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.y + oy));
+      return free(x, y);
+    });
+  if (!fits(0, 0)) {
+    for (let ring = 1; ring <= 12; ring++) {
+      const step = ring * bal.economy.buildingMinDist * 2.2;
+      let found = false;
+      for (let a = 0; a < 8; a++) {
+        const ang = (a / 8) * Math.PI * 2;
+        const ox = Math.cos(ang) * step;
+        const oy = Math.sin(ang) * step;
+        if (fits(ox, oy)) { offX = ox; offY = oy; found = true; break; }
+      }
+      if (found) break;
+    }
+  }
   if (anchor) {
-    world.moveEntity(p, Math.max(60, Math.min(size - 60, anchor.x)), Math.max(60, Math.min(size - 60, anchor.y + 110)));
+    world.moveEntity(p,
+      Math.max(60, Math.min(size - 60, anchorX + offX)),
+      Math.max(60, Math.min(size - 60, anchorY + offY + 110)));
   }
 
   let placed = 0;
   for (const sb of saved.buildings) {
     if (!BUILDING_IDS.includes(sb.t)) continue;
     const cfg = bal.buildings[sb.t];
-    const x = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.x));
-    const y = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.y));
-    // someone else may have built here while we were away — skip that slot
-    let blocked = false;
-    for (const e of world.grid.queryCircle(x, y, bal.economy.buildingMinDist)) {
-      if (e.kind === 'building') { blocked = true; break; }
-    }
-    if (blocked) continue;
+    const x = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.x + offX));
+    const y = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.y + offY));
+    if (!free(x, y)) continue; // last-resort skip if even the shifted spot is taken
     const stored = accrueOffline(sb.t, Math.max(0, sb.s), awayMs);
     const b = makeBuilding(world, sb.t, x, y, { id: p.id, name: p.name, account: p.account }, now, stored);
     p.buildingIds.add(b.id);

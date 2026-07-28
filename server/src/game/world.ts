@@ -141,7 +141,7 @@ export class World {
     return randomPointInBiome(b, size, 300);
   }
 
-  spawnPlayer(name: string, ws: WebSocket | null, account?: { name: string; money: number; banked: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number; level: number; food: number }, lang: 'ru' | 'en' = 'ru', bot = false): Player {
+  spawnPlayer(name: string, ws: WebSocket | null, account?: { name: string; money: number; banked: number; bankedTotal: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number; level: number; food: number }, lang: 'ru' | 'en' = 'ru', bot = false): Player {
     const bal = getBalance();
     const pos = this.spawnPoint();
     const weapons: WeaponId[] = account ? [...account.weapons] : ['fists'];
@@ -164,6 +164,7 @@ export class World {
       input: { seq: 0, mx: 0, my: 0, aim: 0, attack: false },
       money: account ? account.money : bal.player.startMoney,
       banked: account ? account.banked : 0,
+      bankedTotal: account ? account.bankedTotal : 0,
       weapons,
       equipped: 'fists',
       food: account ? Math.max(0, Math.min(Math.floor(account.food), bal.food.maxCarry)) : 0,
