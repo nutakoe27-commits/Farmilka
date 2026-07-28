@@ -70,7 +70,9 @@ for (const b of Object.values(bal.bosses)) {
   // every beat after it (the crate, the raid) silently has nothing to spend.
   b.contactDamage = 1;
   for (const a of [b.slam, b.burst, b.unique]) if (a) a.damage = 1;
-  b.spawnIntervalSec = 100 * S;     // arrives in time for the finale, not before
+  // Wall-clock, not slow-world: the boss timer runs on the server's real clock,
+  // so it has to land inside the take whatever the slow-motion factor is.
+  b.spawnIntervalSec = 120;
 }
 // the crate beat has to land every time
 bal.weaponLootbox = { ...bal.weaponLootbox, legendaryChance: 1, epicChance: 0, weaponChance: 0, goldChance: 0 };
