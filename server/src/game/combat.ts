@@ -65,7 +65,9 @@ export function performAttack(world: World, p: Player, w: WeaponCfg, now: number
     // Knockback only a still-living target — a dead one has already been removed
     // from the world, and moveEntity would re-insert it into the grid as a 0-HP ghost.
     if (hit && !t.dead && w.knockback && t.kind !== 'building' && t.kind !== 'boss') {
-      world.moveEntity(t, t.x + Math.cos(ang) * w.knockback, t.y + Math.sin(ang) * w.knockback);
+      // knockback slides along walls — you cannot punch someone through a base
+      world.moveSolid(t, t.x + Math.cos(ang) * w.knockback, t.y + Math.sin(ang) * w.knockback,
+        t.kind === 'player' ? t.id : undefined);
     }
   }
 }
@@ -225,6 +227,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
       // extraction rule: everything carried is lost, banked gold is untouched
       const dropped = Math.floor(target.money * bal.player.dropMoneyFrac * (1 - victimFx.dropSaveFrac));
       target.money -= dropped;
+      target.withdrawCredit = 0; // the withdrawn gold is gone — the debt dies with it
       world.spawnCoinPiles(target.x, target.y, dropped);
       // death is harsh: purchased weapons and carried food are lost too
       const equippedAtDeath = target.equipped;
@@ -339,7 +342,8 @@ export function updateProjectiles(world: World, dt: number, now: number): void {
             if (wcfg.pull && owner && !t.dead && (t.kind === 'player' || t.kind === 'mob')) {
               const ang = Math.atan2(t.y - owner.y, t.x - owner.x);
               const hold = owner.radius + t.radius + 30;
-              world.moveEntity(t, owner.x + Math.cos(ang) * hold, owner.y + Math.sin(ang) * hold);
+              world.moveSolid(t, owner.x + Math.cos(ang) * hold, owner.y + Math.sin(ang) * hold,
+                t.kind === 'player' ? t.id : undefined);
             }
           }
         }

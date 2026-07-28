@@ -10,6 +10,8 @@ export interface Account {
   banked: number;
   /** every coin ever deposited — drives Base Rank and never goes down */
   bankedTotal: number;
+  /** gold withdrawn from the vault and not yet re-banked (see depositAll) */
+  withdrawCredit: number;
   weapons: WeaponId[];
   hats: string[];
   hat: string | null;
@@ -38,13 +40,13 @@ export function register(name: string, password: string, startMoney = 0, lang: L
   getDb()
     .prepare('INSERT INTO accounts (name, pass_hash, salt, money, weapons, created_ts, last_seen_ts) VALUES (?,?,?,?,?,?,?)')
     .run(name, hash(password, salt), salt, startMoney, JSON.stringify(['fists']), now, now);
-  return { ok: true, account: { name, money: startMoney, banked: 0, bankedTotal: 0, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now } };
+  return { ok: true, account: { name, money: startMoney, banked: 0, bankedTotal: 0, withdrawCredit: 0, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now } };
 }
 
 export function login(name: string, password: string, lang: Lang = 'ru'): { ok: boolean; reason?: string; account?: Account } {
   const row = getDb()
-    .prepare('SELECT name, pass_hash, salt, money, banked, banked_total, weapons, hats, hat, prestige, level, food, created_ts FROM accounts WHERE name = ? COLLATE NOCASE')
-    .get(name) as { name: string; pass_hash: string; salt: string; money: number; banked: number | null; banked_total: number | null; weapons: string; hats: string | null; hat: string | null; prestige: number | null; level: number | null; food: number | null; created_ts: number } | undefined;
+    .prepare('SELECT name, pass_hash, salt, money, banked, banked_total, withdraw_credit, weapons, hats, hat, prestige, level, food, created_ts FROM accounts WHERE name = ? COLLATE NOCASE')
+    .get(name) as { name: string; pass_hash: string; salt: string; money: number; banked: number | null; banked_total: number | null; withdraw_credit: number | null; weapons: string; hats: string | null; hat: string | null; prestige: number | null; level: number | null; food: number | null; created_ts: number } | undefined;
   if (!row) return { ok: false, reason: tr(lang, 'accountNotFound') };
   const attempt = hash(password, row.salt);
   if (!crypto.timingSafeEqual(Buffer.from(attempt), Buffer.from(row.pass_hash))) {
@@ -65,11 +67,11 @@ export function login(name: string, password: string, lang: Lang = 'ru'): { ok: 
     hats = [];
   }
   const hat = row.hat && hats.includes(row.hat) ? row.hat : null;
-  return { ok: true, account: { name: row.name, money: row.money, banked: Math.max(0, row.banked ?? 0), bankedTotal: Math.max(0, row.banked_total ?? 0), weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts } };
+  return { ok: true, account: { name: row.name, money: row.money, banked: Math.max(0, row.banked ?? 0), bankedTotal: Math.max(0, row.banked_total ?? 0), withdrawCredit: Math.max(0, row.withdraw_credit ?? 0), weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts } };
 }
 
 type AccountRow = {
-  name: string; money: number; banked: number | null; banked_total: number | null; weapons: string; hats: string | null; hat: string | null;
+  name: string; money: number; banked: number | null; banked_total: number | null; withdraw_credit: number | null; weapons: string; hats: string | null; hat: string | null;
   prestige: number | null; level: number | null; food: number | null; created_ts: number;
 };
 
@@ -85,10 +87,10 @@ function rowToAccount(row: AccountRow): Account {
     if (Array.isArray(parsed)) hats = parsed.filter((h) => typeof h === 'string');
   } catch { hats = []; }
   const hat = row.hat && hats.includes(row.hat) ? row.hat : null;
-  return { name: row.name, money: row.money, banked: Math.max(0, row.banked ?? 0), bankedTotal: Math.max(0, row.banked_total ?? 0), weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts };
+  return { name: row.name, money: row.money, banked: Math.max(0, row.banked ?? 0), bankedTotal: Math.max(0, row.banked_total ?? 0), withdrawCredit: Math.max(0, row.withdraw_credit ?? 0), weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts };
 }
 
-const ACC_COLS = 'name, money, banked, banked_total, weapons, hats, hat, prestige, level, food, created_ts';
+const ACC_COLS = 'name, money, banked, banked_total, withdraw_credit, weapons, hats, hat, prestige, level, food, created_ts';
 
 /** Account columns that hold a third-party portal's player id. */
 type PlatformIdColumn = 'yandex_id' | 'cg_id';
@@ -112,7 +114,7 @@ function loginPlatform(column: PlatformIdColumn, platformId: string, displayName
   for (let i = 2; accountExists(name); i++) name = `${base.slice(0, 13)}#${i}`; // dodge name-uniqueness clashes
   db.prepare(`INSERT INTO accounts (name, pass_hash, salt, money, weapons, created_ts, last_seen_ts, ${column}) VALUES (?,?,?,?,?,?,?,?)`)
     .run(name, passHash, salt, startMoney, JSON.stringify(['fists']), now, now, platformId);
-  return { name, money: startMoney, banked: 0, bankedTotal: 0, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now };
+  return { name, money: startMoney, banked: 0, bankedTotal: 0, withdrawCredit: 0, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now };
 }
 
 /** Yandex Games player id → account. */
@@ -181,8 +183,8 @@ export function saveBase(name: string, json: string): void {
 }
 
 /** Persists gold, weapons, hats, prestige, level and food at logout. */
-export function saveProgress(name: string, money: number, banked: number, bankedTotal: number, weapons: WeaponId[], hats: string[], hat: string | null, prestige: number, level: number, food: number): void {
+export function saveProgress(name: string, money: number, banked: number, bankedTotal: number, withdrawCredit: number, weapons: WeaponId[], hats: string[], hat: string | null, prestige: number, level: number, food: number): void {
   getDb()
-    .prepare('UPDATE accounts SET money = ?, banked = ?, banked_total = ?, weapons = ?, hats = ?, hat = ?, prestige = ?, level = ?, food = ?, last_seen_ts = ? WHERE name = ? COLLATE NOCASE')
-    .run(money, Math.max(0, Math.floor(banked)), Math.max(0, Math.floor(bankedTotal)), JSON.stringify(weapons), JSON.stringify(hats), hat, prestige, Math.max(1, Math.floor(level)), Math.max(0, Math.floor(food)), Date.now(), name);
+    .prepare('UPDATE accounts SET money = ?, banked = ?, banked_total = ?, withdraw_credit = ?, weapons = ?, hats = ?, hat = ?, prestige = ?, level = ?, food = ?, last_seen_ts = ? WHERE name = ? COLLATE NOCASE')
+    .run(money, Math.max(0, Math.floor(banked)), Math.max(0, Math.floor(bankedTotal)), Math.max(0, Math.floor(withdrawCredit)), JSON.stringify(weapons), JSON.stringify(hats), hat, prestige, Math.max(1, Math.floor(level)), Math.max(0, Math.floor(food)), Date.now(), name);
 }

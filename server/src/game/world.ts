@@ -11,7 +11,8 @@ import type { Entity, Player, Mob, Boss, Projectile, Coin, Food, Building } from
 import { updatePlayers } from './player.js';
 import { updateMobs, populateMobs } from './mobs.js';
 import { updateBosses, updateBossTimers } from './boss.js';
-import { updateBuildings } from './buildings.js';
+import { updateBuildings, solidsNear } from './buildings.js';
+import { resolveSolids } from '@shared/collision.js';
 import { updateCoins } from './economy.js';
 import { updateProjectiles } from './combat.js';
 import { ensureBots, updateBots } from './bots.js';
@@ -98,6 +99,24 @@ export class World {
     e.movedTick = this.tickNo;
   }
 
+  /**
+   * Like moveEntity, but slides around solid buildings instead of through
+   * them. `ignoreOwnerId` passes through that player's own base. The client
+   * runs the same resolution on the same inputs, so prediction agrees.
+   */
+  moveSolid(e: Entity, nx: number, ny: number, ignoreOwnerId?: string): void {
+    const size = getBalance().world.size;
+    nx = clamp(nx, e.radius, size - e.radius);
+    ny = clamp(ny, e.radius, size - e.radius);
+    const solids = solidsNear(this, nx, ny, e.radius, ignoreOwnerId);
+    if (solids.length) {
+      const res = resolveSolids(nx, ny, e.radius, solids);
+      nx = clamp(res.x, e.radius, size - e.radius);
+      ny = clamp(res.y, e.radius, size - e.radius);
+    }
+    this.moveEntity(e, nx, ny);
+  }
+
   // ---------- messaging ----------
 
   send(p: Player, msg: ServerMsg): void {
@@ -141,7 +160,7 @@ export class World {
     return randomPointInBiome(b, size, 300);
   }
 
-  spawnPlayer(name: string, ws: WebSocket | null, account?: { name: string; money: number; banked: number; bankedTotal: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number; level: number; food: number }, lang: 'ru' | 'en' = 'ru', bot = false): Player {
+  spawnPlayer(name: string, ws: WebSocket | null, account?: { name: string; money: number; banked: number; bankedTotal: number; withdrawCredit: number; weapons: WeaponId[]; hats: string[]; hat: string | null; prestige: number; level: number; food: number }, lang: 'ru' | 'en' = 'ru', bot = false): Player {
     const bal = getBalance();
     const pos = this.spawnPoint();
     const weapons: WeaponId[] = account ? [...account.weapons] : ['fists'];
@@ -189,6 +208,7 @@ export class World {
       raidShieldUntil: 0,
       dockedVaultId: null,
       bankPaused: false,
+      withdrawCredit: account ? account.withdrawCredit : 0,
       buildingIds: new Set(),
       known: new Set(),
       session: { joinedAt: Date.now(), kills: 0, deaths: 0, moneyEarned: 0 },

@@ -3,6 +3,8 @@ import { getDb } from '../db/db.js';
 import { reloadBalance, getBalance } from '../game/balance.js';
 import { WEAPON_IDS } from '@shared/balance-schema.js';
 import type { World } from '../game/world.js';
+import { countBuildings } from '../game/buildings.js';
+import { rankFromBanked } from '@shared/rank.js';
 
 function esc(v: unknown): string {
   return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -69,8 +71,8 @@ export function adminRouter(getWorlds: () => World[]): Router {
     const name = String(req.query.name ?? '');
     const now = Date.now();
 
-    const acc = db.prepare('SELECT created_ts, last_seen_ts, money, weapons FROM accounts WHERE name = ? COLLATE NOCASE').get(name) as
-      | { created_ts: number; last_seen_ts: number; money: number; weapons: string }
+    const acc = db.prepare('SELECT created_ts, last_seen_ts, money, banked, banked_total, base, weapons FROM accounts WHERE name = ? COLLATE NOCASE').get(name) as
+      | { created_ts: number; last_seen_ts: number; money: number; banked: number | null; banked_total: number | null; base: string | null; weapons: string }
       | undefined;
     const sess = db.prepare('SELECT COUNT(*) n, SUM(COALESCE(left_ts, ?) - joined_ts) total, SUM(kills) kills, SUM(deaths) deaths, SUM(money_earned) earned FROM sessions WHERE player = ? COLLATE NOCASE').get(now, name) as { n: number; total: number | null; kills: number | null; deaths: number | null; earned: number | null };
     const online = worlds.some((w) => [...w.players.values()].some((p) => p.ws && p.name.toLowerCase() === name.toLowerCase()));
@@ -86,10 +88,37 @@ export function adminRouter(getWorlds: () => World[]): Router {
     const kills = sess.kills ?? 0;
     const deaths = sess.deaths ?? 0;
 
+    // extraction + raiding, the two things the loop now runs on
+    const bankRows = db.prepare(`SELECT action, SUM(amount) total, SUM(scored) scored, COUNT(*) n FROM banking WHERE player = ? COLLATE NOCASE GROUP BY action`).all(name) as { action: string; total: number; scored: number; n: number }[];
+    const dep = bankRows.find((r) => r.action === 'deposit');
+    const wd = bankRows.find((r) => r.action === 'withdraw');
+    const lostOnDeath = (db.prepare(`SELECT SUM(money_dropped) s FROM deaths WHERE player = ? COLLATE NOCASE`).get(name) as { s: number | null }).s ?? 0;
+    const raidsDone = (db.prepare(`SELECT COUNT(*) n FROM kills WHERE victim_kind='building' AND killer = ? COLLATE NOCASE`).get(name) as { n: number }).n;
+    const razedOf = (db.prepare(`SELECT victim, COUNT(*) n FROM kills WHERE victim_kind='building' AND killer = ? COLLATE NOCASE GROUP BY victim ORDER BY n DESC`).all(name) as { victim: string; n: number }[]);
+    const rank = rankFromBanked(Math.max(0, acc?.banked_total ?? 0), getBalance().rank);
+
+    // what their saved base looks like right now
+    let baseSummary = 'база не сохранена';
+    if (acc?.base) {
+      try {
+        const parsed = JSON.parse(acc.base) as { buildings?: { t: string }[]; ts?: number };
+        const counts = new Map<string, number>();
+        for (const b of parsed.buildings ?? []) counts.set(b.t, (counts.get(b.t) ?? 0) + 1);
+        baseSummary = [...counts.entries()].sort().map(([t, n]) => `${t} ×${n}`).join(', ') || 'пусто';
+      } catch {
+        baseSummary = 'не читается';
+      }
+    }
+
     const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${esc(name)} — FarmClash</title>${STYLE}</head><body>
 <p><a href="/admin/stats?token=${encodeURIComponent(token)}">← ко всей статистике</a></p>
 <h1>Профиль: ${esc(name)} ${online ? '<span class="tag">онлайн</span>' : ''} ${acc ? '<span class="tag">аккаунт</span>' : '<span class="tag guest">гость</span>'}</h1>
-${acc ? `<p class="note">Зарегистрирован: ${fmtDate(acc.created_ts)} · был в сети: ${fmtDate(acc.last_seen_ts)} · золото на счету: ${fmt(acc.money)} · оружие: ${esc(acc.weapons)}</p>` : '<p class="note">Играет без аккаунта (имя может использоваться разными людьми).</p>'}
+${acc ? `<p class="note">Зарегистрирован: ${fmtDate(acc.created_ts)} · был в сети: ${fmtDate(acc.last_seen_ts)} · при себе: ${fmt(acc.money)} · в хранилище: ${fmt(acc.banked ?? 0)} · ранг базы: ${rank} (за всё время занесено ${fmt(acc.banked_total ?? 0)}) · оружие: ${esc(acc.weapons)}</p>
+<p class="note">Сохранённая база: ${esc(baseSummary)}</p>` : '<p class="note">Играет без аккаунта (имя может использоваться разными людьми).</p>'}
+${table('Экстракция и рейды', ['Занесено в ранг', 'Вкладов, раз', 'Снято', 'Снятий, раз', 'Потеряно на смертях', 'Снёс чужих построек'], [[
+  fmt(dep?.scored ?? 0), dep?.n ?? 0, fmt(wd?.total ?? 0), wd?.n ?? 0, fmt(lostOnDeath), raidsDone,
+]])}
+${razedOf.length ? table('Что сносил', ['Постройка', 'Раз'], razedOf.map((r) => [r.victim, r.n])) : ''}
 ${table('Сводка', ['Сессий', 'Время в игре', 'Убийств', 'Смертей', 'K/D', 'Заработано денег', 'Съедено еды', 'Отхилено HP'], [[
   sess.n, fmtDur(sess.total ?? 0), kills, deaths, fmt(deaths > 0 ? kills / deaths : kills), fmt(sess.earned ?? 0), healsRow.n, fmt(healsRow.total ?? 0),
 ]])}
@@ -113,26 +142,87 @@ ${table('Последние сессии', ['Вход', 'Длительност�
     const since = Date.now() - hours * 3600_000;
     const now = Date.now();
 
+    const rankCfg = getBalance().rank;
+
     // --- live online (all game servers) ---
     const onlineRows: string[][] = [];
     let onlineTotal = 0;
     for (const w of worlds) {
       for (const p of w.connectedPlayers()) {
         onlineTotal++;
+        const b = countBuildings(w, p);
         onlineRows.push([
           String(w.serverId),
           playerLink(p.name, token),
           p.account ? '<span class="tag">аккаунт</span>' : '<span class="tag guest">гость</span>',
           fmt(p.money),
+          fmt(p.banked),
+          String(rankFromBanked(p.bankedTotal, rankCfg)),
           String(p.session.kills),
           String(p.session.deaths),
           esc(p.equipped),
           esc(p.hat ?? '—'),
-          String(p.buildingIds.size),
+          `${b.other} + ${b.walls}🧱`,
+          p.raidShieldUntil > now ? '🛡' : '—',
           esc(fmtDur(now - p.session.joinedAt)),
         ]);
       }
     }
+
+    // --- bases standing in the live worlds, by type ---
+    const baseByType = new Map<string, { owned: number; absent: number; stored: number }>();
+    let absentBases = 0;
+    for (const w of worlds) {
+      const absentAccounts = new Set<string>();
+      for (const b of w.buildings.values()) {
+        const e = baseByType.get(b.buildingType) ?? { owned: 0, absent: 0, stored: 0 };
+        if (b.ownerId) e.owned++;
+        else { e.absent++; if (b.ownerAccount) absentAccounts.add(b.ownerAccount); }
+        e.stored += b.stored;
+        baseByType.set(b.buildingType, e);
+      }
+      absentBases += absentAccounts.size;
+    }
+    const baseRows = [...baseByType.entries()].sort().map(([t, e]) => [t, e.owned, e.absent, fmt(e.stored)]);
+
+    // --- extraction: what actually reaches the vault vs what is dropped ---
+    const bankAgg = db.prepare(`SELECT action, SUM(amount) total, SUM(scored) scored, COUNT(*) n, COUNT(DISTINCT player) players FROM banking WHERE ts>=? GROUP BY action`).all(since) as { action: string; total: number; scored: number; n: number; players: number }[];
+    const deposits = bankAgg.find((r) => r.action === 'deposit');
+    const withdrawals = bankAgg.find((r) => r.action === 'withdraw');
+    const droppedRow = db.prepare(`SELECT SUM(money_dropped) lost FROM deaths WHERE ts>=?`).get(since) as { lost: number | null };
+    const banked = deposits?.scored ?? 0;
+    const lost = droppedRow.lost ?? 0;
+    const extractRate = banked + lost > 0 ? (banked / (banked + lost)) * 100 : 0;
+    const extractRows = [[
+      fmt(banked), fmt(lost), `${fmt(extractRate)}%`,
+      fmt(deposits?.total ?? 0), deposits?.n ?? 0, fmt(withdrawals?.total ?? 0), withdrawals?.n ?? 0,
+      deposits?.players ?? 0,
+    ]];
+
+    // --- raids: buildings razed and what they paid out ---
+    const razed = db.prepare(`SELECT victim AS building, COUNT(*) n FROM kills WHERE victim_kind='building' AND ts>=? GROUP BY victim ORDER BY n DESC`).all(since) as { building: string; n: number }[];
+    const raidIncome = db.prepare(`SELECT COUNT(*) n, SUM(amount) total, COUNT(DISTINCT player) raiders FROM income WHERE source='raid' AND ts>=?`).get(since) as { n: number; total: number | null; raiders: number };
+    const topRaiders = db.prepare(`SELECT killer, COUNT(*) n FROM kills WHERE victim_kind='building' AND ts>=? GROUP BY killer COLLATE NOCASE ORDER BY n DESC LIMIT 8`).all(since) as { killer: string; n: number }[];
+    const razedRows = razed.map((r) => [r.building, r.n]);
+    const raidRows = [[razed.reduce((s, r) => s + r.n, 0), raidIncome.raiders ?? 0, fmt(raidIncome.total ?? 0),
+      fmt(raidIncome.n > 0 ? (raidIncome.total ?? 0) / raidIncome.n : 0)]];
+
+    // --- Base Rank spread across all accounts ---
+    const bankedTotals = (db.prepare('SELECT banked_total bt FROM accounts').all() as { bt: number | null }[])
+      .map((r) => rankFromBanked(Math.max(0, r.bt ?? 0), rankCfg));
+    const rankBuckets = [
+      { label: '0 (нет ранга)', hit: (r: number) => r === 0 },
+      { label: '1–4', hit: (r: number) => r >= 1 && r <= 4 },
+      { label: '5–9', hit: (r: number) => r >= 5 && r <= 9 },
+      { label: '10–19', hit: (r: number) => r >= 10 && r <= 19 },
+      { label: '20+', hit: (r: number) => r >= 20 },
+    ];
+    const rankRows = rankBuckets.map((b) => [b.label, bankedTotals.filter((r) => b.hit(r)).length]);
+    const topRanked = db.prepare('SELECT name, banked, banked_total FROM accounts ORDER BY banked_total DESC LIMIT 10').all() as { name: string; banked: number | null; banked_total: number | null }[];
+    const topRankRows = topRanked.map((r) => [
+      playerLink(r.name, token), String(rankFromBanked(Math.max(0, r.banked_total ?? 0), rankCfg)),
+      fmt(r.banked_total ?? 0), fmt(r.banked ?? 0),
+    ]);
 
     // --- totals ---
     const totalPlayers = (db.prepare('SELECT COUNT(DISTINCT player COLLATE NOCASE) n FROM sessions').get() as { n: number }).n;
@@ -224,11 +314,18 @@ ${table('Последние сессии', ['Вход', 'Длительност�
 <p class="note">Период: <a href="?token=${esc(token)}&hours=1">1ч</a> · <a href="?token=${esc(token)}&hours=24">24ч</a> · <a href="?token=${esc(token)}&hours=168">неделя</a> · <a href="?token=${esc(token)}&hours=720">месяц</a>.
 Кликните имя игрока — откроется его профиль.</p>
 ${table(loadTitle, ['Срв', 'Игроки', 'Сущности', 'Тик (мс)', 'Трафик'], loadRows, true)}
-${table(`Сейчас онлайн: ${onlineTotal} (${worlds.map((w) => `сервер ${w.serverId}: ${w.connectedPlayers().length}`).join(' · ')})`, ['Срв', 'Игрок', 'Тип', 'Деньги', 'Убийств', 'Смертей', 'Оружие', 'Шляпа', 'Построек', 'В игре'], onlineRows, true)}
+${table(`Сейчас онлайн: ${onlineTotal} (${worlds.map((w) => `сервер ${w.serverId}: ${w.connectedPlayers().length}`).join(' · ')})`, ['Срв', 'Игрок', 'Тип', 'При себе', 'В хранилище', 'Ранг', 'Убийств', 'Смертей', 'Оружие', 'Шляпа', 'Построек', 'Щит', 'В игре'], onlineRows, true)}
 ${table('Всего за всё время', ['Уникальных игроков', 'Зарегистрировано аккаунтов', 'Сессий', 'Суммарное время игры', `Новых аккаунтов за ${hours}ч`, `Игроков за ${hours}ч`], [[
   totalPlayers, totalAccounts, totalSessions, fmtDur(totalPlayMs), newAccounts, periodPlayers,
 ]])}
 ${table('Топ игроков за период', ['Игрок', 'Убийств', 'Смертей', 'K/D', 'Заработано', 'Время'], topRows, true)}
+${table('Экстракция: донесли до хранилища или потеряли на смерти', ['Занесено в ранг', 'Потеряно на смертях', 'Доля дошедшего', 'Вкладов всего', 'Вкладов, раз', 'Снято', 'Снятий, раз', 'Игроков'], extractRows)}
+${table('Рейды', ['Снесено построек', 'Рейдеров', 'Лута всего', 'Лут за постройку'], raidRows)}
+${table('Что сносят', ['Постройка', 'Снесено'], razedRows)}
+${table('Топ рейдеров', ['Игрок', 'Снесено построек'], topRaiders.map((r) => [playerLink(r.killer, token), String(r.n)]), true)}
+${table(`Базы в живых мирах (заочных баз: ${absentBases})`, ['Постройка', 'С владельцем', 'Заочных', 'В силосах'], baseRows)}
+${table('Распределение по рангам базы', ['Ранг', 'Аккаунтов'], rankRows)}
+${table('Топ по рангу базы', ['Игрок', 'Ранг', 'Занесено за всё время', 'Сейчас в хранилище'], topRankRows, true)}
 ${table('Баланс оружия (только игроцкое оружие)', ['Оружие', 'Убийств всего', 'PvP-убийств', 'Доля PvP', 'Смертей с ним', 'K/D (PvP)', 'Урон', 'Игроков', 'Ср. дистанция'], weaponRows)}
 ${table('Убито мобов (PvE)', ['Моб', 'Убито'], mobRows)}
 ${table('Доход по источникам', ['Источник', 'Всего', 'Событий', 'Доход / игро-час'], incomeRows)}

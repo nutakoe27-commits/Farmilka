@@ -234,6 +234,8 @@ export interface Balance {
   economy: {
     maxBuildingsPerPlayer: number;
     maxTurretsPerPlayer: number;
+    /** walls have their own budget — they are fortification, not economy */
+    maxWallsPerPlayer: number;
     buildingMinDist: number;
     /** share of a building's price dropped as scrap when it is destroyed */
     raidLootFrac: number;
@@ -410,7 +412,7 @@ export function validateBalance(raw: unknown): Balance {
   }
 
   const economy = section(root, 'economy');
-  for (const k of ['maxBuildingsPerPlayer', 'maxTurretsPerPlayer', 'buildingMinDist', 'raidLootFrac', 'vaultRaidFrac', 'raidShieldSec', 'dangerBiomeMult', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
+  for (const k of ['maxBuildingsPerPlayer', 'maxTurretsPerPlayer', 'maxWallsPerPlayer', 'buildingMinDist', 'raidLootFrac', 'vaultRaidFrac', 'raidShieldSec', 'dangerBiomeMult', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
     num(economy, k, 'economy');
   }
 

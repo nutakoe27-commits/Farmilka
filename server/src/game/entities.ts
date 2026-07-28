@@ -116,6 +116,12 @@ export interface Player extends BaseEntity, StatusEffects {
   dockedVaultId: string | null;
   /** set by a withdrawal: no auto-banking until the player walks away */
   bankPaused: boolean;
+  /**
+   * Gold pulled back out of the vault and not yet re-deposited. Re-banking it
+   * repays this first, so shuffling the same coins in and out cannot inflate
+   * `bankedTotal` (and with it Base Rank).
+   */
+  withdrawCredit: number;
   buildingIds: Set<string>;
   known: Set<string>;
   session: SessionStats;

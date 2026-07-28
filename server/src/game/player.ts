@@ -30,9 +30,9 @@ export function updatePlayers(world: World, dt: number, now: number): void {
     const hat = hatEffects(p.hat);
     let speed = bal.player.speed * hat.speedMult * chillSpeedFactor(p, now);
     if (w.type === 'ranged' && p.input.attack && w.slowFactor) speed *= w.slowFactor;
-    if (mx !== 0 || my !== 0) {
-      world.moveEntity(p, p.x + mx * speed * dt, p.y + my * speed * dt);
-    }
+    // Resolved every tick, not only while moving: a building raised on top of
+    // someone (base restore, respawn) has to push them out rather than trap them.
+    world.moveSolid(p, p.x + mx * speed * dt, p.y + my * speed * dt, p.id);
     if (p.angle !== p.input.aim) {
       p.angle = p.input.aim;
       p.movedTick = world.tickNo;

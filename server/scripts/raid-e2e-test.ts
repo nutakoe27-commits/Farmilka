@@ -18,7 +18,8 @@ class Client {
   ws: WebSocket;
   ready = false;
   id = '';
-  self: { money: number; banked: number; buildings: number } = { money: 0, banked: 0, buildings: 0 };
+  welcome: { buildings: Record<string, { radius: number; price: number }> } | null = null;
+  self: { money: number; banked: number; buildings: number; walls: number } = { money: 0, banked: 0, buildings: 0, walls: 0 };
   entities = new Map<string, { kind: string; buildingType?: string; owner?: string; x: number; y: number }>();
   events: { e: string; [k: string]: unknown }[] = [];
 
@@ -29,7 +30,7 @@ class Client {
     this.ws.on('message', (d, isBinary) => {
       if (!isBinary) {
         const m = JSON.parse(d.toString());
-        if (m.t === 'welcome') { this.ready = true; this.id = m.id; }
+        if (m.t === 'welcome') { this.ready = true; this.id = m.id; this.welcome = m; }
         else if (m.t === 'event') this.events.push(m.ev);
         else if (m.t === 'reject') console.error('rejected:', m.reason);
         return;
@@ -38,7 +39,7 @@ class Client {
       for (const s of m.add) this.entities.set(s.id, s as never);
       for (const u of m.upd) { const e = this.entities.get(u.id); if (e) { e.x = u.x; e.y = u.y; } }
       for (const id of m.rem) this.entities.delete(id);
-      this.self = { money: m.self.money, banked: m.self.banked, buildings: m.self.buildings };
+      this.self = { money: m.self.money, banked: m.self.banked, buildings: m.self.buildings, walls: m.self.walls };
     });
   }
   send(o: object): void { this.ws.send(JSON.stringify(o)); }
@@ -104,6 +105,36 @@ async function main(): Promise<void> {
   check('reconnect restores the saved base', b.self.buildings >= 2, `buildings=${b.self.buildings}`);
   check('banked gold persisted across the logout', b.self.banked === banked, `banked=${b.self.banked} was=${banked}`);
   check('the restored base still has a vault', !!b.mine('vault'));
+
+  // ---- walls: own budget, laid shoulder to shoulder ----
+  {
+    const wallCfg = b.welcome?.buildings.wall;
+    const me = b.entities.get(b.id);
+    if (wallCfg && me) {
+      b.send({ t: 'withdraw' }); // pay for the walls out of the vault
+      await sleep(300);
+      const otherBefore = b.self.buildings;
+      const r = wallCfg.radius;
+      const afford = Math.floor(b.self.money / wallCfg.price);
+      b.events.length = 0;
+      // touching walls: centres exactly two half-sizes apart
+      for (let i = 0; i < afford + 1; i++) {
+        b.send({ t: 'place', building: 'wall', x: me.x - 120 + i * r * 2, y: me.y + 120 });
+        await sleep(250);
+      }
+      const results = b.events.filter((e) => e.e === 'placed');
+      check('every affordable wall was accepted', b.self.walls === afford && afford > 0,
+        `walls=${b.self.walls} afford=${afford}`);
+      check('adjacent walls are never refused for spacing',
+        !results.some((e) => String(e.reason ?? '').includes('близко')),
+        results.map((e) => `${e.ok}:${e.reason ?? ''}`).join(' | '));
+      check('walls do not eat the ordinary building slots', b.self.buildings === otherBefore,
+        `buildings=${b.self.buildings} was=${otherBefore}`);
+      let placed = 0;
+      for (const e of b.entities.values()) if (e.kind === 'building' && e.buildingType === 'wall' && e.owner === b.id) placed++;
+      check('the walls actually exist in the world', placed === afford, `n=${placed} afford=${afford}`);
+    }
+  }
 
   b.ws.close();
   console.log(`\n${pass} passed, ${fail} failed`);

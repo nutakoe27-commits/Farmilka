@@ -8,6 +8,7 @@ interface PurchaseRow { ts: number; player: string; item: string; price: number 
 interface DeathRow { ts: number; player: string; cause: DeathCause; weapon: string; equipped: string; moneyDropped: number }
 
 interface HealRow { ts: number; player: string; amount: number }
+interface BankRow { ts: number; player: string; action: 'deposit' | 'withdraw'; amount: number; scored: number }
 
 const kills: KillRow[] = [];
 const damages: DamageRow[] = [];
@@ -15,6 +16,7 @@ const incomes: IncomeRow[] = [];
 const purchases: PurchaseRow[] = [];
 const deaths: DeathRow[] = [];
 const heals: HealRow[] = [];
+const banking: BankRow[] = [];
 
 // damage rows are aggregated per (attacker, weapon, targetKind) between flushes
 const damageAgg = new Map<string, DamageRow>();
@@ -40,6 +42,14 @@ export const telemetry = {
   },
   heal(player: string, amount: number): void {
     heals.push({ ts: Date.now(), player, amount });
+  },
+  /**
+   * Vault traffic. `scored` is the slice of a deposit that raised the lifetime
+   * total — the difference from `amount` is gold the player had withdrawn
+   * earlier, so the two together show how much real extraction is happening.
+   */
+  bank(player: string, action: 'deposit' | 'withdraw', amount: number, scored = 0): void {
+    banking.push({ ts: Date.now(), player, action, amount, scored });
   },
   sessionStart(player: string): number {
     const res = getDb()
@@ -74,6 +84,7 @@ export function startTelemetryFlusher(): void {
   const insPurchase = db.prepare('INSERT INTO purchases (ts, player, item, price) VALUES (?,?,?,?)');
   const insDeath = db.prepare('INSERT INTO deaths (ts, player, cause, weapon, equipped, money_dropped) VALUES (?,?,?,?,?,?)');
   const insHeal = db.prepare('INSERT INTO heals (ts, player, amount) VALUES (?,?,?)');
+  const insBank = db.prepare('INSERT INTO banking (ts, player, action, amount, scored) VALUES (?,?,?,?,?)');
 
   const flush = db.transaction(() => {
     for (const r of kills) insKill.run(r.ts, r.killer, r.victim, r.weapon, Math.round(r.distance), r.victimKind);
@@ -82,17 +93,19 @@ export function startTelemetryFlusher(): void {
     for (const r of purchases) insPurchase.run(r.ts, r.player, r.item, r.price);
     for (const r of deaths) insDeath.run(r.ts, r.player, r.cause, r.weapon, r.equipped, r.moneyDropped);
     for (const r of heals) insHeal.run(r.ts, r.player, r.amount);
+    for (const r of banking) insBank.run(r.ts, r.player, r.action, r.amount, r.scored);
     kills.length = 0;
     damageAgg.clear();
     incomes.length = 0;
     purchases.length = 0;
     deaths.length = 0;
     heals.length = 0;
+    banking.length = 0;
   });
 
   setInterval(() => {
     try {
-      if (kills.length || damageAgg.size || incomes.length || purchases.length || deaths.length || heals.length) flush();
+      if (kills.length || damageAgg.size || incomes.length || purchases.length || deaths.length || heals.length || banking.length) flush();
     } catch (err) {
       console.error('[telemetry] flush failed', err);
     }

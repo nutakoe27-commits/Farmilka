@@ -28,6 +28,7 @@ export function openDb(): Database.Database {
     'ALTER TABLE accounts ADD COLUMN banked INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE accounts ADD COLUMN base TEXT',
     'ALTER TABLE accounts ADD COLUMN banked_total INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE accounts ADD COLUMN withdraw_credit INTEGER NOT NULL DEFAULT 0',
   ]) {
     try {
       db.exec(ddl);

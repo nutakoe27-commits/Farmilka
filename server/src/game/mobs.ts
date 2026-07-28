@@ -131,7 +131,8 @@ export function updateMobs(world: World, dt: number, now: number): void {
       const nx = clamp(mob.x + vx * dt, rect.x0 + mob.radius, rect.x1 - mob.radius);
       const ny = clamp(mob.y + vy * dt, rect.y0 + mob.radius, rect.y1 - mob.radius);
       mob.angle = Math.atan2(vy, vx);
-      world.moveEntity(mob, nx, ny);
+      // mobs respect walls too — fencing the yard is half the point of a base
+      world.moveSolid(mob, nx, ny);
     }
   }
 }

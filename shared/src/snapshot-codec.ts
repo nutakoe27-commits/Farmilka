@@ -173,6 +173,7 @@ function writeSelf(w: Writer, s: SelfState): void {
   w.str(s.equipped);
   w.u8(s.weapons.length); for (const wp of s.weapons) w.str(wp);
   w.u16(s.buildings);
+  w.u16(s.walls);
   w.u8(s.hats.length); for (const h of s.hats) w.str(h);
   w.str(s.hat ?? '');
   w.u8(s.prestige); w.u32(s.prestigeCost);
@@ -186,12 +187,13 @@ function readSelf(r: Reader): SelfState {
   const s: SelfState = {
     x: r.f32(), y: r.f32(), hp: r.u16(), maxHp: r.u16(), money: r.u32(), banked: r.u32(), bankedTotal: r.u32(),
     equipped: r.str() as WeaponId,
-    weapons: [], buildings: 0, hats: [], hat: null,
+    weapons: [], buildings: 0, walls: 0, hats: [], hat: null,
     prestige: 0, prestigeCost: 0, level: 0, levelKills: 0,
     food: 0, foodIn: 0, protIn: 0, chill: 1,
   };
   const wn = r.u8(); for (let i = 0; i < wn; i++) s.weapons.push(r.str() as WeaponId);
   s.buildings = r.u16();
+  s.walls = r.u16();
   const hn = r.u8(); for (let i = 0; i < hn; i++) s.hats.push(r.str());
   { const h = r.str(); s.hat = h || null; }
   s.prestige = r.u8(); s.prestigeCost = r.u32();

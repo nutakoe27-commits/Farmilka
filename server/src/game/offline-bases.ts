@@ -1,6 +1,6 @@
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
-import { makeBuilding } from './buildings.js';
+import { makeBuilding, canPlaceAt } from './buildings.js';
 import { listRaidableBases } from '../db/accounts.js';
 import { accrueOffline, type SavedBase } from './base.js';
 
@@ -89,11 +89,8 @@ export function seedOfflineBases(world: World, onlineAccounts: Set<string>): voi
       if (!cfg) continue;
       const x = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.x));
       const y = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.y));
-      let blocked = false;
-      for (const e of world.grid.queryCircle(x, y, bal.economy.buildingMinDist)) {
-        if (e.kind === 'building') { blocked = true; break; }
-      }
-      if (blocked) continue;
+      // their own layout may be packed wall-to-wall; only foreign bases block it
+      if (!canPlaceAt(world, sb.t, x, y, `acc:${row.name}`, true)) continue;
       // ownerId is empty: nobody in this world owns it, so it is pure raid bait
       const stored = accrueOffline(sb.t, Math.max(0, sb.s), awayMs);
       makeBuilding(world, sb.t, x, y, { id: '', name: row.name, account: row.name }, now, stored);

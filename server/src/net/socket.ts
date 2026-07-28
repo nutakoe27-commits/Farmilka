@@ -108,6 +108,7 @@ export function startServer(worlds: WorldManager): http.Server {
       rank: bal.rank,
       economy: { sellFrac: bal.economy.sellFrac },
       maxBuildings: bal.economy.maxBuildingsPerPlayer,
+      maxWalls: bal.economy.maxWallsPerPlayer,
     };
     ws.send(encode(welcome));
     console.log(`[ws] ${name}${account ? ' (аккаунт)' : ''} joined server ${world.serverId} (${world.connectedPlayers().length} online)`);
@@ -348,7 +349,7 @@ export function startServer(worlds: WorldManager): http.Server {
       // account progress (gold + weapons + hats) survives the session
       if (player.account) {
         try {
-          saveProgress(player.account, player.money, player.banked, player.bankedTotal, player.weapons, player.hats, player.hat, player.prestige, player.level, player.food);
+          saveProgress(player.account, player.money, player.banked, player.bankedTotal, player.withdrawCredit, player.weapons, player.hats, player.hat, player.prestige, player.level, player.food);
         } catch (err) {
           console.error('[auth] progress save failed', err);
         }

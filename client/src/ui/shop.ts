@@ -217,9 +217,14 @@ export class Shop {
       if (!id) continue; // the bank row is not a purchasable building
       const cfg = this.welcome.buildings[id];
       const btn = el.querySelector('button') as HTMLButtonElement;
-      btn.disabled = self.money < cfg.price || self.buildings >= this.welcome.maxBuildings;
+      // walls run on their own budget, so a full farm plot still lets you fortify
+      const atLimit = id === 'wall'
+        ? self.walls >= this.welcome.maxWalls
+        : self.buildings >= this.welcome.maxBuildings;
+      btn.disabled = self.money < cfg.price || atLimit;
     }
-    $('build-count').textContent = t('shop.buildCount', { n: self.buildings, max: this.welcome.maxBuildings });
+    $('build-count').textContent = t('shop.buildCount', { n: self.buildings, max: this.welcome.maxBuildings })
+      + ' ' + t('shop.wallCount', { n: self.walls, max: this.welcome.maxWalls });
     $('bank-total').textContent = t('shop.bankRow', { n: self.banked });
     ($('withdraw-btn') as HTMLButtonElement).disabled = self.banked <= 0;
 

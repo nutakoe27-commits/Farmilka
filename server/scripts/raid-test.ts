@@ -108,6 +108,30 @@ function owned(world: World, p: Player, type: string): Building | null {
   now += 100; updateBuildings(world, 0.1, now);
   check('returning to the vault banks again', p.banked === carried && p.money === 0,
     `banked=${p.banked} carried=${p.money}`);
+
+  // Regression: Base Rank scores gold *earned*, not gold moved. Shuffling the
+  // same coins in and out of the vault must not raise the lifetime total.
+  const lifetime = p.bankedTotal;
+  for (let cycle = 0; cycle < 5; cycle++) {
+    tryWithdraw(world, p);
+    world.moveEntity(p, SIZE / 2, SIZE / 2);
+    now += 100; updateBuildings(world, 0.1, now);
+    world.moveEntity(p, vault.x + 20, vault.y);
+    now += 100; updateBuildings(world, 0.1, now);
+  }
+  check('withdraw/re-bank round-trips do not inflate the lifetime total',
+    p.bankedTotal === lifetime && p.banked === carried,
+    `lifetime=${p.bankedTotal} was=${lifetime} banked=${p.banked}`);
+
+  // freshly earned gold still counts, credit or no credit
+  tryWithdraw(world, p);
+  p.money += 300; // a mob reward on the way home
+  world.moveEntity(p, SIZE / 2, SIZE / 2);
+  now += 100; updateBuildings(world, 0.1, now);
+  world.moveEntity(p, vault.x + 20, vault.y);
+  now += 100; updateBuildings(world, 0.1, now);
+  check('new gold still raises the lifetime total', p.bankedTotal === lifetime + 300,
+    `lifetime=${p.bankedTotal} expected=${lifetime + 300}`);
   void away;
 }
 

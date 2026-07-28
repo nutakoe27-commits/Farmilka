@@ -63,7 +63,10 @@ export interface SelfState {
   bankedTotal: number;
   weapons: WeaponId[];
   equipped: WeaponId;
+  /** standing buildings, walls excluded — they run on their own budget */
   buildings: number;
+  /** standing walls */
+  walls: number;
   hats: string[];
   hat: string | null;
   prestige: number;
@@ -159,6 +162,7 @@ export interface WelcomeMsg {
   rank: RankCfg;
   economy: { sellFrac: number };
   maxBuildings: number;
+  maxWalls: number;
 }
 
 export interface SnapshotMsg {

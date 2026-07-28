@@ -74,6 +74,17 @@ CREATE TABLE IF NOT EXISTS heals (
   amount REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS banking (
+  id INTEGER PRIMARY KEY,
+  ts INTEGER NOT NULL,
+  player TEXT NOT NULL,
+  action TEXT NOT NULL, -- deposit | withdraw
+  amount REAL NOT NULL,
+  -- gold that actually counted toward Base Rank (deposits repay withdrawals first)
+  scored REAL NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS idx_kills_ts ON kills(ts);
+CREATE INDEX IF NOT EXISTS idx_banking_ts ON banking(ts);
 CREATE INDEX IF NOT EXISTS idx_damage_ts ON damage(ts);
 CREATE INDEX IF NOT EXISTS idx_income_ts ON income(ts);

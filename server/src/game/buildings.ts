@@ -9,6 +9,7 @@ import { hatEffects } from './hats.js';
 import { tr } from './i18n.js';
 import { biomeAt } from '@shared/biomes.js';
 import { rankFromBanked, rankPerks } from '@shared/rank.js';
+import type { Solid } from '@shared/collision.js';
 
 /** Base Rank perks for a player (rank 0 for guests, who have no account). */
 export function perksOf(p: Player | undefined) {
@@ -34,6 +35,69 @@ const COLLECT_RANGE = 70;
 
 /** The vault is granted with the starter base and cannot be bought again. */
 const FREE_BUILDINGS: BuildingId[] = ['vault'];
+
+/**
+ * Required centre-to-centre distance between two buildings.
+ *
+ * Walls only work as walls if they can be laid shoulder-to-shoulder, so a
+ * player's own wall may sit right against another of their structures — just
+ * not overlapping it. Everything else (and anything next to a *stranger's*
+ * building) keeps the wide spacing, which also stops anyone from bricking up
+ * someone else's base from the outside.
+ */
+export function minSpacing(a: BuildingId, b: BuildingId, sameOwner: boolean): number {
+  const bal = getBalance();
+  if (sameOwner && (a === 'wall' || b === 'wall')) {
+    return bal.buildings[a].radius + bal.buildings[b].radius;
+  }
+  return bal.economy.buildingMinDist;
+}
+
+/** Widest spacing any pair can demand — the query radius for placement checks. */
+function maxSpacing(): number {
+  const bal = getBalance();
+  let r = bal.economy.buildingMinDist;
+  for (const id of BUILDING_IDS) r = Math.max(r, bal.buildings[id].radius * 2);
+  return r;
+}
+
+/**
+ * Who a structure belongs to, for spacing purposes. Seeded absent bases have
+ * no live owner entity, so they fall back to the account name — otherwise
+ * every unowned base in the world would count as one big estate.
+ */
+export function ownerKey(b: Building): string {
+  return b.ownerId || (b.ownerAccount ? `acc:${b.ownerAccount}` : '');
+}
+
+/**
+ * Is there room for a `type` building at (x, y)? `owner` is the placer's owner
+ * key; `ignoreOwn` skips their existing structures entirely — used when a
+ * saved base is rebuilt, so its own tightly-packed walls don't block each other.
+ */
+export function canPlaceAt(world: World, type: BuildingId, x: number, y: number, owner: string, ignoreOwn = false): boolean {
+  for (const e of world.grid.queryCircle(x, y, maxSpacing())) {
+    if (e.kind !== 'building') continue;
+    const b = e as Building;
+    const same = ownerKey(b) === owner;
+    if (same && ignoreOwn) continue;
+    if (dist(x, y, b.x, b.y) < minSpacing(type, b.buildingType, same)) return false;
+  }
+  return true;
+}
+
+/** Walls are fortification, not economy — they run on their own budget. */
+export function countBuildings(world: World, p: Player): { walls: number; other: number; turrets: number } {
+  let walls = 0, other = 0, turrets = 0;
+  for (const id of p.buildingIds) {
+    const b = world.buildings.get(id);
+    if (!b) continue;
+    if (b.buildingType === 'wall') walls++;
+    else other++;
+    if (b.buildingType === 'turret') turrets++;
+  }
+  return { walls, other, turrets };
+}
 
 export function makeBuilding(
   world: World,
@@ -79,26 +143,28 @@ export function tryPlaceBuilding(world: World, p: Player, type: BuildingId, x: n
   if (p.dead) return { ok: false, reason: tr(p.lang, 'dead') };
   const cfg = bal.buildings[type];
   if (p.money < cfg.price) return { ok: false, reason: tr(p.lang, 'noMoney') };
-  const slots = bal.economy.maxBuildingsPerPlayer + perksOf(p).extraSlots;
-  if (p.buildingIds.size >= slots) {
-    return { ok: false, reason: tr(p.lang, 'buildLimit', { n: slots }) };
-  }
-  if (type === 'turret') {
-    let turrets = 0;
-    for (const id of p.buildingIds) { const bd = world.buildings.get(id); if (bd && bd.buildingType === 'turret') turrets++; }
-    if (turrets >= bal.economy.maxTurretsPerPlayer) {
-      return { ok: false, reason: tr(p.lang, 'turretLimit', { n: bal.economy.maxTurretsPerPlayer }) };
+  const owned = countBuildings(world, p);
+  if (type === 'wall') {
+    if (owned.walls >= bal.economy.maxWallsPerPlayer) {
+      return { ok: false, reason: tr(p.lang, 'wallLimit', { n: bal.economy.maxWallsPerPlayer }) };
     }
+  } else {
+    const slots = bal.economy.maxBuildingsPerPlayer + perksOf(p).extraSlots;
+    if (owned.other >= slots) return { ok: false, reason: tr(p.lang, 'buildLimit', { n: slots }) };
+  }
+  if (type === 'turret' && owned.turrets >= bal.economy.maxTurretsPerPlayer) {
+    return { ok: false, reason: tr(p.lang, 'turretLimit', { n: bal.economy.maxTurretsPerPlayer }) };
   }
   const size = bal.world.size;
   if (x < cfg.radius || y < cfg.radius || x > size - cfg.radius || y > size - cfg.radius) {
     return { ok: false, reason: tr(p.lang, 'outOfWorld') };
   }
   if (dist(p.x, p.y, x, y) > PLACE_RANGE) return { ok: false, reason: tr(p.lang, 'tooFar') };
-  for (const b of world.grid.queryCircle(x, y, bal.economy.buildingMinDist + 50)) {
-    if (b.kind === 'building' && dist(x, y, b.x, b.y) < bal.economy.buildingMinDist) {
-      return { ok: false, reason: tr(p.lang, 'tooClose') };
-    }
+  if (!canPlaceAt(world, type, x, y, p.id)) return { ok: false, reason: tr(p.lang, 'tooClose') };
+  // buildings are solid now, so dropping one on someone would be a free trap
+  for (const e of world.grid.queryCircle(x, y, cfg.radius + 60)) {
+    if (e.kind !== 'player' || e.id === p.id || e.dead) continue;
+    if (dist(x, y, e.x, e.y) < cfg.radius + e.radius + 6) return { ok: false, reason: tr(p.lang, 'blockedByPlayer') };
   }
 
   p.money -= cfg.price;
@@ -126,11 +192,7 @@ export function grantStarterBase(world: World, p: Player): void {
     const x = Math.max(cfg.radius, Math.min(size - cfg.radius, p.x + spot.dx));
     const y = Math.max(cfg.radius, Math.min(size - cfg.radius, p.y + spot.dy));
     // don't stack on top of someone else's base
-    let blocked = false;
-    for (const e of world.grid.queryCircle(x, y, bal.economy.buildingMinDist)) {
-      if (e.kind === 'building') { blocked = true; break; }
-    }
-    if (blocked) continue;
+    if (!canPlaceAt(world, spot.type, x, y, p.id)) continue;
     const b = makeBuilding(world, spot.type, x, y, { id: p.id, name: p.name, account: p.account }, now);
     p.buildingIds.add(b.id);
   }
@@ -151,7 +213,13 @@ export function depositAll(world: World, p: Player): number {
   if (amount <= 0) return 0;
   p.money -= amount;
   p.banked += amount;
-  p.bankedTotal += amount; // lifetime score behind Base Rank
+  // Base Rank counts gold *earned*, not gold moved. A deposit first repays
+  // whatever the player pulled back out, so withdraw/re-bank round-trips at
+  // the vault add nothing to the lifetime score.
+  const repay = Math.min(amount, p.withdrawCredit);
+  p.withdrawCredit -= repay;
+  p.bankedTotal += amount - repay;
+  if (!p.bot) telemetry.bank(p.name, 'deposit', amount, amount - repay);
   world.markDirty(p);
   world.sendEvent(p, { e: 'bank', action: 'deposit', amount, banked: p.banked });
   return amount;
@@ -167,10 +235,43 @@ export function tryWithdraw(world: World, p: Player): { ok: boolean; reason?: st
   const amount = Math.floor(p.banked);
   p.banked -= amount;
   p.money += amount;
+  p.withdrawCredit += amount; // re-banking this gold must not re-score Base Rank
   p.bankPaused = true; // hold off auto-banking until they leave the vault
+  if (!p.bot) telemetry.bank(p.name, 'withdraw', amount);
   world.markDirty(p);
   world.sendEvent(p, { e: 'bank', action: 'withdraw', amount, banked: p.banked });
   return { ok: true };
+}
+
+/**
+ * Buildings that block a mover of radius `r` heading for (x, y).
+ *
+ * Every structure is solid — that is what makes a wall a wall, and what turns
+ * a base into something you have to break into rather than stroll through.
+ * `ignoreOwnerId` lets a player walk through their *own* base, so nobody can
+ * brick themselves in and defenders keep the run of their own yard.
+ */
+export function solidsNear(world: World, x: number, y: number, r: number, ignoreOwnerId?: string): Solid[] {
+  const out: Solid[] = [];
+  const reach = r + maxBuildingRadius();
+  for (const e of world.grid.queryCircle(x, y, reach)) {
+    if (e.kind !== 'building') continue;
+    const b = e as Building;
+    if (ignoreOwnerId !== undefined && b.ownerId === ignoreOwnerId) continue;
+    out.push(b);
+  }
+  return out;
+}
+
+let radiusCache: { key: object; value: number } | null = null;
+/** Largest building half-size, cached per balance reload. */
+function maxBuildingRadius(): number {
+  const bal = getBalance();
+  if (radiusCache?.key === bal) return radiusCache.value;
+  let r = 0;
+  for (const id of BUILDING_IDS) r = Math.max(r, bal.buildings[id].radius);
+  radiusCache = { key: bal, value: r };
+  return r;
 }
 
 /** Removes every building the player owns — used when a base is abandoned. */

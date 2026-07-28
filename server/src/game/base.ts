@@ -3,7 +3,7 @@ import { BUILDING_IDS } from '@shared/balance-schema.js';
 import { getBalance } from './balance.js';
 import type { World } from './world.js';
 import type { Player } from './entities.js';
-import { makeBuilding, grantStarterBase } from './buildings.js';
+import { makeBuilding, grantStarterBase, canPlaceAt } from './buildings.js';
 import { loadBase, saveBase } from '../db/accounts.js';
 
 /** One structure of a saved base, in absolute world coordinates. */
@@ -93,12 +93,9 @@ export function restoreBase(world: World, p: Player): boolean {
   // base is home, and waking up on the far side of the map makes it useless.
   const anchor = saved.buildings.find((b) => b.t === 'vault') ?? saved.buildings[0];
 
-  const free = (x: number, y: number): boolean => {
-    for (const e of world.grid.queryCircle(x, y, bal.economy.buildingMinDist)) {
-      if (e.kind === 'building') return false;
-    }
-    return true;
-  };
+  // Our own structures never block the rebuild — a saved base is packed as
+  // tightly as its walls were placed, so it has to be allowed back verbatim.
+  const free = (t: BuildingId, x: number, y: number): boolean => canPlaceAt(world, t, x, y, p.id, true);
 
   // Someone may have built over our old plot while we were away. Rather than
   // dropping the base (which would wipe the player's investment), shift the
@@ -112,7 +109,7 @@ export function restoreBase(world: World, p: Player): boolean {
       if (!cfg) return true;
       const x = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.x + ox));
       const y = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.y + oy));
-      return free(x, y);
+      return free(sb.t, x, y);
     });
   if (!fits(0, 0)) {
     for (let ring = 1; ring <= 12; ring++) {
@@ -139,7 +136,7 @@ export function restoreBase(world: World, p: Player): boolean {
     const cfg = bal.buildings[sb.t];
     const x = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.x + offX));
     const y = Math.max(cfg.radius, Math.min(size - cfg.radius, sb.y + offY));
-    if (!free(x, y)) continue; // last-resort skip if even the shifted spot is taken
+    if (!free(sb.t, x, y)) continue; // last-resort skip if even the shifted spot is taken
     const stored = accrueOffline(sb.t, Math.max(0, sb.s), awayMs);
     const b = makeBuilding(world, sb.t, x, y, { id: p.id, name: p.name, account: p.account }, now, stored);
     p.buildingIds.add(b.id);

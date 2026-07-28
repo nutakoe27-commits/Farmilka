@@ -3,6 +3,7 @@ import { getBalance } from '../game/balance.js';
 import type { World } from '../game/world.js';
 import type { Entity, Player, Building } from '../game/entities.js';
 import { nextPrestigeCost } from '../game/prestige.js';
+import { countBuildings } from '../game/buildings.js';
 
 /** Silo fill as 0..255, so the client can draw how loaded a building is. */
 function siloFill(b: Building): number {
@@ -114,6 +115,7 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     }
   }
 
+  const standing = countBuildings(world, p);
   const self: SelfState = {
     x: Math.round(p.x * 10) / 10,
     y: Math.round(p.y * 10) / 10,
@@ -124,7 +126,8 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     bankedTotal: p.bankedTotal,
     weapons: p.weapons,
     equipped: p.equipped,
-    buildings: p.buildingIds.size,
+    buildings: standing.other,
+    walls: standing.walls,
     hats: p.hats,
     hat: p.hat,
     prestige: p.prestige,

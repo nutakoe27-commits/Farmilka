@@ -1,6 +1,7 @@
 import { Application, Container, Graphics, Sprite } from 'pixi.js';
 import { SPARK } from './game/textures.js';
 import { clamp } from '@shared/math.js';
+import { resolveSolids, type Solid } from '@shared/collision.js';
 import type { WeaponId } from '@shared/types.js';
 import type { WelcomeMsg } from '@shared/protocol.js';
 import { Connection } from './net/connection.js';
@@ -317,12 +318,32 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     return speed;
   }
 
-  function applyMove(x: number, y: number, mx: number, my: number, dt: number, attack: boolean): { x: number; y: number } {
+  /**
+   * Buildings that block us right now. Our own base is walked through, exactly
+   * as the server does it — otherwise prediction would fight the server and
+   * the player would rubber-band at their own vault.
+   */
+  const BLOCK_REACH = 600; // generous: prediction replays a few frames of movement
+  function blockers(cx: number, cy: number): Solid[] {
+    const out: Solid[] = [];
+    for (const r of conn.entities.values()) {
+      const s = r.state;
+      if (s.kind !== 'building' || s.owner === welcome.id) continue;
+      if (Math.abs(s.x - cx) > BLOCK_REACH || Math.abs(s.y - cy) > BLOCK_REACH) continue;
+      out.push(s);
+    }
+    return out;
+  }
+
+  function applyMove(x: number, y: number, mx: number, my: number, dt: number, attack: boolean, solids: Solid[]): { x: number; y: number } {
     const speed = moveSpeed(attack);
     const r = welcome.player.radius;
+    const nx = clamp(x + mx * speed * dt, r, welcome.world.size - r);
+    const ny = clamp(y + my * speed * dt, r, welcome.world.size - r);
+    const res = resolveSolids(nx, ny, r, solids);
     return {
-      x: clamp(x + mx * speed * dt, r, welcome.world.size - r),
-      y: clamp(y + my * speed * dt, r, welcome.world.size - r),
+      x: clamp(res.x, r, welcome.world.size - r),
+      y: clamp(res.y, r, welcome.world.size - r),
     };
   }
 
@@ -332,8 +353,9 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     const self = conn.self!;
     let px = self.x;
     let py = self.y;
+    const solids = blockers(self.x, self.y);
     for (const inp of conn.pending) {
-      const res = applyMove(px, py, inp.mx, inp.my, inp.dt, inp.attack);
+      const res = applyMove(px, py, inp.mx, inp.my, inp.dt, inp.attack, solids);
       px = res.x;
       py = res.y;
     }
@@ -629,7 +651,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     conn.send({ t: 'input', seq, mx, my, aim, attack });
     conn.pending.push({ seq, mx, my, dt: 0.05, attack });
     if (conn.pending.length > 60) conn.pending.shift();
-    const res = applyMove(predX, predY, mx, my, 0.05, attack);
+    const res = applyMove(predX, predY, mx, my, 0.05, attack, blockers(predX, predY));
     predX = res.x;
     predY = res.y;
   }, 50);

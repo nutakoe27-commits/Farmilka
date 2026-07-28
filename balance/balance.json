@@ -793,6 +793,7 @@
   "economy": {
     "maxBuildingsPerPlayer": 10,
     "maxTurretsPerPlayer": 4,
+    "maxWallsPerPlayer": 24,
     "buildingMinDist": 100,
     "raidLootFrac": 0.25,
     "coinDespawnSec": 60,

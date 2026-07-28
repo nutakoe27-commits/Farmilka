@@ -50,7 +50,7 @@ const snap: SnapshotMsg = {
   self: {
     x: 1240, y: 680, hp: 120, maxHp: 190, money: 1_250_000, banked: 987_654, bankedTotal: 4_200_000,
     weapons: ['fists', 'sword', 'ice_staff'], equipped: 'ice_staff',
-    buildings: 3, hats: ['cap', 'golden_crown', 'chef_hat'], hat: 'golden_crown',
+    buildings: 3, walls: 17, hats: ['cap', 'golden_crown', 'chef_hat'], hat: 'golden_crown',
     prestige: 7, prestigeCost: 34567, level: 10, levelKills: 12,
     food: 42, foodIn: 0, protIn: 2.5, chill: 0.65, respawnIn: 3.4,
   },
