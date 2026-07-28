@@ -176,8 +176,9 @@ beat('mobs');
 
 // 3. the crate: a legendary weapon reveal
 await openShop(page, 'hats');
-const crate = await page.$('#weapon-lootbox-btn');
-if (crate) { await crate.click(); await sleep(2200); }
+const crate = page.locator('#weapon-lootbox-btn');
+if (await crate.count() && !(await crate.isDisabled())) { await crate.click(); await sleep(2200); }
+else console.warn('crate beat skipped — not affordable');
 await page.keyboard.press('Escape');
 await sleep(500);
 await page.keyboard.press('Digit2');

@@ -66,8 +66,11 @@ bal.economy.maxWallsPerPlayer = 24;
 for (const m of Object.values(bal.mobs)) { m.damage = 1; m.count = Math.max(6, m.count); }
 for (const b of Object.values(bal.bosses)) {
   b.hp = Math.round(b.hp * 0.25);   // a boss that dies inside the take
-  b.contactDamage = 2;
-  b.spawnIntervalSec = 25 * S;
+  // Nothing may kill the actor mid-take: a death drops the carried gold and
+  // every beat after it (the crate, the raid) silently has nothing to spend.
+  b.contactDamage = 1;
+  for (const a of [b.slam, b.burst, b.unique]) if (a) a.damage = 1;
+  b.spawnIntervalSec = 100 * S;     // arrives in time for the finale, not before
 }
 // the crate beat has to land every time
 bal.weaponLootbox = { ...bal.weaponLootbox, legendaryChance: 1, epicChance: 0, weaponChance: 0, goldChance: 0 };
