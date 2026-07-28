@@ -30,6 +30,7 @@ export function startLoop(worlds: WorldManager): void {
       }
     }
     worlds.reap(start); // tear down worlds that have sat empty
+    worlds.seedBases(start); // keep absent players' bases available to raid
 
     // once per second, turn byte accumulators into a rate
     if (start - lastSample >= 1000) {

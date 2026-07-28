@@ -395,6 +395,24 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         if (ev.target === conn.welcome!.id && settings.values.shake) scene.shake = 7;
         break;
       }
+      case 'bank': {
+        audio.reward();
+        hud.notice(ev.action === 'deposit'
+          ? t('ev.banked', { amount: ev.amount, total: ev.banked })
+          : t('ev.withdrew', { amount: ev.amount }));
+        break;
+      }
+      case 'collect': {
+        effects.gainNumber(ev.x, ev.y, ev.amount);
+        break;
+      }
+      case 'raided': {
+        audio.death();
+        hud.bossBanner(t('ev.raidedBanner', { name: escapeHtml(ev.byName) }));
+        setTimeout(() => hud.bossBanner(null), 6000);
+        hud.notice(t('ev.raided', { name: escapeHtml(ev.byName), lost: ev.lost }), 9000);
+        break;
+      }
       case 'heal':
         audio.heal();
         effects.incomeNumber(dispX, dispY, ev.amount);
@@ -534,6 +552,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   shop.onSell = (item) => conn.send({ t: 'sell', weapon: item });
   shop.onLootbox = () => conn.send({ t: 'lootbox' });
   shop.onWeaponLootbox = () => conn.send({ t: 'weaponLootbox' });
+  shop.onWithdraw = () => conn.send({ t: 'withdraw' });
   shop.onEquipHat = (hat) => conn.send({ t: 'equipHat', hat });
   shop.onPrestige = () => conn.send({ t: 'prestige' });
   conn.onLeaderboard = (top, rank, total) => leaderboard.update(top, rank, total);

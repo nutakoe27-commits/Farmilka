@@ -10,7 +10,9 @@ import type { World } from '../game/world.js';
 import type { WorldManager } from '../game/world-manager.js';
 import type { Player } from '../game/entities.js';
 import { tryBuyWeapon, tryBuyFood, trySellWeapon, tryReorder, tryEat, tryEquip, tryWeaponLootbox } from '../game/economy.js';
-import { tryPlaceBuilding, removePlayerBuildings } from '../game/buildings.js';
+import { tryPlaceBuilding, removePlayerBuildings, tryWithdraw } from '../game/buildings.js';
+import { restoreBase, storeBase } from '../game/base.js';
+import { releaseBase } from '../game/offline-bases.js';
 import { tryLootbox, tryEquipHat, recomputeMaxHp } from '../game/hats.js';
 import { tryPrestige } from '../game/prestige.js';
 import { tr, normalizeLang, type Lang } from '../game/i18n.js';
@@ -79,6 +81,9 @@ export function startServer(worlds: WorldManager): http.Server {
     const player = world.spawnPlayer(name, ws, account, lang);
     recomputeMaxHp(world, player); // fold in restored level + hat
     player.hp = player.maxHp; // (re)join at full HP for the restored level
+    // if this world was hosting their base as a raid target, hand it back first
+    if (account) for (const w of worlds.active()) releaseBase(w, account.name);
+    restoreBase(world, player); // saved base, or a free starter one for newcomers
     try {
       sessionIds.set(player, telemetry.sessionStart(name));
     } catch (err) {
@@ -283,6 +288,11 @@ export function startServer(worlds: WorldManager): http.Server {
           tryEat(world, player, Date.now());
           break;
         }
+        case 'withdraw': {
+          const res = tryWithdraw(world, player);
+          if (!res.ok) world.sendEvent(player, { e: 'purchase', ok: false, item: 'withdraw', reason: res.reason });
+          break;
+        }
         case 'respawn': {
           if (player.dead && Date.now() >= player.respawnAt) world.respawnPlayer(player);
           break;
@@ -337,13 +347,15 @@ export function startServer(worlds: WorldManager): http.Server {
       // account progress (gold + weapons + hats) survives the session
       if (player.account) {
         try {
-          saveProgress(player.account, player.money, player.weapons, player.hats, player.hat, player.prestige, player.level, player.food);
+          saveProgress(player.account, player.money, player.banked, player.weapons, player.hats, player.hat, player.prestige, player.level, player.food);
         } catch (err) {
           console.error('[auth] progress save failed', err);
         }
       }
-      // buildings only live while their owner is online
+      // the base is saved and then cleared from this world; it is rebuilt
+      // wherever the player logs in next
       if (world) {
+        storeBase(world, player);
         removePlayerBuildings(world, player);
         if (!player.dead) world.removeEntity(player);
         player.ws = null;

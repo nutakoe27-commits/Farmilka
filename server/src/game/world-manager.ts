@@ -1,5 +1,6 @@
 import { getBalance } from './balance.js';
 import { World } from './world.js';
+import { seedOfflineBases, releaseWorld } from './offline-bases.js';
 
 /** How long a world may sit empty (above the minimum) before it is torn down. */
 const REAP_GRACE_MS = Number(process.env.REAP_GRACE_MS) || 20_000;
@@ -28,6 +29,25 @@ export class WorldManager {
   }
   private get capacity(): number {
     return getBalance().world.maxPlayers;
+  }
+
+  private nextSeedAt = 0;
+
+  /**
+   * Keeps every world stocked with absent players' bases to raid. Called from
+   * the main loop; the work itself is throttled and only hits the DB when a
+   * world is actually short of targets.
+   */
+  seedBases(now: number): void {
+    if (now < this.nextSeedAt) return;
+    this.nextSeedAt = now + 15_000;
+    const online = new Set<string>();
+    for (const w of this.active()) {
+      for (const p of w.players.values()) {
+        if (p.account && (p.ws || p.bot)) online.add(p.account);
+      }
+    }
+    for (const w of this.active()) seedOfflineBases(w, online);
   }
 
   /** Currently-active worlds — for the tick loop, admin and cross-world checks. */
@@ -85,6 +105,7 @@ export class WorldManager {
       if (since === undefined) {
         this.emptySince.set(w.serverId, now);
       } else if (now - since >= REAP_GRACE_MS) {
+        releaseWorld(w); // its seeded bases can be re-seeded elsewhere
         this.slots[i] = null;
         this.emptySince.delete(w.serverId);
         console.log(`[worlds] reaped empty server ${w.serverId} (${this.active().length} active)`);

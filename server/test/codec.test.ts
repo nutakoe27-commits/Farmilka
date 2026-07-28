@@ -35,7 +35,7 @@ const snap: SnapshotMsg = {
     { id: 'p1_9', kind: 'player', x: 10, y: 20.5, angle: -3.1415, radius: 24, hp: 50, maxHp: 100, name: 'Guest', weapon: 'fists', hat: null, prestige: 0, fx: 0 },
     { id: 'm1_3', kind: 'mob', x: 800, y: 900.5, angle: 0.5, radius: 20, hp: 40, maxHp: 70, mobType: 'wolf', fx: 1 },
     { id: 'b1_1', kind: 'boss', x: 3500, y: 3500, angle: 0, radius: 66, hp: 8000, maxHp: 9000, bossType: 'crystal_queen' },
-    { id: 'bd1_4', kind: 'building', x: 500, y: 500, angle: 0, radius: 40, hp: 150, maxHp: 200, buildingType: 'turret', owner: 'p1_2', name: 'Игрок' },
+    { id: 'bd1_4', kind: 'building', x: 500, y: 500, angle: 0, radius: 40, hp: 150, maxHp: 200, buildingType: 'turret', owner: 'p1_2', name: 'Игрок', store: 180 },
     { id: 'c1_5', kind: 'coin', x: 111, y: 222.5, angle: 0, radius: 12, value: 450 },
     { id: 'f1_6', kind: 'food', x: 333, y: 444, angle: 0, radius: 14 },
     { id: 'pr1_7', kind: 'projectile', x: 600, y: 600, angle: 2.5, radius: 8, owner: 'p1_2', name: 'ice_staff' },
@@ -48,7 +48,7 @@ const snap: SnapshotMsg = {
   ],
   rem: ['c1_5', 'f1_6'],
   self: {
-    x: 1240, y: 680, hp: 120, maxHp: 190, money: 1_250_000,
+    x: 1240, y: 680, hp: 120, maxHp: 190, money: 1_250_000, banked: 987_654,
     weapons: ['fists', 'sword', 'ice_staff'], equipped: 'ice_staff',
     buildings: 3, hats: ['cap', 'golden_crown', 'chef_hat'], hat: 'golden_crown',
     prestige: 7, prestigeCost: 34567, level: 10, levelKills: 12,

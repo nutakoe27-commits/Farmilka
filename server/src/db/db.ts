@@ -25,6 +25,8 @@ export function openDb(): Database.Database {
     'ALTER TABLE accounts ADD COLUMN reward_streak INTEGER NOT NULL DEFAULT 0',
     'ALTER TABLE accounts ADD COLUMN yandex_id TEXT',
     'ALTER TABLE accounts ADD COLUMN cg_id TEXT',
+    'ALTER TABLE accounts ADD COLUMN banked INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE accounts ADD COLUMN base TEXT',
   ]) {
     try {
       db.exec(ddl);

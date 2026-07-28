@@ -8,6 +8,7 @@ import type { Entity, Player, Mob, Building } from './entities.js';
 import { telemetry } from '../db/telemetry.js';
 import { onBossDamaged, onBossKilled } from './boss.js';
 import { grantHat, hatEffects, randomHatOfTier } from './hats.js';
+import { lootFromDestroyed } from './buildings.js';
 import { awardKillPoints, killPoints } from './levels.js';
 
 export interface DamageSource {
@@ -149,6 +150,9 @@ export function applyDamage(
   if (target.kind === 'building') {
     if (src.cause !== 'player' && src.cause !== 'turret') return false;
     if (target.ownerId === src.id) return false; // cannot damage own buildings
+    // a base that was just raided is briefly immune, so owners are not farmed
+    const bOwner = world.players.get(target.ownerId);
+    if (bOwner && bOwner.raidShieldUntil > now) return false;
   }
   if (target.kind === 'mob' && src.cause !== 'player' && src.cause !== 'turret') return false;
 
@@ -217,6 +221,7 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
   switch (target.kind) {
     case 'player': {
       const victimFx = hatEffects(target.hat);
+      // extraction rule: everything carried is lost, banked gold is untouched
       const dropped = Math.floor(target.money * bal.player.dropMoneyFrac * (1 - victimFx.dropSaveFrac));
       target.money -= dropped;
       world.spawnCoinPiles(target.x, target.y, dropped);
@@ -284,9 +289,12 @@ function handleDeath(world: World, target: Entity, src: DamageSource, now: numbe
         owner.buildingIds.delete(target.id);
         world.sendEvent(owner, { e: 'buildingDestroyed', id: target.id, byName: src.name, own: true });
       }
-      const cfg = bal.buildings[target.buildingType];
-      const loot = Math.floor(cfg.price * bal.economy.raidLootFrac);
+      const loot = lootFromDestroyed(world, target, owner);
       world.spawnCoinPiles(target.x, target.y, loot);
+      if (owner) {
+        world.sendEvent(owner, { e: 'raided', building: target.buildingType, byName: src.name, lost: loot });
+        owner.raidShieldUntil = now + bal.economy.raidShieldSec * 1000;
+      }
       if (killerPlayer) {
         world.sendEvent(killerPlayer, { e: 'buildingDestroyed', id: target.id, byName: src.name, own: false });
         if (!killerBot) telemetry.income(killerPlayer.name, 'raid', loot);

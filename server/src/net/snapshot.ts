@@ -1,8 +1,15 @@
 import type { EntityState, EntityDelta, SnapshotMsg, SelfState } from '@shared/protocol.js';
 import { getBalance } from '../game/balance.js';
 import type { World } from '../game/world.js';
-import type { Entity, Player } from '../game/entities.js';
+import type { Entity, Player, Building } from '../game/entities.js';
 import { nextPrestigeCost } from '../game/prestige.js';
+
+/** Silo fill as 0..255, so the client can draw how loaded a building is. */
+function siloFill(b: Building): number {
+  const cap = getBalance().buildings[b.buildingType].storeCap ?? 0;
+  if (cap <= 0) return 0;
+  return Math.max(0, Math.min(255, Math.round((b.stored / cap) * 255)));
+}
 
 function statusFx(e: { poisonUntil: number; chillUntil: number }): number {
   const now = Date.now();
@@ -46,6 +53,7 @@ function fullState(e: Entity): EntityState {
       s.buildingType = e.buildingType;
       s.owner = e.ownerId;
       s.name = e.ownerName;
+      s.store = siloFill(e);
       break;
     case 'coin':
       s.value = e.value;
@@ -90,6 +98,8 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
           d.fx = statusFx(e);
         } else if (e.kind === 'mob') {
           d.fx = statusFx(e);
+        } else if (e.kind === 'building') {
+          d.store = siloFill(e);
         }
       }
       upd.push(d);
@@ -110,6 +120,7 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
     hp: Math.round(p.hp),
     maxHp: p.maxHp,
     money: p.money,
+    banked: p.banked,
     weapons: p.weapons,
     equipped: p.equipped,
     buildings: p.buildingIds.size,

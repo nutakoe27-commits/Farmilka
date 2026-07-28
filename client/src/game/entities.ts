@@ -18,7 +18,7 @@ export const WEAPON_ICONS: Record<string, string> = {
   daggers: '🔪', scythe: '🌪️', venom_blade: '🐍', vampire_blade: '🩸', triple_bow: '🪃', ice_staff: '❄️',
   hook_blade: '⛓️', mirror_blade: '🪞', storm_hammer: '⚡', tamer_blade: '🐺', reaper_scythe: '💀', dragon_bow: '🐉',
 };
-export const BUILDING_ICONS: Record<string, string> = { farm: '🌾', mine: '⛏️', turret: '🗼' };
+export const BUILDING_ICONS: Record<string, string> = { farm: '🌾', mine: '⛏️', turret: '🗼', vault: '🏦', wall: '🧱' };
 
 export const HAT_EMOJI: Record<string, string> = {
   straw_hat: '👒', cap: '🧢', miner_helmet: '⛑️', champion_crown: '👑', shadow_hood: '🎩',
@@ -50,7 +50,7 @@ const BOSS_STYLE: Record<string, { body: number; glow: number; ring: number; ico
   crystal_queen: { body: 0x1a6a70, glow: 0x6ee8e0, ring: 0x4fd8c8, icon: '💎' },
 };
 
-const BUILDING_COLORS: Record<string, number> = { farm: 0x3f8f4a, mine: 0x5b6478, turret: 0x8a5fb0 };
+const BUILDING_COLORS: Record<string, number> = { farm: 0x3f8f4a, mine: 0x5b6478, turret: 0x8a5fb0, vault: 0xc9a227, wall: 0x4a5060 };
 
 function playerColor(id: string): number {
   let h = 0;
@@ -81,6 +81,8 @@ export class EntityView {
   flashStart = -1e9;
   lastFx = 0;
   weaponText: Text | null = null;
+  siloBar: Graphics | null = null;
+  lastStore = -1;
   hatText: Text | null = null;
   nameText: Text | null = null;
   aura: Graphics | null = null;
@@ -234,6 +236,11 @@ export class EntityView {
           g.circle(0, 0, r * 0.4).fill(0x30363d).stroke({ width: 2, color: 0xcfd4e4 });
           g.rect(0, -4, r + 10, 8).fill(0x30363d);
         }
+        if (s.buildingType === 'vault') {
+          // the vault reads as the prize of the base: gold trim + a coin slot
+          g.roundRect(-r + 3, -r + 3, r * 2 - 6, r * 2 - 6, 7).stroke({ width: 3, color: 0xffd76e, alpha: 0.9 });
+          g.rect(-10, -r + 10, 20, 5).fill(0x2a2410);
+        }
         const icon = new Text({ text: BUILDING_ICONS[s.buildingType ?? ''] ?? '', style: { fontSize: 22 } });
         icon.anchor.set(0.5);
         this.top.addChild(icon);
@@ -248,6 +255,10 @@ export class EntityView {
       }
     }
     this.top.addChild(this.hpBar);
+    if (s.kind === 'building' && (s.buildingType === 'farm' || s.buildingType === 'mine')) {
+      this.siloBar = new Graphics();
+      this.top.addChild(this.siloBar);
+    }
   }
 
   /** Per-frame update: rotation, hp bar, small idle animations, fade-in. */
@@ -292,6 +303,19 @@ export class EntityView {
     if (this.protRing) {
       this.protRing.visible = !!s.prot;
       if (s.prot) this.protRing.alpha = 0.5 + 0.5 * Math.sin(now / 120);
+    }
+
+    // silo fill: how much loot is sitting in this building right now
+    if (this.siloBar && (s.store ?? 0) !== this.lastStore) {
+      this.lastStore = s.store ?? 0;
+      const frac = this.lastStore / 255;
+      const w = s.radius * 1.8;
+      this.siloBar.clear();
+      if (frac > 0.01) {
+        const y = s.radius + 8;
+        this.siloBar.roundRect(-w / 2, y, w, 6, 3).fill({ color: 0x000000, alpha: 0.55 });
+        this.siloBar.roundRect(-w / 2, y, w * frac, 6, 3).fill(frac > 0.75 ? 0xffd76e : 0xe0a63a);
+      }
     }
 
     if (this.hatText && (s.hat ?? null) !== this.lastHat) {

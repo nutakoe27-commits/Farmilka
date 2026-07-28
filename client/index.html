@@ -55,7 +55,9 @@
     #hp-bar-bg { height: 14px; background: rgba(0,0,0,.55); border: 1px solid #2c3242; border-radius: 8px; overflow: hidden; }
     #hp-bar { height: 100%; width: 100%; background: linear-gradient(90deg,#2ea043,#7ee787); transition: width .15s; border-radius: 8px; }
     #hp-text { text-align: center; font-size: 11px; color: #bfc4d4; margin-top: 3px; text-shadow: 0 1px 2px #000; }
-    #money { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 700; color: #ffd76e; text-shadow: 0 1px 4px #000; }
+    #money { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 700; color: #ffd76e; text-shadow: 0 1px 4px #000; white-space: nowrap; }
+    #money .vault { color: #7ee787; font-size: 16px; }
+    #money .risk { color: #ff9d5c; }
     #zone-label { position: fixed; top: 42px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #7ee787; text-shadow: 0 1px 3px #000; white-space: nowrap; }
     #onboarding { position: fixed; top: 72px; left: 50%; transform: translateX(-50%); max-width: 90vw; background: linear-gradient(135deg,#1f6feb,#1a5fd0); color: #fff; padding: 10px 18px; border-radius: 22px; font-size: 14px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.5); z-index: 14; text-align: center; transition: opacity .4s; }
     body.touch #onboarding { top: 162px; font-size: 13px; padding: 9px 15px; } /* below leaderboard + minimap */

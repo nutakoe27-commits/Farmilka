@@ -114,9 +114,12 @@ export interface BossCfg {
 export interface BuildingCfg {
   price: number;
   hp: number;
+  /** gold added to this building's own silo each interval (0 = not a producer) */
   income: number;
   incomeIntervalSec: number;
   radius: number;
+  /** how much unclaimed gold the silo holds before production stalls */
+  storeCap?: number;
   damage?: number;
   range?: number;
   attackRate?: number;
@@ -230,7 +233,12 @@ export interface Balance {
     maxBuildingsPerPlayer: number;
     maxTurretsPerPlayer: number;
     buildingMinDist: number;
+    /** share of a building's price dropped as scrap when it is destroyed */
     raidLootFrac: number;
+    /** share of the owner's banked gold a raider takes for cracking the vault */
+    vaultRaidFrac: number;
+    /** minutes a base is immune after being raided */
+    raidShieldSec: number;
     sellFrac: number;
     coinDespawnSec: number;
     coinPickupRadius: number;
@@ -245,7 +253,7 @@ export const WEAPON_IDS: WeaponId[] = [
 export const MOB_IDS: MobId[] = ['slime', 'wolf', 'ice_slime', 'yeti', 'scorpion', 'sand_golem', 'shade', 'treant', 'wisp', 'crystal_golem'];
 export const BOSS_IDS: BossId[] = ['champion', 'frost_titan', 'sand_worm', 'shadow_lord', 'crystal_queen'];
 export const BOSS_UNIQUE_KINDS = ['charge', 'nova', 'burrow', 'blink', 'spikes'];
-const BUILDING_IDS: BuildingId[] = ['farm', 'mine', 'turret'];
+export const BUILDING_IDS: BuildingId[] = ['farm', 'mine', 'turret', 'vault', 'wall'];
 const BIOME_IDS = ['normal', 'snow', 'desert', 'mystic_west', 'mystic_east'];
 
 function num(obj: Record<string, unknown>, key: string, path: string, min = 0): number {
@@ -398,7 +406,7 @@ export function validateBalance(raw: unknown): Balance {
   }
 
   const economy = section(root, 'economy');
-  for (const k of ['maxBuildingsPerPlayer', 'maxTurretsPerPlayer', 'buildingMinDist', 'raidLootFrac', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
+  for (const k of ['maxBuildingsPerPlayer', 'maxTurretsPerPlayer', 'buildingMinDist', 'raidLootFrac', 'vaultRaidFrac', 'raidShieldSec', 'sellFrac', 'coinDespawnSec', 'coinPickupRadius']) {
     num(economy, k, 'economy');
   }
 

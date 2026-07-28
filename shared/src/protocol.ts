@@ -30,6 +30,8 @@ export interface EntityState {
   prestige?: number;
   /** status effect bitmask: 1 = poison, 2 = chill (players & mobs) */
   fx?: number;
+  /** silo fill 0..255 (buildings) — how much loot is sitting there */
+  store?: number;
 }
 
 export interface EntityDelta {
@@ -45,6 +47,7 @@ export interface EntityDelta {
   hat?: string | null;
   prestige?: number;
   fx?: number;
+  store?: number;
 }
 
 export interface SelfState {
@@ -53,6 +56,8 @@ export interface SelfState {
   hp: number;
   maxHp: number;
   money: number;
+  /** gold safe in the vault — untouched by death */
+  banked: number;
   weapons: WeaponId[];
   equipped: WeaponId;
   buildings: number;
@@ -90,6 +95,9 @@ export type GameEvent =
   | { e: 'purchase'; ok: boolean; item: string; reason?: string }
   | { e: 'placed'; ok: boolean; reason?: string }
   | { e: 'heal'; amount: number }
+  | { e: 'bank'; action: 'deposit' | 'withdraw'; amount: number; banked: number }
+  | { e: 'collect'; amount: number; x: number; y: number }
+  | { e: 'raided'; building: BuildingId; byName: string; lost: number }
   | { e: 'swing'; id: string; x: number; y: number; angle: number; weapon: string }
   | { e: 'hat'; hat: string; name: string; tier: HatTier; source: 'mob' | 'boss' | 'lootbox'; dup: boolean; gold: number }
   | { e: 'lootbox'; result: 'hat' | 'gold' | 'food' | 'nothing'; gold: number; food?: number }
@@ -118,6 +126,7 @@ export type ClientMsg =
   | { t: 'sell'; weapon: WeaponId }
   | { t: 'reorder'; weapons: WeaponId[] }
   | { t: 'eat' }
+  | { t: 'withdraw' }
   | { t: 'respawn' }
   | { t: 'lootbox' }
   | { t: 'weaponLootbox' }

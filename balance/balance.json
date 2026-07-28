@@ -15,7 +15,7 @@
     "regenDelaySec": 5,
     "respawnSec": 4,
     "startMoney": 50,
-    "dropMoneyFrac": 0.5,
+    "dropMoneyFrac": 1.0,
     "spawnProtectSec": 3
   },
   "levels": {
@@ -544,28 +544,44 @@
   "buildings": {
     "farm": {
       "price": 150,
-      "hp": 200,
-      "income": 5,
+      "hp": 250,
+      "income": 6,
       "incomeIntervalSec": 10,
-      "radius": 40
+      "radius": 40,
+      "storeCap": 300
     },
     "mine": {
       "price": 600,
-      "hp": 350,
-      "income": 25,
+      "hp": 400,
+      "income": 26,
       "incomeIntervalSec": 10,
-      "radius": 40
+      "radius": 40,
+      "storeCap": 1200
     },
     "turret": {
       "price": 500,
-      "hp": 300,
+      "hp": 350,
       "income": 0,
       "incomeIntervalSec": 0,
       "radius": 40,
-      "damage": 10,
-      "range": 350,
+      "damage": 12,
+      "range": 360,
       "attackRate": 1.0,
       "projSpeed": 700
+    },
+    "vault": {
+      "price": 0,
+      "hp": 900,
+      "income": 0,
+      "incomeIntervalSec": 0,
+      "radius": 46
+    },
+    "wall": {
+      "price": 80,
+      "hp": 1200,
+      "income": 0,
+      "incomeIntervalSec": 0,
+      "radius": 32
     }
   },
   "food": {
@@ -775,12 +791,14 @@
     ]
   },
   "economy": {
-    "maxBuildingsPerPlayer": 5,
-    "maxTurretsPerPlayer": 2,
+    "maxBuildingsPerPlayer": 14,
+    "maxTurretsPerPlayer": 4,
     "buildingMinDist": 100,
-    "raidLootFrac": 0.5,
+    "raidLootFrac": 0.25,
     "coinDespawnSec": 60,
     "coinPickupRadius": 50,
-    "sellFrac": 0.5
+    "sellFrac": 0.5,
+    "vaultRaidFrac": 0.12,
+    "raidShieldSec": 1800
   }
 }

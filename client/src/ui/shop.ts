@@ -35,6 +35,7 @@ export class Shop {
   onStartPlace: (b: BuildingId) => void = () => {};
   onLootbox: () => void = () => {};
   onWeaponLootbox: () => void = () => {};
+  onWithdraw: () => void = () => {};
   onEquipHat: (hat: string | null) => void = () => {};
   onPrestige: () => void = () => {};
 
@@ -105,10 +106,17 @@ export class Shop {
       wg.appendChild(el);
     }
 
-    // buildings
+    // buildings — the bank row sits on top: this is where a run's gold is made safe
     const bg = $('shop-buildings');
     bg.innerHTML = '';
+    const bank = document.createElement('div');
+    bank.className = 'shop-item';
+    bank.id = 'shop-bank';
+    bank.innerHTML = `<div><div class="nm">🏦 <span id="bank-total"></span></div><div class="st">${t('shop.bankHint')}</div></div><div class="btns"><button id="withdraw-btn">${t('shop.withdraw')}</button></div>`;
+    (bank.querySelector('#withdraw-btn') as HTMLButtonElement).onclick = () => this.onWithdraw();
+    bg.appendChild(bank);
     for (const [id, cfg] of Object.entries(this.welcome.buildings)) {
+      if (id === 'vault') continue; // comes free with the base
       const el = document.createElement('div');
       el.className = 'shop-item';
       el.dataset.item = id;
@@ -199,12 +207,15 @@ export class Shop {
       }
     }
     for (const el of document.querySelectorAll<HTMLElement>('#shop-buildings .shop-item')) {
-      const id = el.dataset.item as BuildingId;
+      const id = el.dataset.item as BuildingId | undefined;
+      if (!id) continue; // the bank row is not a purchasable building
       const cfg = this.welcome.buildings[id];
       const btn = el.querySelector('button') as HTMLButtonElement;
       btn.disabled = self.money < cfg.price || self.buildings >= this.welcome.maxBuildings;
     }
     $('build-count').textContent = t('shop.buildCount', { n: self.buildings, max: this.welcome.maxBuildings });
+    $('bank-total').textContent = t('shop.bankRow', { n: self.banked });
+    ($('withdraw-btn') as HTMLButtonElement).disabled = self.banked <= 0;
 
     // level — earned from kills; show progress to the next level
     $('level-cur').textContent = String(self.level);

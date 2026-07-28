@@ -68,7 +68,10 @@ export interface Player extends BaseEntity, StatusEffects {
   name: string;
   ws: WebSocket | null;
   input: PlayerInput;
+  /** gold being carried — lost in full on death (the vault holds the safe half) */
   money: number;
+  /** gold deposited in the vault: survives death, only a raid can touch it */
+  banked: number;
   weapons: WeaponId[];
   equipped: WeaponId;
   food: number;
@@ -101,6 +104,8 @@ export interface Player extends BaseEntity, StatusEffects {
   lifeStartAt: number;
   /** PvP kills scored in the current life (reset on death) */
   killsThisLife: number;
+  /** base is immune until this time after being raided */
+  raidShieldUntil: number;
   buildingIds: Set<string>;
   known: Set<string>;
   session: SessionStats;
@@ -174,9 +179,14 @@ export interface Food extends BaseEntity {
 export interface Building extends BaseEntity {
   kind: 'building';
   buildingType: BuildingId;
+  /** entity id of the owning player, or '' for an absent player's base */
   ownerId: string;
   ownerName: string;
+  /** account the base belongs to; kept even while the owner is offline */
+  ownerAccount: string | null;
   incomeAt: number;
+  /** unclaimed gold in this building — collected by the owner, looted by a raider */
+  stored: number;
   attackReadyAt: number;
   lastAlertAt: number;
   ownerOfflineAt: number; // 0 while owner online

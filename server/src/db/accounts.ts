@@ -6,6 +6,8 @@ import { tr, type Lang } from '../game/i18n.js';
 export interface Account {
   name: string;
   money: number;
+  /** gold sitting in the player's vault — safe from death, raidable in part */
+  banked: number;
   weapons: WeaponId[];
   hats: string[];
   hat: string | null;
@@ -34,13 +36,13 @@ export function register(name: string, password: string, startMoney = 0, lang: L
   getDb()
     .prepare('INSERT INTO accounts (name, pass_hash, salt, money, weapons, created_ts, last_seen_ts) VALUES (?,?,?,?,?,?,?)')
     .run(name, hash(password, salt), salt, startMoney, JSON.stringify(['fists']), now, now);
-  return { ok: true, account: { name, money: startMoney, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now } };
+  return { ok: true, account: { name, money: startMoney, banked: 0, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now } };
 }
 
 export function login(name: string, password: string, lang: Lang = 'ru'): { ok: boolean; reason?: string; account?: Account } {
   const row = getDb()
-    .prepare('SELECT name, pass_hash, salt, money, weapons, hats, hat, prestige, level, food, created_ts FROM accounts WHERE name = ? COLLATE NOCASE')
-    .get(name) as { name: string; pass_hash: string; salt: string; money: number; weapons: string; hats: string | null; hat: string | null; prestige: number | null; level: number | null; food: number | null; created_ts: number } | undefined;
+    .prepare('SELECT name, pass_hash, salt, money, banked, weapons, hats, hat, prestige, level, food, created_ts FROM accounts WHERE name = ? COLLATE NOCASE')
+    .get(name) as { name: string; pass_hash: string; salt: string; money: number; banked: number | null; weapons: string; hats: string | null; hat: string | null; prestige: number | null; level: number | null; food: number | null; created_ts: number } | undefined;
   if (!row) return { ok: false, reason: tr(lang, 'accountNotFound') };
   const attempt = hash(password, row.salt);
   if (!crypto.timingSafeEqual(Buffer.from(attempt), Buffer.from(row.pass_hash))) {
@@ -61,11 +63,11 @@ export function login(name: string, password: string, lang: Lang = 'ru'): { ok: 
     hats = [];
   }
   const hat = row.hat && hats.includes(row.hat) ? row.hat : null;
-  return { ok: true, account: { name: row.name, money: row.money, weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts } };
+  return { ok: true, account: { name: row.name, money: row.money, banked: Math.max(0, row.banked ?? 0), weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts } };
 }
 
 type AccountRow = {
-  name: string; money: number; weapons: string; hats: string | null; hat: string | null;
+  name: string; money: number; banked: number | null; weapons: string; hats: string | null; hat: string | null;
   prestige: number | null; level: number | null; food: number | null; created_ts: number;
 };
 
@@ -81,10 +83,10 @@ function rowToAccount(row: AccountRow): Account {
     if (Array.isArray(parsed)) hats = parsed.filter((h) => typeof h === 'string');
   } catch { hats = []; }
   const hat = row.hat && hats.includes(row.hat) ? row.hat : null;
-  return { name: row.name, money: row.money, weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts };
+  return { name: row.name, money: row.money, banked: Math.max(0, row.banked ?? 0), weapons, hats, hat, prestige: row.prestige ?? 0, level: Math.max(1, row.level ?? 1), food: Math.max(0, row.food ?? 0), createdTs: row.created_ts };
 }
 
-const ACC_COLS = 'name, money, weapons, hats, hat, prestige, level, food, created_ts';
+const ACC_COLS = 'name, money, banked, weapons, hats, hat, prestige, level, food, created_ts';
 
 /** Account columns that hold a third-party portal's player id. */
 type PlatformIdColumn = 'yandex_id' | 'cg_id';
@@ -108,7 +110,7 @@ function loginPlatform(column: PlatformIdColumn, platformId: string, displayName
   for (let i = 2; accountExists(name); i++) name = `${base.slice(0, 13)}#${i}`; // dodge name-uniqueness clashes
   db.prepare(`INSERT INTO accounts (name, pass_hash, salt, money, weapons, created_ts, last_seen_ts, ${column}) VALUES (?,?,?,?,?,?,?,?)`)
     .run(name, passHash, salt, startMoney, JSON.stringify(['fists']), now, now, platformId);
-  return { name, money: startMoney, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now };
+  return { name, money: startMoney, banked: 0, weapons: ['fists'], hats: [], hat: null, prestige: 0, level: 1, food: 0, createdTs: now };
 }
 
 /** Yandex Games player id → account. */
@@ -147,9 +149,30 @@ export function claimDailyReward(name: string): { gold: number; streak: number }
   return { gold, streak };
 }
 
+/** Reads the stored base layout for an account, or null when it has none. */
+export function loadBase(name: string): string | null {
+  const row = getDb().prepare('SELECT base FROM accounts WHERE name = ? COLLATE NOCASE').get(name) as { base: string | null } | undefined;
+  return row?.base ?? null;
+}
+
+/**
+ * Accounts with a stored base, most recently seen first — the pool absent
+ * players' bases are seeded from.
+ */
+export function listRaidableBases(limit: number): { name: string; base: string | null }[] {
+  return getDb()
+    .prepare("SELECT name, base FROM accounts WHERE base IS NOT NULL AND base != '' ORDER BY last_seen_ts DESC LIMIT ?")
+    .all(limit) as { name: string; base: string | null }[];
+}
+
+/** Writes the base layout so it can be rebuilt on the next login. */
+export function saveBase(name: string, json: string): void {
+  getDb().prepare('UPDATE accounts SET base = ? WHERE name = ? COLLATE NOCASE').run(json, name);
+}
+
 /** Persists gold, weapons, hats, prestige, level and food at logout. */
-export function saveProgress(name: string, money: number, weapons: WeaponId[], hats: string[], hat: string | null, prestige: number, level: number, food: number): void {
+export function saveProgress(name: string, money: number, banked: number, weapons: WeaponId[], hats: string[], hat: string | null, prestige: number, level: number, food: number): void {
   getDb()
-    .prepare('UPDATE accounts SET money = ?, weapons = ?, hats = ?, hat = ?, prestige = ?, level = ?, food = ?, last_seen_ts = ? WHERE name = ? COLLATE NOCASE')
-    .run(money, JSON.stringify(weapons), JSON.stringify(hats), hat, prestige, Math.max(1, Math.floor(level)), Math.max(0, Math.floor(food)), Date.now(), name);
+    .prepare('UPDATE accounts SET money = ?, banked = ?, weapons = ?, hats = ?, hat = ?, prestige = ?, level = ?, food = ?, last_seen_ts = ? WHERE name = ? COLLATE NOCASE')
+    .run(money, Math.max(0, Math.floor(banked)), JSON.stringify(weapons), JSON.stringify(hats), hat, prestige, Math.max(1, Math.floor(level)), Math.max(0, Math.floor(food)), Date.now(), name);
 }

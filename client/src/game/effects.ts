@@ -122,6 +122,18 @@ export class Effects {
     this.texts.push({ t, vy: -55, life: 0.9, maxLife: 0.9 });
   }
 
+  /** Green floating "+N" for gold collected from a silo. */
+  gainNumber(x: number, y: number, amount: number): void {
+    const t = new Text({
+      text: `+${amount}`,
+      style: { fontFamily: 'system-ui', fontSize: 16, fontWeight: '800', fill: 0x7ee787, stroke: { color: 0x000000, width: 4 } },
+    });
+    t.anchor.set(0.5);
+    t.position.set(x + (Math.random() - 0.5) * 20, y - 28);
+    this.layer.addChild(t);
+    this.texts.push({ t, vy: -60, life: 1.1, maxLife: 1.1 });
+  }
+
   /** Grey floating "miss" label (mirror_blade dodges). */
   missText(x: number, y: number, label: string): void {
     const t = new Text({

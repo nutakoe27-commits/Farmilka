@@ -77,7 +77,7 @@ function writeEntity(w: Writer, e: EntityState): void {
       w.u16(e.hp ?? 0); w.u16(e.maxHp ?? 0); w.str(e.bossType);
       break;
     case 'building':
-      w.u16(e.hp ?? 0); w.u16(e.maxHp ?? 0); w.str(e.buildingType); w.str(e.owner); w.str(e.name);
+      w.u16(e.hp ?? 0); w.u16(e.maxHp ?? 0); w.str(e.buildingType); w.str(e.owner); w.str(e.name); w.u8(e.store ?? 0);
       break;
     case 'coin':
       w.u16(e.value ?? 0);
@@ -108,7 +108,7 @@ function readEntity(r: Reader): EntityState {
       e.hp = r.u16(); e.maxHp = r.u16(); e.bossType = r.str() as BossId;
       break;
     case 'building':
-      e.hp = r.u16(); e.maxHp = r.u16(); e.buildingType = r.str() as BuildingId; e.owner = r.str(); e.name = r.str();
+      e.hp = r.u16(); e.maxHp = r.u16(); e.buildingType = r.str() as BuildingId; e.owner = r.str(); e.name = r.str(); e.store = r.u8();
       break;
     case 'coin':
       e.value = r.u16();
@@ -122,8 +122,9 @@ function readEntity(r: Reader): EntityState {
   return e;
 }
 
-// delta flag bits
-const D_HP = 1, D_MAXHP = 2, D_WEAPON = 4, D_PROT_SET = 8, D_PROT_VAL = 16, D_HAT = 32, D_PRESTIGE = 64, D_FX = 128;
+// Delta flag bits. Stored as u16: the byte filled up once buildings started
+// reporting their silo fill.
+const D_HP = 1, D_MAXHP = 2, D_WEAPON = 4, D_PROT_SET = 8, D_PROT_VAL = 16, D_HAT = 32, D_PRESTIGE = 64, D_FX = 128, D_STORE = 256;
 
 function writeDelta(w: Writer, d: EntityDelta): void {
   w.str(d.id);
@@ -138,18 +139,20 @@ function writeDelta(w: Writer, d: EntityDelta): void {
   if (d.hat !== undefined) flags |= D_HAT;
   if (d.prestige !== undefined) flags |= D_PRESTIGE;
   if (d.fx !== undefined) flags |= D_FX;
-  w.u8(flags);
+  if (d.store !== undefined) flags |= D_STORE;
+  w.u16(flags);
   if (flags & D_HP) w.u16(d.hp!);
   if (flags & D_MAXHP) w.u16(d.maxHp!);
   if (flags & D_WEAPON) w.str(d.weapon);
   if (flags & D_HAT) w.str(d.hat ?? '');
   if (flags & D_PRESTIGE) w.u8(d.prestige!);
   if (flags & D_FX) w.u8(d.fx!);
+  if (flags & D_STORE) w.u8(d.store!);
 }
 
 function readDelta(r: Reader): EntityDelta {
   const d: EntityDelta = { id: r.str(), x: r.f32(), y: r.f32(), angle: r.ang() };
-  const flags = r.u8();
+  const flags = r.u16();
   if (flags & D_HP) d.hp = r.u16();
   if (flags & D_MAXHP) d.maxHp = r.u16();
   if (flags & D_WEAPON) d.weapon = r.str() as WeaponId;
@@ -157,6 +160,7 @@ function readDelta(r: Reader): EntityDelta {
   if (flags & D_HAT) { const h = r.str(); d.hat = h || null; }
   if (flags & D_PRESTIGE) d.prestige = r.u8();
   if (flags & D_FX) d.fx = r.u8();
+  if (flags & D_STORE) d.store = r.u8();
   return d;
 }
 
@@ -164,6 +168,7 @@ function writeSelf(w: Writer, s: SelfState): void {
   w.f32(s.x); w.f32(s.y);
   w.u16(s.hp); w.u16(s.maxHp);
   w.u32(s.money);
+  w.u32(s.banked);
   w.str(s.equipped);
   w.u8(s.weapons.length); for (const wp of s.weapons) w.str(wp);
   w.u16(s.buildings);
@@ -178,7 +183,7 @@ function writeSelf(w: Writer, s: SelfState): void {
 
 function readSelf(r: Reader): SelfState {
   const s: SelfState = {
-    x: r.f32(), y: r.f32(), hp: r.u16(), maxHp: r.u16(), money: r.u32(),
+    x: r.f32(), y: r.f32(), hp: r.u16(), maxHp: r.u16(), money: r.u32(), banked: r.u32(),
     equipped: r.str() as WeaponId,
     weapons: [], buildings: 0, hats: [], hat: null,
     prestige: 0, prestigeCost: 0, level: 0, levelKills: 0,

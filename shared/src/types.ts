@@ -13,7 +13,7 @@ export type MobId =
   | 'shade' | 'treant'               // mystic west
   | 'wisp' | 'crystal_golem';        // mystic east
 export type BossId = 'champion' | 'frost_titan' | 'sand_worm' | 'shadow_lord' | 'crystal_queen';
-export type BuildingId = 'farm' | 'mine' | 'turret';
+export type BuildingId = 'farm' | 'mine' | 'turret' | 'vault' | 'wall';
 
 export type IncomeSource = 'mob' | 'boss' | 'building' | 'loot' | 'raid';
 export type DeathCause = 'player' | 'mob' | 'boss' | 'turret';

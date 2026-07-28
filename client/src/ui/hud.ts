@@ -12,6 +12,7 @@ function fmtTime(sec: number): string {
 
 export class Hud {
   private lastMoney = -1;
+  private lastBanked = -1;
   private lastLevel = -1;
   private maxLevel = 10;
   private foodCooldownSec = 2;
@@ -52,9 +53,13 @@ export class Hud {
       this.lastLevel = self.level;
       $('level-badge').innerHTML = `${t('hud.level', { n: self.level })}<span class="mx">/${this.maxLevel}</span>`;
     }
-    if (self.money !== this.lastMoney) {
+    if (self.money !== this.lastMoney || self.banked !== this.lastBanked) {
       this.lastMoney = self.money;
-      $('money').textContent = `💰 ${self.money}`;
+      this.lastBanked = self.banked;
+      // carried gold is what a death costs you — it turns orange once the
+      // stack is worth a trip home; the vault total sits next to it
+      const risk = self.money >= 500 ? ' risk' : '';
+      $('money').innerHTML = `<span class="carry${risk}">💰 ${self.money}</span> <span class="vault">🏦 ${self.banked}</span>`;
     }
     if (self.protIn > 0) {
       $('zone-label').textContent = t('hud.protectSec', { n: Math.ceil(self.protIn) });
