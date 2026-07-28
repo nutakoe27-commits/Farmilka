@@ -28,7 +28,7 @@ function fullState(e: Entity): EntityState {
   };
   switch (e.kind) {
     case 'player':
-      s.hp = Math.round(e.hp);
+      s.hp = Math.max(0, Math.round(e.hp));
       s.maxHp = e.maxHp;
       s.name = e.name;
       s.weapon = e.equipped;
@@ -38,18 +38,18 @@ function fullState(e: Entity): EntityState {
       if (e.invulnUntil > Date.now()) s.prot = true;
       break;
     case 'mob':
-      s.hp = Math.round(e.hp);
+      s.hp = Math.max(0, Math.round(e.hp));
       s.maxHp = e.maxHp;
       s.mobType = e.mobType;
       s.fx = statusFx(e);
       break;
     case 'boss':
-      s.hp = Math.round(e.hp);
+      s.hp = Math.max(0, Math.round(e.hp));
       s.maxHp = e.maxHp;
       s.bossType = e.bossType;
       break;
     case 'building':
-      s.hp = Math.round(e.hp);
+      s.hp = Math.max(0, Math.round(e.hp));
       s.maxHp = e.maxHp;
       s.buildingType = e.buildingType;
       s.owner = e.ownerId;
@@ -89,7 +89,7 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
         angle: Math.round(e.angle * 100) / 100,
       };
       if (e.dirtyTick === world.tickNo) {
-        d.hp = Math.round(e.hp);
+        d.hp = Math.max(0, Math.round(e.hp));
         if (e.kind === 'player') {
           d.maxHp = e.maxHp; // changes with level / hat — keep the over-head bar in sync
           d.weapon = e.equipped;
@@ -119,7 +119,7 @@ export function buildSnapshot(world: World, p: Player): SnapshotMsg {
   const self: SelfState = {
     x: Math.round(p.x * 10) / 10,
     y: Math.round(p.y * 10) / 10,
-    hp: Math.round(p.hp),
+    hp: Math.max(0, Math.round(p.hp)),
     maxHp: p.maxHp,
     money: p.money,
     banked: p.banked,

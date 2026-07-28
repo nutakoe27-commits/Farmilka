@@ -126,9 +126,12 @@ export class Shop {
       const el = document.createElement('div');
       el.className = 'shop-item';
       el.dataset.item = id;
+      // walls neither earn nor shoot — the turret stat line would read "dmg 0 · range 0"
       const stats = cfg.income > 0
         ? t('shop.income', { n: cfg.income, sec: cfg.incomeIntervalSec, hp: cfg.hp })
-        : t('shop.turretStat', { dmg: cfg.damage ?? 0, range: cfg.range ?? 0, hp: cfg.hp });
+        : cfg.damage
+          ? t('shop.turretStat', { dmg: cfg.damage, range: cfg.range ?? 0, hp: cfg.hp })
+          : t('shop.wallStat', { hp: cfg.hp });
       el.innerHTML = `<div><div class="nm">${BUILDING_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${t('note.' + id)}<br>${t('shop.buildingVanish')}</div></div><div class="btns"><button>💰 ${cfg.price}</button></div>`;
       el.querySelector('button')!.onclick = () => {
         this.hide();

@@ -1,0 +1,16 @@
+{
+  "name": "@farmclash/marketing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Store assets: covers, screenshots and the gameplay preview video. Not part of the game build — install separately with `npm install` in this folder.",
+  "scripts": {
+    "covers": "node make-crazygames-covers.mjs && node render-svg.mjs",
+    "preview": "node record-preview.mjs",
+    "shots": "node capture-screens.mjs"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "playwright": "^1.49.0"
+  }
+}

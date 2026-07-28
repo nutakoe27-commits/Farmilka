@@ -1,7 +1,7 @@
 // One facade over the portal SDKs (Yandex Games / CrazyGames) so the game code
-// never branches on which platform it is running on. Exactly one SDK is loaded,
-// chosen at build time by VITE_PLATFORM (see config.ts); on the standalone site
-// none is loaded and every call here is a no-op.
+// never branches on which platform it is running on. Exactly one SDK is fetched
+// and initialised, chosen at build time by VITE_PLATFORM (see config.ts); on the
+// standalone site none is loaded and every call here is a no-op.
 
 import { PLATFORM, IS_SELF_HOST } from '../config.js';
 import {

@@ -1,172 +1,272 @@
-// Records a scripted gameplay take for the store preview video.
+// Records the store preview video from real play and encodes it to H.264.
 //
-// The hero is steered with real feedback rather than blind key presses: the
-// in-game minimap is a 2D canvas, so we read its pixels to find our own dot
-// (white) and the boss dot (light purple). That keeps the hero away from the
-// world edge — where the camera would show black past the boundary — and walks
-// it straight into the boss fight instead of hoping the boss wanders over.
-import { chromium } from 'playwright';
-import { writeFileSync } from 'node:fs';
+//   node marketing/record-preview.mjs
+//
+// Needs a server on :3993 started with video-rig-balance.json (generate it with
+// make-video-rig.mjs). See CRAZYGAMES.md for why the world runs in slow motion.
+//
+// Two clients join the same world. Only the hero's page is recorded; the
+// neighbour is off-camera scaffolding whose walled base gives the hero
+// something real to break into. Steering is closed-loop: the client exposes
+// screenToWorld, so the world coordinate under the centre of the screen is the
+// actor's own position, and the minimap is read for the boss.
 
-const OUT = '/tmp/claude-0/-home-user-Farmilka/9e0a0f6e-42bb-5164-af32-dc77ab722252/scratchpad';
-const BASE = 'http://localhost:3993/';
-const W = 1280, H = 720;   // upscaled at encode time; 720p renders ~3x faster here
+import { chromium } from 'playwright';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join as pathJoin } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ffmpeg from 'ffmpeg-static';
+
+const DIR = dirname(fileURLToPath(import.meta.url));
+const OUT = process.env.PREVIEW_TMP || '/tmp/farmclash-preview';
+const BASE = process.env.PREVIEW_URL || 'http://localhost:3993/';
+const WORLD = Number(process.env.RIG_WORLD_SIZE || 3600);
+const SLOWMO = Number(process.env.SLOWMO || 2.5); // must match make-video-rig.mjs
+const W = 1280, H = 720;                          // upscaled at encode time; 720p renders ~3x faster
 const CX = W / 2, CY = H / 2;
 
+mkdirSync(OUT, { recursive: true });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const browser = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium',
+  executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium',
   args: ['--disable-gpu-vsync', '--disable-frame-rate-limit', '--enable-webgl', '--hide-scrollbars'],
 });
-const ctx = await browser.newContext({
-  viewport: { width: W, height: H },
-  recordVideo: { dir: `${OUT}/video-raw`, size: { width: W, height: H } },
-});
-const page = await ctx.newPage();
-const errors = [];
-page.on('pageerror', (e) => errors.push(String(e)));
 
+const errors = [];
 const beats = [];
 let t0 = 0;
 const beat = (n) => { const t = Date.now() - t0; beats.push({ n, t }); console.log(`beat ${n} @ ${t}ms`); };
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Reads hero + boss positions off the minimap canvas, as 0..1 world fractions. */
-async function readMap() {
-  return page.evaluate(() => {
-    const c = document.getElementById('minimap');
-    if (!c) return null;
-    const g = c.getContext('2d');
-    if (!g) return null;
-    const S = c.width || 160;
-    const d = g.getImageData(0, 0, S, S).data;
-    let sx = 0, sy = 0, sn = 0, bx = 0, by = 0, bn = 0;
-    for (let y = 0; y < S; y++) {
-      for (let x = 0; x < S; x++) {
-        const i = (y * S + x) * 4;
-        const r = d[i], gg = d[i + 1], b = d[i + 2], a = d[i + 3];
-        if (a < 40) continue;
-        if (r > 248 && gg > 248 && b > 248) { sx += x; sy += y; sn++; }                              // self (white)
-        else if (r > 228 && r < 250 && gg > 188 && gg < 214 && b > 246) { bx += x; by += y; bn++; }  // boss
-      }
-    }
-    return {
-      self: sn ? { x: sx / sn / S, y: sy / sn / S } : null,
-      boss: bn ? { x: bx / bn / S, y: by / bn / S } : null,
-    };
+async function join(name, { record = false } = {}) {
+  const ctx = await browser.newContext({
+    viewport: { width: W, height: H },
+    ...(record ? { recordVideo: { dir: `${OUT}/raw`, size: { width: W, height: H } } } : {}),
   });
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => errors.push(`${name}: ${e}`));
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate(() => localStorage.setItem('farmclash-lang', 'en'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.fill('#name-input', name);
+  await page.click('#play-btn');
+  await page.waitForSelector('#hud:not(.hidden)', { timeout: 20000 }).catch(() => {});
+  await sleep(3000);
+  return { ctx, page };
 }
 
-const held = new Set();
-async function setKeys(want) {
-  for (const k of [...held]) if (!want.has(k)) { await page.keyboard.up(k); held.delete(k); }
-  for (const k of want) if (!held.has(k)) { await page.keyboard.down(k); held.add(k); }
-}
-const releaseAll = () => setKeys(new Set());
+const where = (page) => page.evaluate(([x, y]) => window.farmclashView?.screenToWorld(x, y) ?? null, [CX, CY]);
+const zoomOf = (page) => page.evaluate(() => window.farmclashView?.zoom() ?? 1);
 
-/** Keys that push the hero along (dx, dy) in world-fraction space. */
-function keysFor(dx, dy, thr = 0.012) {
-  const k = new Set();
-  if (dy < -thr) k.add('KeyW');
-  if (dy > thr) k.add('KeyS');
-  if (dx < -thr) k.add('KeyA');
-  if (dx > thr) k.add('KeyD');
-  return k;
+const held = new Map();
+async function keys(page, want) {
+  const cur = held.get(page) ?? new Set();
+  for (const k of cur) if (!want.has(k)) { await page.keyboard.up(k); cur.delete(k); }
+  for (const k of want) if (!cur.has(k)) { await page.keyboard.down(k); cur.add(k); }
+  held.set(page, cur);
 }
-
-const aimAt = (ang, r = 320) => page.mouse.move(CX + Math.cos(ang) * r, CY + Math.sin(ang) * r);
+const aimAt = (page, ang, r = 300) => page.mouse.move(CX + Math.cos(ang) * r, CY + Math.sin(ang) * r);
 
 /**
- * Walks toward a target (0..1 world fraction) while attacking.
- * `target` may be 'boss' to chase whatever the minimap currently shows.
+ * Walks toward a world point, optionally swinging the whole way (`spin` keeps
+ * the aim rotating, which reads as "fighting through" rather than "walking").
  */
-async function driveTo(target, ms, { attack = true, spin = false, stopAt = 0.02 } = {}) {
+async function driveTo(page, target, { ms = 20000, stopAt = 120, attack = false, spin = false } = {}) {
   const start = Date.now();
   let spinA = 0;
   if (attack) await page.mouse.down();
+  let arrived = false;
   while (Date.now() - start < ms) {
-    const m = await readMap();
-    const self = m?.self;
-    const dest = target === 'boss' ? m?.boss : target;
-    if (self && dest) {
-      const dx = dest.x - self.x, dy = dest.y - self.y;
-      if (Math.hypot(dx, dy) < stopAt && target !== 'boss') await setKeys(new Set());
-      else await setKeys(keysFor(dx, dy));
-      if (spin) { spinA += 0.5; await aimAt(spinA); }
-      else await aimAt(Math.atan2(dy, dx));
-    } else if (spin) {
-      spinA += 0.5;
-      await aimAt(spinA);
-    }
+    const me = await where(page);
+    if (!me) break;
+    const dx = target.x - me.x, dy = target.y - me.y;
+    const d = Math.hypot(dx, dy);
+    if (d < stopAt) { arrived = true; break; }
+    const k = new Set();
+    if (dy < -20) k.add('KeyW');
+    if (dy > 20) k.add('KeyS');
+    if (dx < -20) k.add('KeyA');
+    if (dx > 20) k.add('KeyD');
+    await keys(page, k);
+    if (spin) { spinA += 0.5; await aimAt(page, spinA); }
+    else await aimAt(page, Math.atan2(dy, dx));
     await sleep(100);
   }
+  await keys(page, new Set());
   if (attack) await page.mouse.up();
-  await releaseAll();
+  return arrived;
 }
 
-await page.goto(BASE);
-await page.waitForTimeout(1200);
-await page.fill('#name-input', 'FarmClash');
-await page.click('#play-btn');
-await page.waitForTimeout(3500);
+/** Fights in place for a while, sweeping the aim around. */
+async function brawl(page, ms) {
+  await page.mouse.down();
+  const start = Date.now();
+  let a = 0;
+  while (Date.now() - start < ms) { a += 0.35; await aimAt(page, a); await sleep(100); }
+  await page.mouse.up();
+}
+
+async function openShop(page, tab) {
+  if (await page.locator('#shop.hidden').count()) {
+    await page.keyboard.press('b');
+    await page.waitForSelector('#shop:not(.hidden)', { timeout: 5000 });
+  }
+  await page.click(`.shop-tab[data-tab="${tab}"]`);
+  await sleep(400);
+}
+
+async function build(page, item, wx, wy, z) {
+  await openShop(page, 'buildings');
+  const row = page.locator(`#shop-buildings .shop-item[data-item="${item}"] button`);
+  if (!(await row.count()) || (await row.isDisabled())) { await page.keyboard.press('Escape'); return false; }
+  await row.click();
+  await sleep(300);
+  await page.mouse.click(CX + wx * z, CY + wy * z);
+  await sleep(350);
+  return true;
+}
+
+const findBoss = (page) => page.evaluate(() => {
+  const c = document.getElementById('minimap');
+  const g = c?.getContext('2d');
+  if (!g) return null;
+  const S = c.width || 160;
+  const d = g.getImageData(0, 0, S, S).data;
+  let bx = 0, by = 0, n = 0;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = (y * S + x) * 4;
+    if (d[i + 3] < 40) continue;
+    if (d[i] > 228 && d[i] < 250 && d[i + 1] > 188 && d[i + 1] < 214 && d[i + 2] > 246) { bx += x; by += y; n++; }
+  }
+  return n ? { x: bx / n / S, y: by / n / S } : null;
+});
+
+// ---------- off-camera: a neighbour with a base worth raiding ----------
+const nb = await join('Neighbour');
+{
+  const z = await zoomOf(nb.page);
+  for (let i = -2; i <= 2; i++) await build(nb.page, 'wall', 250, i * 66, z);
+  await build(nb.page, 'mine', -230, 140, z);
+  await build(nb.page, 'farm', -240, -160, z);
+  await nb.page.keyboard.press('Escape');
+}
+const target = await where(nb.page);
+console.log('raid target at', target);
+
+// ---------- on camera ----------
+const hero = await join('FarmClash', { record: true });
+const page = hero.page;
 t0 = Date.now();
 beat('start');
 
-const CENTER = { x: 0.5, y: 0.5 };
+const z = await zoomOf(page);
+const home = await where(page);
 
-// --- 1. head for the middle of the map, killing whatever is on the way ---
-await driveTo(CENTER, 17000, { spin: true });
-beat('recentred');
+// 1. wall the home base in — the build beat
+for (let i = -2; i <= 2; i++) await build(page, 'wall', 250, i * 66, z);
+await build(page, 'turret', -60, -210, z);
+await page.keyboard.press('Escape');
+beat('base-walled');
 
-// --- 2. orbit the centre so the fight stays framed and away from the edges ---
-await driveTo({ x: 0.56, y: 0.44 }, 7500, { spin: true });
-await driveTo({ x: 0.44, y: 0.56 }, 7500, { spin: true });
-beat('mobs-done');
+// 2. out into the field, killing what is there
+await driveTo(page, { x: home.x - 600, y: home.y - 400 }, { ms: 14000, spin: true, attack: true });
+await brawl(page, 7000);
+beat('mobs');
 
-// --- 3. shop: buy a weapon that reads well on video ---
-await page.keyboard.press('KeyB');
-await page.waitForTimeout(900);
-const buy = await page.$('#shop-weapons .shop-item[data-item="scythe"] .buy');
-if (buy) { await buy.click(); await page.waitForTimeout(600); }
-beat('bought-weapon');
-
-// --- 4. the money shot: weapon crate -> guaranteed legendary ---
-const hatsTab = await page.$('.shop-tab[data-tab="hats"]');
-if (hatsTab) { await hatsTab.click(); await page.waitForTimeout(700); }
+// 3. the crate: a legendary weapon reveal
+await openShop(page, 'hats');
 const crate = await page.$('#weapon-lootbox-btn');
-if (crate) { await crate.click(); await page.waitForTimeout(1800); }
-beat('crate-opened');
-await page.keyboard.press('KeyB');
-await page.waitForTimeout(600);
-// keep the legendary visible in the hotbar but fight with the scythe: the
-// Tamer's Blade would make mobs ignore us and drain the scene
+if (crate) { await crate.click(); await sleep(2200); }
+await page.keyboard.press('Escape');
+await sleep(500);
 await page.keyboard.press('Digit2');
-await page.waitForTimeout(300);
+beat('crate');
 
-// --- 5. show off the new kit near the centre ---
-await driveTo({ x: 0.52, y: 0.52 }, 10000, { spin: true });
-beat('showing-off');
+// 4. the raid: walk to the neighbour's wall and break in
+await driveTo(page, { x: target.x + 520, y: target.y }, { ms: 45000, spin: true, attack: true });
+await driveTo(page, { x: target.x + 330, y: target.y }, { ms: 15000, stopAt: 60 });
+await page.mouse.down();
+await aimAt(page, Math.PI);
+await sleep(14000);
+await page.mouse.up();
+beat('raid');
+// scoop the spill
+await driveTo(page, { x: target.x + 120, y: target.y }, { ms: 12000, stopAt: 50, attack: true });
+beat('looted');
 
-// --- 6. hunt the boss: walk it down as soon as the minimap shows it ---
-const hunt = Date.now();
-let sawBoss = false;
-while (Date.now() - hunt < 110_000) {
-  const m = await readMap();
-  if (m?.boss) {
-    if (!sawBoss) { sawBoss = true; beat('boss-spotted'); }
-    await driveTo('boss', 4000, { spin: false });
-  } else {
-    await driveTo(CENTER, 4000, { spin: true }); // keep the frame busy until it shows up
+// 5. the boss finale
+{
+  const t = Date.now();
+  let seen = false;
+  while (Date.now() - t < 70_000) {
+    const b = await findBoss(page);
+    if (b) {
+      if (!seen) { seen = true; beat('boss-spotted'); }
+      await driveTo(page, { x: b.x * WORLD, y: b.y * WORLD }, { ms: 6000, stopAt: 220, attack: true });
+      await brawl(page, 3000);
+    } else {
+      await driveTo(page, { x: WORLD / 2, y: WORLD / 2 }, { ms: 5000, spin: true, attack: true });
+    }
   }
 }
 beat('end');
 
-await releaseAll();
-await page.waitForTimeout(600);
+await keys(page, new Set());
+await sleep(800);
 const video = page.video();
-await ctx.close();
+await hero.ctx.close();
 const raw = await video.path();
+await nb.ctx.close();
 await browser.close();
 
 writeFileSync(`${OUT}/beats.json`, JSON.stringify({ raw, beats, errors }, null, 2));
 console.log('raw video:', raw);
 console.log('errors:', errors.length ? errors.slice(0, 3).join(' | ') : 'none');
+
+// ---------- encode ----------
+// The take is longer than a store preview should be, so it is cut down to the
+// four beats that carry the pitch. The capture is slow motion; speeding it back
+// up by SLOWMO restores real time and turns ~5 rendered fps into ~29 distinct
+// frames per second.
+const at = (name) => beats.find((b) => b.n === name)?.t ?? null;
+
+/** [start, end] windows in raw capture seconds, in story order. */
+function cut() {
+  const s0 = (ms) => Math.max(0, ms / 1000);
+  const walled = at('base-walled'), mobs = at('mobs'), raid = at('raid'), looted = at('looted');
+  const bossAt = at('boss-spotted'), end = at('end');
+  const win = [];
+  const push = (from, to, max) => {
+    if (from == null || to == null || to <= from) return;
+    const a = s0(from), b = s0(to);
+    win.push([Math.max(a, b - max), b]);
+  };
+  push(at('start'), walled, 20);            // walling the base in
+  push(walled, mobs, 15);                   // a fight in the field
+  push(raid ? raid - 22_000 : null, looted ?? raid, 26); // breaking into a base
+  push(bossAt, end, 16);                    // the boss
+  return win;
+}
+
+const windows = cut();
+console.log('cut windows (raw s):', windows.map(([a, b]) => `${a.toFixed(1)}-${b.toFixed(1)}`).join(', '));
+
+function encode(out, extra) {
+  const parts = windows.map(([a, b], i) =>
+    `[0:v]trim=start=${a.toFixed(2)}:end=${b.toFixed(2)},setpts=PTS-STARTPTS[v${i}]`);
+  const chain =
+    `${parts.join(';')};${windows.map((_, i) => `[v${i}]`).join('')}concat=n=${windows.length}:v=1:a=0[cat];` +
+    `[cat]setpts=PTS/${SLOWMO},${extra},fps=30[out]`;
+  const r = spawnSync(ffmpeg, [
+    '-y', '-i', raw, '-filter_complex', chain, '-map', '[out]',
+    '-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+    out,
+  ], { stdio: ['ignore', 'ignore', 'inherit'] });
+  if (r.status !== 0) throw new Error(`ffmpeg failed for ${out}`);
+  console.log('wrote', out);
+}
+
+if (!windows.length) throw new Error('no beats recorded — nothing to cut');
+encode(pathJoin(DIR, 'farmclash-preview.mp4'), 'scale=1920:1080:flags=lanczos');
+encode(pathJoin(DIR, 'farmclash-preview-vertical.mp4'), 'crop=ih*9/16:ih,scale=1080:1920:flags=lanczos');

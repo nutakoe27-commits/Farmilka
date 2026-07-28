@@ -91,6 +91,7 @@ const RU: Dict = {
   'shop.dmgRanged': 'урон {dmg} · дальн. {range} · {rate}/с · снаряд',
   'shop.income': '+{n} монет / {sec}с · HP {hp}',
   'shop.turretStat': 'урон {dmg}/выстрел · дальн. {range} · HP {hp}',
+  'shop.wallStat': 'HP {hp} · сплошная — враги и мобы не пройдут, только проломят',
 
   // death screen
   'death.title': 'Вы погибли',
@@ -301,6 +302,7 @@ const EN: Dict = {
   'shop.dmgRanged': 'dmg {dmg} · range {range} · {rate}/s · projectile',
   'shop.income': '+{n} coins / {sec}s · HP {hp}',
   'shop.turretStat': 'dmg {dmg}/shot · range {range} · HP {hp}',
+  'shop.wallStat': 'HP {hp} · solid — enemies and mobs have to break through',
 
   'death.title': 'You died',
   'death.survived': 'Survived',

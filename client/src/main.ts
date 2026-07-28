@@ -198,6 +198,13 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
 
   const scene = new Scene(app);
   scene.viewScale = isTouchDevice() ? 1.6 : 1; // phones get a wider view of the world
+  // Read-only hook for the store-asset capture scripts (marketing/), which need
+  // to turn a screen click into the world coordinate the server will see. It
+  // exposes nothing a player could not already read off their own screen.
+  (window as unknown as { farmclashView?: unknown }).farmclashView = {
+    screenToWorld: (x: number, y: number) => scene.screenToWorld(x, y),
+    zoom: () => scene.zoom,
+  };
   scene.drawGround(welcome.world.size);
   setPrestigeCfg(welcome.prestige);
   const effects = new Effects(scene.layers.effects, scene.layers.telegraphs);

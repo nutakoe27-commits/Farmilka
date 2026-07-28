@@ -12,8 +12,12 @@ const DEFAULT_ORIGIN = 'https://farmclash.online';
 
 /**
  * Which portal this build targets, set at build time with VITE_PLATFORM
- * ('yandex' | 'crazygames'). Empty = the standalone site. Only the matching
- * SDK is ever loaded, so each archive stays clean of the other portal's code.
+ * ('yandex' | 'crazygames'). Empty = the standalone site.
+ *
+ * Only the matching SDK is ever *fetched* at runtime — the other adapter's init
+ * never runs. Both adapters are still linked into the bundle (the platform
+ * choice is resolved through a runtime host check, so the bundler cannot drop
+ * one), which costs a couple of kB of dead code and nothing else.
  */
 export type PlatformId = '' | 'yandex' | 'crazygames';
 const RAW_PLATFORM = (ENV.VITE_PLATFORM || '').trim().toLowerCase();

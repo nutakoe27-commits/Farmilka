@@ -2,6 +2,9 @@
 
 Everything needed for the developer portal, plus what the build does on-platform.
 
+The game is pitched on the loop that is actually ours: **build a base, bank what
+you earn, break into everyone else's.** Every asset in this folder says that.
+
 ## Assets in this folder
 
 | File | Use |
@@ -9,26 +12,53 @@ Everything needed for the developer portal, plus what the build does on-platform
 | `crazygames-cover-landscape.png` | 1920×1080 (16:9) landscape cover |
 | `crazygames-cover-portrait.png` | 1080×1920 (9:16) portrait cover |
 | `crazygames-cover-square.png` | 1080×1080 (1:1) square cover |
-| `screen-1-combat.png` … `screen-4-buildings.png` | desktop gameplay stills |
-| `mobile-1-combat.png` … `mobile-3-shop.png` | mobile gameplay stills |
-| `farmclash-preview.mp4` | 28 s gameplay preview, 1920×1080 (hover preview) |
+| `screen-1-base.png` | a walled base: vault, farms, turret, wall line |
+| `screen-2-raid.png` | breaking into someone else's base |
+| `screen-3-combat.png` | field combat with the local wildlife |
+| `screen-4-shop.png` | the shop: vault, Base Rank, buildings |
+| `mobile-1-play.png`, `mobile-2-shop.png` | mobile gameplay stills |
+| `farmclash-preview.mp4` | gameplay preview, 1920×1080 (hover preview) |
 | `farmclash-preview-vertical.mp4` | the same cut at 9:16, for mobile/social |
 
-Covers are generated from vector sources by `make-crazygames-covers.mjs`, so if
-the portal asks for different pixel sizes they can be re-rendered exactly —
-change the numbers at the bottom of that script and re-run it.
+### Regenerating them
 
-The preview is recorded from real play, not mocked: `record-preview.mjs` drives
-a browser against a local server started with `video-rig-balance.json` (denser
-mobs, a fast boss, a guaranteed legendary crate) and steers the hero by reading
-the minimap canvas, so it stays off the world edge and walks into the boss
-fight. The take is cut into three beats — mob combat, the unique-weapon reveal,
-the boss fight — and encoded to H.264.
+```
+cd marketing
+npm install                 # playwright + ffmpeg-static, kept out of the game build
+npm run covers              # vector covers -> SVG -> PNG
+npm run shots               # screenshots, needs the capture server (below)
+npm run preview             # the video, needs the video server (below)
+```
+
+Covers are vector (`make-crazygames-covers.mjs`), so if the portal ever asks for
+different pixel sizes, change the numbers at the bottom of that script and
+re-render — no image editing.
+
+Screenshots and the video are captured from **real play**, never staged. Both
+scripts drive a browser against a local server started with a rig balance:
+
+```
+# screenshots — a compact world so two clients meet, gold to wall a base in
+DATA_DIR=/tmp/cap PORT=3996 BALANCE_PATH=marketing/capture-rig-balance.json \
+  npx tsx src/index.ts        # from server/
+
+# preview video — slow-motion rig, see the note below
+DATA_DIR=/tmp/vid PORT=3993 BALANCE_PATH=marketing/video-rig-balance.json \
+  npx tsx src/index.ts        # from server/
+```
+
+`capture-screens.mjs` joins twice — a defender who builds a walled base and a
+raider who walks over and smashes it — and shoots from whichever side tells the
+story. It converts screen clicks to world coordinates through a small read-only
+hook the client exposes (`window.farmclashView`), so a wall line lands exactly
+shoulder-to-shoulder instead of approximately.
+
+### Why the video is recorded in slow motion
 
 Headless Chromium has no GPU, so WebGL falls back to software rasterisation and
 the game renders at only ~5 fps at 1080p. The recording works around that: the
 world runs at 2/5 speed (every rate and duration in the rig is scaled) and is
-captured at 720p, then the video is sped back up 2.5x and upscaled. That yields
+captured at 720p, then the video is sped back up 2.5× and upscaled. That yields
 ~29 of 30 frames per second genuinely distinct instead of ~5. If a re-take ever
 looks choppy, check that the rig is still the slow-motion one and that the
 `setpts=(PTS-STARTPTS)/2.5` factor matches it.
@@ -40,38 +70,52 @@ plays hover previews muted.
 
 **Title:** FarmClash
 
+**Tagline:** Build your farm. Raid theirs.
+
 **Short description**
-> Farm gold, buy weapons, and fight players and giant bosses in a fast .io arena.
+> Build a walled farm, bank your gold, then smash your way into everyone else's
+> base before they do it to yours.
 
 **Description**
-> FarmClash is a multiplayer .io arena where every run starts from nothing.
-> Kill mobs to earn gold, spend it on weapons and buildings, and level up by
-> fighting — but drop everything when you die.
+> FarmClash is a multiplayer .io game about a base you actually have to defend.
 >
-> Explore five biomes, each ruled by its own boss with a signature attack: the
-> Champion charges across the field, the Frost Titan freezes everything around
-> it, the Sand Worm erupts from below, the Shadow Lord teleports onto you, and
-> the Crystal Queen impales several players at once. Bosses roam the whole map,
-> so nowhere is safe.
+> You start with a vault and a farm. Farms and mines fill up whether you are
+> there or not, so every run is a decision: keep farming, or walk the gold home
+> before someone takes it. Gold in your hands is lost the moment you die. Gold
+> in your vault is safe — until a raider cracks it open.
 >
-> Open crates for hats and unique weapons with powers you cannot buy: a hook
-> that drags enemies to you, a blade that makes attacks miss, a scythe that
-> executes wounded mobs, a bow whose arrows pierce four targets. Unique weapons
-> vanish when you die — risk them or sell them high.
+> Wall your base in. Walls are solid: enemies and monsters have to break
+> through, and only you can walk through your own. Add turrets, then go out and
+> do the same to somebody else. Every base you find is a real player's — the
+> ones who are offline are still standing there, silos full, waiting for
+> someone to take a hammer to them.
 >
-> Build farms and mines for passive income, defend them with turrets, and raid
-> everyone else's. Play solo or invite a friend into your world.
+> Banking gold raises your Base Rank forever: wider silos, faster production,
+> more building slots, a tougher vault. It never touches your damage, health or
+> speed, so a veteran's base is richer than yours — never harder to kill.
+>
+> Five biomes, each ruled by its own boss with a signature attack: the Champion
+> charges, the Frost Titan freezes, the Sand Worm erupts from below, the Shadow
+> Lord teleports onto you, the Crystal Queen impales half the field. Bosses roam
+> the whole map, and they do not care whose walls are in the way.
+>
+> Open crates for hats and unique weapons you cannot buy: a hook that drags
+> enemies to you, a blade that makes attacks miss, a scythe that executes
+> wounded monsters, a bow whose arrows pierce four targets. Unique weapons
+> vanish when you die — risk them, or sell them high.
+>
+> Play solo or invite a friend straight into your world.
 
 **Controls**
 > - WASD or arrow keys — move
 > - Mouse — aim
 > - Left mouse button — attack
 > - 1–4 — switch weapons (drag hotbar slots to reorder)
-> - B — shop (weapons, buildings, hats, crates)
+> - B — shop (weapons, buildings, walls, hats, crates)
 > - Q — eat food to heal
 > - Mobile: left stick to move, right side to aim and attack
 
-**Tags:** io, multiplayer, action, survival, arena, pvp, rpg, upgrade
+**Tags:** io, multiplayer, base building, raid, action, survival, arena, pvp, upgrade
 
 ## What the CrazyGames build does
 
@@ -92,8 +136,8 @@ Only the CrazyGames SDK is loaded — the Yandex code path is never touched.
   an instant-multiplayer launch skips the menu straight into gameplay.
 - **Accounts** — `SDK.user.getUserToken()` is forwarded to our server, which
   verifies it and keys a persistent account by the CrazyGames user id, so
-  progress (gold, hats, prestige) follows the player. Guests can still play
-  without logging in.
+  progress (gold, vault, base layout, Base Rank, hats) follows the player.
+  Guests can still play without logging in.
 - **No external links** — the site, Telegram and share buttons are hidden on
   the platform, as required.
 
