@@ -187,6 +187,8 @@ export class World {
       lifeStartAt: Date.now(),
       killsThisLife: 0,
       raidShieldUntil: 0,
+      dockedVaultId: null,
+      bankPaused: false,
       buildingIds: new Set(),
       known: new Set(),
       session: { joinedAt: Date.now(), kills: 0, deaths: 0, moneyEarned: 0 },

@@ -167,6 +167,7 @@ export function tryWithdraw(world: World, p: Player): { ok: boolean; reason?: st
   const amount = Math.floor(p.banked);
   p.banked -= amount;
   p.money += amount;
+  p.bankPaused = true; // hold off auto-banking until they leave the vault
   world.markDirty(p);
   world.sendEvent(p, { e: 'bank', action: 'withdraw', amount, banked: p.banked });
   return { ok: true };
@@ -237,7 +238,20 @@ export function updateBuildings(world: World, dt: number, now: number): void {
         if (!owner.bot) telemetry.income(owner.name, 'building', take);
         world.sendEvent(owner, { e: 'collect', amount: take, x: b.x, y: b.y });
       }
-      if (b.buildingType === 'vault' && owner.money > 0) depositAll(world, owner);
+    }
+
+    // Vault banking is edge-triggered: it fires when the owner arrives, not on
+    // every tick they stand there. Otherwise "take it all" would be undone
+    // immediately, since withdrawing requires standing next to the vault.
+    if (b.buildingType === 'vault' && owner && (owner.ws || owner.bot)) {
+      const inRange = !owner.dead && dist(owner.x, owner.y, b.x, b.y) <= b.radius + COLLECT_RANGE;
+      if (inRange && owner.dockedVaultId !== b.id) {
+        owner.dockedVaultId = b.id;
+        if (!owner.bankPaused && owner.money > 0) depositAll(world, owner);
+      } else if (!inRange && owner.dockedVaultId === b.id) {
+        owner.dockedVaultId = null;
+        owner.bankPaused = false; // walked away — the next arrival banks again
+      }
     }
 
     // turret AI — keeps firing even while the owner is away; it is the base's guard

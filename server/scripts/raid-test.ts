@@ -93,6 +93,21 @@ function owned(world: World, p: Player, type: string): Building | null {
   world.moveEntity(p, vault.x + 20, vault.y);
   const bankedBefore = p.banked;
   check('withdrawing at the vault returns the gold', tryWithdraw(world, p).ok && p.money === bankedBefore, `carried=${p.money}`);
+
+  // Regression: banking is edge-triggered. Standing at the vault after a
+  // withdrawal must NOT sweep the gold straight back in.
+  const carried = p.money;
+  for (let i = 0; i < 20; i++) { now += 100; updateBuildings(world, 0.1, now); }
+  check('withdrawn gold is not auto-banked while standing at the vault',
+    p.money === carried && p.banked === 0, `carried=${p.money} banked=${p.banked}`);
+
+  // ...but walking away and coming back banks again, as designed
+  world.moveEntity(p, SIZE / 2, SIZE / 2);
+  now += 100; updateBuildings(world, 0.1, now);
+  world.moveEntity(p, vault.x + 20, vault.y);
+  now += 100; updateBuildings(world, 0.1, now);
+  check('returning to the vault banks again', p.banked === carried && p.money === 0,
+    `banked=${p.banked} carried=${p.money}`);
   void away;
 }
 

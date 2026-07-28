@@ -108,6 +108,14 @@ export interface Player extends BaseEntity, StatusEffects {
   killsThisLife: number;
   /** base is immune until this time after being raided */
   raidShieldUntil: number;
+  /**
+   * Vault the player is currently standing at. Banking is triggered by
+   * *arriving*, not by standing there, so a manual withdrawal is not swept
+   * straight back in on the next tick.
+   */
+  dockedVaultId: string | null;
+  /** set by a withdrawal: no auto-banking until the player walks away */
+  bankPaused: boolean;
   buildingIds: Set<string>;
   known: Set<string>;
   session: SessionStats;
