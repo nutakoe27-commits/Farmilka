@@ -174,7 +174,12 @@ await driveTo(page, { x: home.x - 600, y: home.y - 400 }, { ms: 14000, spin: tru
 await brawl(page, 7000);
 beat('mobs');
 
-// 3. the crate: a legendary weapon reveal
+// 3. the crate: a legendary weapon reveal. Take the gold back out of the vault
+// first — walking past your own vault banks everything you are carrying, which
+// otherwise leaves nothing to spend by the time we get here.
+await openShop(page, 'buildings');
+const takeAll = page.locator('#withdraw-btn');
+if (await takeAll.count() && !(await takeAll.isDisabled())) { await takeAll.click(); await sleep(600); }
 await openShop(page, 'hats');
 const crate = page.locator('#weapon-lootbox-btn');
 if (await crate.count() && !(await crate.isDisabled())) { await crate.click(); await sleep(2200); }
