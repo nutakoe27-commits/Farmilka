@@ -96,8 +96,8 @@
     #food-slot .cnt { font-size: 11px; color: #ffd76e; font-weight: 700; }
     #food-slot .key { position: absolute; top: 2px; left: 5px; font-size: 9px; color: #6a7085; }
     #food-cd { position: absolute; inset: 0; background: rgba(0,0,0,.65); transform-origin: bottom; transform: scaleY(0); }
-    #killfeed { position: fixed; top: calc(12px + var(--sat)); right: calc(56px + var(--sar)); display: flex; flex-direction: column; gap: 4px; align-items: flex-end; max-width: 320px; }
-    .kf { background: rgba(14,17,25,.8); border-radius: 6px; padding: 4px 10px; font-size: 12px; color: #cfd4e4; border: 1px solid #262b38; }
+    #killfeed { position: fixed; top: calc(12px + var(--sat)); right: calc(56px + var(--sar)); display: flex; flex-direction: column; gap: 4px; align-items: flex-end; width: min(320px, calc(100vw - 120px - var(--sal) - var(--sar))); }
+    .kf { background: rgba(14,17,25,.8); border-radius: 6px; padding: 4px 10px; font-size: 12px; color: #cfd4e4; border: 1px solid #262b38; max-width: 100%; overflow-wrap: anywhere; }
     .kf b { color: #ff7b72; }
     #boss-banner { position: fixed; top: calc(68px + var(--sat)); left: 50%; transform: translateX(-50%); background: rgba(60,10,60,.85); border: 1px solid #b565d8; color: #f0c8ff; padding: 8px 22px; border-radius: 10px; font-size: 15px; font-weight: 600; text-shadow: 0 1px 3px #000; max-width: 90vw; text-align: center; }
     #hint { position: fixed; bottom: calc(20px + var(--sab)); left: calc(16px + var(--sal)); font-size: 11px; color: #6a7085; line-height: 1.7; }
@@ -201,7 +201,7 @@
     .lb-badge { font-weight: 700; }
     .lb-you { margin-top: 5px; padding-top: 5px; border-top: 1px solid #2c3242; color: #7ee787; font-weight: 700; font-size: 11px; }
     body.touch #minimap { right: calc(12px + var(--sar)); top: calc(12px + var(--sat)); bottom: auto; width: 110px; height: 110px; }
-    body.touch #killfeed { top: calc(136px + var(--sat)); right: calc(12px + var(--sar)); max-width: 46vw; }
+    body.touch #killfeed { top: calc(136px + var(--sat)); right: calc(12px + var(--sar)); width: min(46vw, calc(100vw - 24px - var(--sal) - var(--sar))); }
     body.touch #settings-btn { left: calc(12px + var(--sal)); right: auto; }
     body.touch #fullscreen-btn { left: calc(58px + var(--sal)); right: auto; }
     body.touch #food-slot { display: none; } /* mobile uses the side button */

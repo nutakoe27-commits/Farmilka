@@ -12,7 +12,8 @@
     "shots:en": "CAP_LANG=en CAP_PREFIX=yandex-en- node capture-screens.mjs",
     "preview": "node record-preview.mjs",
     "ux": "node ux-check.mjs",
-    "fs": "node fs-check.mjs"
+    "fs": "node fs-check.mjs",
+    "yx": "node yandex-check.mjs"
   },
   "dependencies": {
     "ffmpeg-static": "^5.2.0",
