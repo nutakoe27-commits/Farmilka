@@ -5,9 +5,12 @@
   "type": "module",
   "description": "Store assets: covers, screenshots and the gameplay preview video. Not part of the game build — install separately with `npm install` in this folder.",
   "scripts": {
-    "covers": "node make-crazygames-covers.mjs && node render-svg.mjs",
-    "preview": "node record-preview.mjs",
+    "covers": "node make-crazygames-covers.mjs && node render-svg.mjs crazygames-cover-landscape.svg crazygames-cover-portrait.svg crazygames-cover-square.svg",
+    "yandex": "node make-yandex-assets.mjs && node render-svg.mjs yandex-icon.svg yandex-cover-ru.svg yandex-cover-en.svg",
     "shots": "node capture-screens.mjs",
+    "shots:ru": "CAP_LANG=ru CAP_PREFIX=yandex-ru- node capture-screens.mjs",
+    "shots:en": "CAP_LANG=en CAP_PREFIX=yandex-en- node capture-screens.mjs",
+    "preview": "node record-preview.mjs",
     "ux": "node ux-check.mjs",
     "fs": "node fs-check.mjs"
   },

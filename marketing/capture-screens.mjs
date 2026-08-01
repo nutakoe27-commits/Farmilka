@@ -18,6 +18,10 @@ import { fileURLToPath } from 'node:url';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.CAPTURE_URL || 'http://localhost:3996/';
+// Yandex 8.2.3: the screenshots uploaded to a draft must be in that draft's
+// language, so the same run is repeated per language with its own file prefix.
+const LANG = process.env.CAP_LANG || 'en';
+const PREFIX = process.env.CAP_PREFIX || '';
 const WORLD = Number(process.env.RIG_WORLD_SIZE || 3000);
 const W = 1280, H = 720;
 const CX = W / 2, CY = H / 2;
@@ -43,7 +47,7 @@ async function join(name, { width = W, height = H, mobile = false } = {}) {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.error(`[${name}]`, String(e)));
   await page.goto(BASE, { waitUntil: 'networkidle' });
-  await page.evaluate(() => localStorage.setItem('farmclash-lang', 'en'));
+  await page.evaluate((l) => localStorage.setItem('farmclash-lang', l), LANG);
   await page.reload({ waitUntil: 'networkidle' });
   await page.fill('#name-input', name);
   await page.click('#play-btn');
@@ -143,8 +147,8 @@ const findBoss = (page) => page.evaluate(() => {
 const settle = (page, ms = 4500) => sleep(ms);
 
 const shot = async (page, name) => {
-  await page.screenshot({ path: pathJoin(DIR, name) });
-  console.log('shot', name);
+  await page.screenshot({ path: pathJoin(DIR, PREFIX + name) });
+  console.log('shot', PREFIX + name);
 };
 
 // ---------- the defender: vault, farms, and a wall line ----------
@@ -210,15 +214,15 @@ await def.keyboard.press('Escape');
 // ---------- mobile ----------
 const mob = await join('Harvest', { width: 430, height: 932, mobile: true });
 await sleep(2500);
-await mob.screenshot({ path: pathJoin(DIR, 'mobile-1-play.png') });
-console.log('shot mobile-1-play.png');
+await mob.screenshot({ path: pathJoin(DIR, PREFIX + 'mobile-1-play.png') });
+console.log('shot', PREFIX + 'mobile-1-play.png');
 await mob.keyboard.press('b').catch(() => {});
 await sleep(500);
 if (await mob.locator('#shop:not(.hidden)').count()) {
   await mob.click('.shop-tab[data-tab="buildings"]').catch(() => {});
   await sleep(800);
-  await mob.screenshot({ path: pathJoin(DIR, 'mobile-2-shop.png') });
-  console.log('shot mobile-2-shop.png');
+  await mob.screenshot({ path: pathJoin(DIR, PREFIX + 'mobile-2-shop.png') });
+  console.log('shot', PREFIX + 'mobile-2-shop.png');
 }
 
 await browser.close();
