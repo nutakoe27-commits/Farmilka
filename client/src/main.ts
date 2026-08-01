@@ -21,7 +21,7 @@ import { t, tList, lang, setLang, applyStaticI18n, bossName, hatName } from './u
 import {
   initPlatform, onPlatform, platformBodyClass, identity as platformIdentity, promptAuth,
   wantsInstantPlay, invitedRoom, gameReady, gameplayStart, gameplayStop, showInterstitial,
-  happytime, enterRoom, leaveRoom,
+  happytime, enterRoom, leaveRoom, isPortalBuild,
 } from './net/platform.js';
 import { audio } from './game/audio.js';
 
@@ -39,6 +39,24 @@ window.addEventListener('keydown', unlockAudio, { once: true });
 document.addEventListener('visibilitychange', () => audio.duckForBlur(document.hidden));
 window.addEventListener('blur', () => audio.duckForBlur(true));
 window.addEventListener('focus', () => audio.duckForBlur(false));
+
+/**
+ * Boot veil (Yandex 1.19): the menu exists from the first frame but must not be
+ * usable until the platform's LoadingAPI.ready has been signalled. The veil
+ * covers the page and eats pointer events; bootDone() lifts it. On the
+ * standalone site initPlatform() resolves immediately, so it is a blink.
+ */
+function bootDone(): void {
+  // The fallback timer always fires long after the veil is gone, and by then
+  // the node has been removed — so this must tolerate not finding it.
+  const veil = document.getElementById('boot-veil');
+  if (!veil || veil.classList.contains('gone')) return;
+  veil.classList.add('gone');
+  setTimeout(() => veil.remove(), 300);
+  nameInput.focus();
+}
+// Never leave a player staring at the veil if the SDK never answers.
+setTimeout(bootDone, 8000);
 
 // translate all static markup up front, then wire the language switchers
 applyStaticI18n();
@@ -70,7 +88,6 @@ $('settings-share').onclick = () => shareGame($('settings-share'));
 const nameInput = $('name-input') as HTMLInputElement;
 const passInput = $('pass-input') as HTMLInputElement;
 nameInput.value = localStorage.getItem('farmclash-name') ?? '';
-nameInput.focus();
 
 let inGame = false;
 
@@ -112,14 +129,19 @@ function doStart(register: boolean): void {
 // Portal bootstrap: init the SDK (no-op on the standalone site), signal
 // "loaded", hide site/TG/share links on-platform, and auto-join when the
 // platform already knows the player or sent us in through an invite.
+// Portal archives hide every off-site link from the first frame — the rule is
+// about the build, not about whether the SDK answered in time (Yandex 8.4.2 /
+// 8.4.3). Done before init so a slow or failed handshake cannot expose them.
+if (isPortalBuild()) document.body.classList.add(platformBodyClass());
+
 initPlatform().then(() => {
   gameReady();
+  bootDone(); // Yandex 1.19: nothing is clickable until LoadingAPI.ready fired
   // the SDK may have switched the language (rule 2.14) — re-sync the RU/EN toggle
   for (const btn of document.querySelectorAll<HTMLButtonElement>('.lang-switch button')) {
     btn.classList.toggle('active', btn.dataset.lang === lang);
   }
   if (!onPlatform()) return;
-  document.body.classList.add(platformBodyClass());
   const id = platformIdentity();
   if (id) nameInput.value = id.name || nameInput.value;
   // an invite link / instant-multiplayer launch must land straight in gameplay
@@ -530,8 +552,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         selfDead = true;
         audio.death();
         hud.showDeath(ev);
-        gameplayStop(); // Yandex: gameplay paused; a fullscreen ad may show at this break
-        showInterstitial();
+        gameplayStop(); // gameplay is paused; the ad waits for the respawn tap
         break;
       case 'bossWarn':
         bossWarnUntil = performance.now() + ev.inSec * 1000;
@@ -595,7 +616,13 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   hud.onEquip = (w) => conn.send({ t: 'equip', weapon: w });
   hud.onEat = () => conn.send({ t: 'eat' });
   hud.onReorder = (weapons) => conn.send({ t: 'reorder', weapons });
-  hud.onRespawn = () => conn.send({ t: 'respawn' });
+  hud.onRespawn = () => {
+    // Yandex 4.4: an ad may only follow a player action at a logical pause.
+    // Dying is not an action — asking to go back in is, and the death screen is
+    // exactly such a pause, so the ad rides on the respawn tap.
+    showInterstitial();
+    conn.send({ t: 'respawn' });
+  };
   $('death-shop-btn').onclick = () => shop.show(); // shop from the death screen
   shop.onBuy = (item) => conn.send({ t: 'buy', item });
   shop.onSell = (item) => conn.send({ t: 'sell', weapon: item });

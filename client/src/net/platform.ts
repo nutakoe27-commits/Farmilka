@@ -42,6 +42,18 @@ export function onPlatform(): boolean {
   return isCrazyGames ? crazygames.available : yandex.available;
 }
 
+/**
+ * True for an archive built *for* a portal, whether or not its SDK answered.
+ *
+ * The rules that forbid off-site links apply to the build, not to the SDK
+ * handshake: if init is slow or fails, the links must still be gone. Anything
+ * that only makes sense once the SDK really is live (ads, invites, accounts)
+ * keeps using onPlatform().
+ */
+export function isPortalBuild(): boolean {
+  return isCrazyGames || PLATFORM === 'yandex';
+}
+
 /** CSS hook used to hide external links, which no portal allows. */
 export function platformBodyClass(): string {
   return isCrazyGames ? 'on-crazygames' : 'on-yandex';
