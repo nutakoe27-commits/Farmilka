@@ -143,7 +143,11 @@ dead code and nothing is loaded from it.)
 - **Gameplay markers** — `gameplayStart()` on entering the world and after
   respawn, `gameplayStop()` on death, so their metrics and ad timing are right.
 - **Ads** — a midgame ad at the death break only (a natural pause, never mid-
-  fight). Game audio is muted for the duration and restored after.
+  fight), fired the moment the hero dies rather than on the respawn tap.
+- **Paused for the ad** — from the request until the SDK hands the screen back,
+  the render loop is stopped, input is not read, nothing is sent to the server,
+  the touch pads come off screen and the audio is muted. A watchdog lifts the
+  pause if the SDK never calls back. `npm run ads` checks all of this.
 - **`happytime()`** — fires on real achievements: level-up, a new hat, a unique
   weapon drop, and a boss kill you actually contributed to.
 - **Rooms and invites** — each of our worlds is a room. On entering a world we

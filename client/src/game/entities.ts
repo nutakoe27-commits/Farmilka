@@ -25,7 +25,6 @@ export const HAT_EMOJI: Record<string, string> = {
   crystal_circlet: '💠', dragon_helm: '🐲', wizard_hat: '🧙', golden_crown: '👑', phoenix_plume: '🪶',
   bandana: '🧣', chef_hat: '🍳', hunter_hood: '🐺', skull_mask: '💀', titan_guard: '🛡️', slayer_crown: '⚜️',
 };
-export const TIER_NAMES: Record<string, string> = { common: 'обычная', rare: 'редкая', epic: 'эпическая', legendary: 'легендарная' };
 export const TIER_COLORS: Record<string, string> = { common: '#9aa5b8', rare: '#4d9fff', epic: '#b565d8', legendary: '#ffd76e' };
 
 /** Visual style per mob type: base shape + palette. Mystic mobs get a glow. */

@@ -99,6 +99,8 @@ export function tr(lang: Lang, key: string, args?: Args): string {
 // localized boss banners.
 const BOSS_EN: Record<string, string> = {
   champion: 'Champion',
+  frost_titan: 'Frost Titan',
+  sand_worm: 'Sand Worm',
   shadow_lord: 'Shadow Lord',
   crystal_queen: 'Crystal Queen',
 };

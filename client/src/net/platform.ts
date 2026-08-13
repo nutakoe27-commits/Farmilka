@@ -109,15 +109,59 @@ export function happytime(): void {
 
 // ---- ads ----
 
-/** Fullscreen/midgame ad at a natural break (death screen). */
+/**
+ * Ad screen-time, published to the game so it can stop the world.
+ *
+ * Yandex 4.7 requires the gameplay to be paused for the whole time an ad owns
+ * the screen — including the "реклама через N" warning the SDK shows before the
+ * spot itself. The warning arrives before any callback we can hook, so the
+ * pause starts the moment we *request* the ad and lifts only when the SDK tells
+ * us the screen is ours again.
+ */
+type AdListener = (active: boolean) => void;
+const adListeners: AdListener[] = [];
+let adOn = false;
+let adWatchdog: ReturnType<typeof setTimeout> | null = null;
+
+/** Register a pause/resume handler; fires with true when an ad takes the screen. */
+export function onAdVisibility(fn: AdListener): void {
+  adListeners.push(fn);
+}
+
+/** True while an ad (or its warning) is on screen — the game must not run. */
+export function adActive(): boolean {
+  return adOn;
+}
+
+function setAdActive(active: boolean): void {
+  if (adOn === active) return;
+  adOn = active;
+  if (adWatchdog !== null) {
+    clearTimeout(adWatchdog);
+    adWatchdog = null;
+  }
+  // An SDK that never calls back must not leave the game frozen for good.
+  if (active) adWatchdog = setTimeout(() => setAdActive(false), 120_000);
+  for (const fn of adListeners) {
+    try { fn(active); } catch { /* a broken listener must not strand the pause */ }
+  }
+}
+
+/** Fullscreen/midgame ad at a natural break (death). Pauses the game for its duration. */
 export function showInterstitial(): void {
-  if (isCrazyGames) cgMidgameAd();
-  else if (isYandex) yaInterstitial();
+  if (!onPlatform()) return; // standalone site: no ads, so nothing to pause for
+  setAdActive(true);
+  const done = (): void => setAdActive(false);
+  if (isCrazyGames) cgMidgameAd(done);
+  else yaInterstitial(done);
 }
 
 export function showRewarded(onReward: () => void): void {
-  if (isCrazyGames) cgRewardedAd(onReward);
-  else if (isYandex) yaRewarded(onReward);
+  if (!onPlatform()) return;
+  setAdActive(true);
+  const done = (): void => setAdActive(false);
+  if (isCrazyGames) cgRewardedAd(onReward, done);
+  else yaRewarded(onReward, done);
 }
 
 // ---- multiplayer rooms (CrazyGames Join/Invite) ----

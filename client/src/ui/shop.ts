@@ -1,9 +1,9 @@
 import type { SelfState, WelcomeMsg } from '@shared/protocol.js';
 import type { WeaponId, BuildingId } from '@shared/types.js';
-import { WEAPON_ICONS, BUILDING_ICONS, HAT_EMOJI, TIER_NAMES, TIER_COLORS } from '../game/entities.js';
+import { WEAPON_ICONS, BUILDING_ICONS, HAT_EMOJI, TIER_COLORS } from '../game/entities.js';
 import { prestigeTier } from '@shared/prestige.js';
 import { killsToNext } from '@shared/levels.js';
-import { t, hatName, weaponName } from './i18n.js';
+import { t, hatName, weaponName, buildingName, tierName, prestigeTierName } from './i18n.js';
 import { rankFromBanked, bankedForRank, rankPerks } from '@shared/rank.js';
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -103,7 +103,7 @@ export class Shop {
       const stats = cfg.type === 'melee'
         ? t('shop.dmg', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate })
         : t('shop.dmgRanged', { dmg: cfg.damage, range: cfg.range, rate: cfg.attackRate });
-      const tierBadge = `<span class="tier-badge" style="background:${TIER_COLORS[cfg.tier!]};color:#0d0f14">${TIER_NAMES[cfg.tier!]}</span>`;
+      const tierBadge = `<span class="tier-badge" style="background:${TIER_COLORS[cfg.tier!]};color:#0d0f14">${tierName(cfg.tier!)}</span>`;
       el.innerHTML = `<div><div class="nm">${WEAPON_ICONS[id] ?? ''} ${weaponName(id)} ${tierBadge}</div><div class="st">${stats}<br><b style="color:${TIER_COLORS[cfg.tier!]}">${t('note.' + id)}</b><br>${t('shop.uniqueSrc')}</div></div><div class="btns"><button class="sell hidden">${t('shop.sell')}</button></div>`;
       (el.querySelector('.sell') as HTMLButtonElement).onclick = () => this.onSell(id as WeaponId);
       wg.appendChild(el);
@@ -143,7 +143,7 @@ export class Shop {
         : cfg.damage
           ? t('shop.turretStat', { dmg: cfg.damage, range: cfg.range ?? 0, hp: cfg.hp })
           : t('shop.wallStat', { hp: cfg.hp });
-      el.innerHTML = `<div><div class="nm">${BUILDING_ICONS[id] ?? ''} ${id}</div><div class="st">${stats}<br>${t('note.' + id)}<br>${t('shop.buildingVanish')}</div></div><div class="btns"><button>💰 ${cfg.price}</button></div>`;
+      el.innerHTML = `<div><div class="nm">${BUILDING_ICONS[id] ?? ''} ${buildingName(id)}</div><div class="st">${stats}<br>${t('note.' + id)}<br>${t('shop.buildingVanish')}</div></div><div class="btns"><button>💰 ${cfg.price}</button></div>`;
       el.querySelector('button')!.onclick = () => {
         this.hide();
         this.onStartPlace(id as BuildingId);
@@ -184,7 +184,7 @@ export class Shop {
       el.className = 'shop-item';
       el.dataset.hat = id;
       const fx = describeEffect(cfg.effect);
-      el.innerHTML = `<div><div class="nm">${HAT_EMOJI[id] ?? '🎩'} ${hatName(id, cfg.name)} <span class="tier-badge" style="background:${TIER_COLORS[cfg.tier]};color:#0d0f14">${TIER_NAMES[cfg.tier]}</span></div><div class="st">${fx}<br>${sourceText[cfg.tier]}</div></div><div class="btns"><button class="hat-btn"></button></div>`;
+      el.innerHTML = `<div><div class="nm">${HAT_EMOJI[id] ?? '🎩'} ${hatName(id, cfg.name)} <span class="tier-badge" style="background:${TIER_COLORS[cfg.tier]};color:#0d0f14">${tierName(cfg.tier)}</span></div><div class="st">${fx}<br>${sourceText[cfg.tier]}</div></div><div class="btns"><button class="hat-btn"></button></div>`;
       (el.querySelector('.hat-btn') as HTMLButtonElement).onclick = () => {
         const btn = el.querySelector('.hat-btn') as HTMLButtonElement;
         this.onEquipHat(btn.dataset.equipped === '1' ? null : id);
@@ -273,7 +273,7 @@ export class Shop {
     $('prestige-level').textContent = String(self.prestige);
     const tierBadge = $('prestige-tier');
     if (tier) {
-      tierBadge.textContent = tier.name;
+      tierBadge.textContent = prestigeTierName(tier.name);
       tierBadge.style.background = tier.color;
       tierBadge.style.color = '#0d0f14';
       tierBadge.style.display = '';
@@ -354,6 +354,6 @@ export class Shop {
     const touch = document.body.classList.contains('touch');
     $('place-hint-text').textContent = this.demolishing
       ? t(touch ? 'hud.demolishHintTouch' : 'hud.demolishHint')
-      : t(touch ? 'hud.placeHintTouch' : 'hud.placeHint', { b: `${BUILDING_ICONS[this.placing!] ?? ''} ${this.placing}` });
+      : t(touch ? 'hud.placeHintTouch' : 'hud.placeHint', { b: `${BUILDING_ICONS[this.placing!] ?? ''} ${buildingName(this.placing!)}` });
   }
 }

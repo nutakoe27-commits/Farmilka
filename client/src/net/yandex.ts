@@ -102,27 +102,40 @@ export function gameReady(): void { try { state.sdk?.features?.LoadingAPI?.ready
 export function gameplayStart(): void { try { state.sdk?.features?.GameplayAPI?.start?.(); } catch { /* no-op */ } }
 export function gameplayStop(): void { try { state.sdk?.features?.GameplayAPI?.stop?.(); } catch { /* no-op */ } }
 
-/** Fullscreen ad — call only at natural breaks (death/menu). Mutes game audio while it plays (rule 4.7). */
-export function showInterstitial(): void {
-  if (!state.sdk) return;
+/**
+ * Fullscreen ad — call only at natural breaks (death/menu). Mutes game audio
+ * while it plays and reports back through `onDone` so the caller can un-pause
+ * the game (rule 4.7). `onDone` is guaranteed to run exactly once, including
+ * when the SDK refuses the request outright.
+ */
+export function showInterstitial(onDone: () => void = () => {}): void {
+  const finish = once(() => { audio.duckForAd(false); onDone(); });
+  if (!state.sdk) { finish(); return; }
   try {
     state.sdk.adv.showFullscreenAdv({ callbacks: {
       onOpen: () => audio.duckForAd(true),
-      onClose: () => audio.duckForAd(false),
-      onError: () => audio.duckForAd(false),
+      onClose: () => finish(),
+      onError: () => finish(),
     } });
-  } catch { /* no-op */ }
+  } catch { finish(); }
 }
 
 /** Rewarded ad — grants `onReward` on a counted view; mutes game audio while it plays (rule 4.7). */
-export function showRewarded(onReward: () => void): void {
-  if (!state.sdk) { return; }
+export function showRewarded(onReward: () => void, onDone: () => void = () => {}): void {
+  const finish = once(() => { audio.duckForAd(false); onDone(); });
+  if (!state.sdk) { finish(); return; }
   try {
     state.sdk.adv.showRewardedVideo({ callbacks: {
       onOpen: () => audio.duckForAd(true),
       onRewarded: () => onReward(),
-      onClose: () => audio.duckForAd(false),
-      onError: () => audio.duckForAd(false),
+      onClose: () => finish(),
+      onError: () => finish(),
     } });
-  } catch { /* no-op */ }
+  } catch { finish(); }
+}
+
+/** Wraps a callback so that only the first of several SDK callbacks gets through. */
+function once(fn: () => void): () => void {
+  let done = false;
+  return () => { if (!done) { done = true; fn(); } };
 }

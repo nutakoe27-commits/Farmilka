@@ -159,28 +159,40 @@ export function cgGameplayStop(): void { try { state.sdk?.game?.gameplayStop?.()
 /** Celebration hook — the site reacts (confetti) on real achievements. */
 export function cgHappytime(): void { try { state.sdk?.game?.happytime?.(); } catch { /* no-op */ } }
 
-/** Midgame ad — only at natural breaks (death). Game audio is muted while it plays. */
-export function cgMidgameAd(): void {
+/** Wraps a callback so that only the first of several SDK callbacks gets through. */
+function once(fn: () => void): () => void {
+  let done = false;
+  return () => { if (!done) { done = true; fn(); } };
+}
+
+/**
+ * Midgame ad — only at natural breaks (death). Game audio is muted while it
+ * plays, and `onDone` fires exactly once when the screen is ours again so the
+ * caller can un-pause the game.
+ */
+export function cgMidgameAd(onDone: () => void = () => {}): void {
+  const finish = once(() => { audio.duckForAd(false); onDone(); });
   const ad = state.sdk?.ad;
-  if (!ad?.requestAd) return;
+  if (!ad?.requestAd) { finish(); return; }
   try {
     ad.requestAd('midgame', {
       adStarted: () => audio.duckForAd(true),
-      adFinished: () => audio.duckForAd(false),
-      adError: () => audio.duckForAd(false),
+      adFinished: () => finish(),
+      adError: () => finish(),
     });
-  } catch { audio.duckForAd(false); }
+  } catch { finish(); }
 }
 
 /** Rewarded ad — grants `onReward` only on a completed view. */
-export function cgRewardedAd(onReward: () => void): void {
+export function cgRewardedAd(onReward: () => void, onDone: () => void = () => {}): void {
+  const finish = once(() => { audio.duckForAd(false); onDone(); });
   const ad = state.sdk?.ad;
-  if (!ad?.requestAd) return;
+  if (!ad?.requestAd) { finish(); return; }
   try {
     ad.requestAd('rewarded', {
       adStarted: () => audio.duckForAd(true),
-      adFinished: () => { audio.duckForAd(false); onReward(); },
-      adError: () => audio.duckForAd(false),
+      adFinished: () => { onReward(); finish(); },
+      adError: () => finish(),
     });
-  } catch { audio.duckForAd(false); }
+  } catch { finish(); }
 }

@@ -13,7 +13,9 @@
     "preview": "node record-preview.mjs",
     "ux": "node ux-check.mjs",
     "fs": "node fs-check.mjs",
-    "yx": "node yandex-check.mjs"
+    "yx": "node yandex-check.mjs",
+    "i18n": "node i18n-check.mjs",
+    "ads": "node ad-check.mjs"
   },
   "dependencies": {
     "ffmpeg-static": "^5.2.0",

@@ -17,11 +17,11 @@ import { Shop } from './ui/shop.js';
 import { Minimap } from './ui/minimap.js';
 import { Leaderboard } from './ui/leaderboard.js';
 import { Settings } from './ui/settings.js';
-import { t, tList, lang, setLang, applyStaticI18n, bossName, hatName } from './ui/i18n.js';
+import { t, tList, lang, setLang, applyStaticI18n, bossName, hatName, weaponName, prestigeTierName } from './ui/i18n.js';
 import {
   initPlatform, onPlatform, platformBodyClass, identity as platformIdentity, promptAuth,
   wantsInstantPlay, invitedRoom, gameReady, gameplayStart, gameplayStop, showInterstitial,
-  happytime, enterRoom, leaveRoom, isPortalBuild,
+  happytime, enterRoom, leaveRoom, isPortalBuild, onAdVisibility, adActive,
 } from './net/platform.js';
 import { audio } from './game/audio.js';
 
@@ -226,6 +226,9 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   (window as unknown as { farmclashView?: unknown }).farmclashView = {
     screenToWorld: (x: number, y: number) => scene.screenToWorld(x, y),
     zoom: () => scene.zoom,
+    // whether the render loop is stopped — how the ad-pause check (Yandex 4.7)
+    // observes that the game really does stand still behind an ad
+    paused: () => !app.ticker.started,
   };
   scene.drawGround(welcome.world.size);
   setPrestigeCfg(welcome.prestige);
@@ -412,7 +415,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     hud.update(self);
     shop.refresh(self);
     mobile?.setFoodCount(self.food);
-    mobile?.setWeapon(WEAPON_ICONS[self.equipped] ?? '👊', self.equipped);
+    mobile?.setWeapon(WEAPON_ICONS[self.equipped] ?? '👊', weaponName(self.equipped));
     if (selfDead) {
       if (self.respawnIn === undefined) {
         selfDead = false;
@@ -447,7 +450,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     switch (ev.e) {
       case 'kill': {
         const badge = prestigeBadge(ev.killer);
-        hud.killFeed(`${badge}<b>${escapeHtml(ev.killer)}</b> ⚔ ${escapeHtml(ev.victim)} <span style="color:#6a7085">(${ev.weapon})</span>`);
+        hud.killFeed(`${badge}<b>${escapeHtml(ev.killer)}</b> ⚔ ${escapeHtml(ev.victim)} <span style="color:#6a7085">(${escapeHtml(weaponName(ev.weapon))})</span>`);
         break;
       }
       case 'damage': {
@@ -512,7 +515,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         break;
       }
       case 'weaponLoot': {
-        const name = ev.weapon ? (ev.tier ? t('wname.' + ev.weapon) : ev.weapon) : '';
+        const name = ev.weapon ? weaponName(ev.weapon) : '';
         if (ev.result === 'unique') {
           audio.reward();
           happytime();
@@ -533,7 +536,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
       }
       case 'prestige': {
         audio.reward();
-        hud.bossBanner(t('ev.prestige', { level: ev.level, tier: ev.tier ? ` — ${ev.tier}!` : '!' }));
+        hud.bossBanner(t('ev.prestige', { level: ev.level, tier: ev.tier ? ` — ${prestigeTierName(ev.tier)}!` : '!' }));
         setTimeout(() => hud.bossBanner(null), 5000);
         break;
       }
@@ -552,7 +555,11 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         selfDead = true;
         audio.death();
         hud.showDeath(ev);
-        gameplayStop(); // gameplay is paused; the ad waits for the respawn tap
+        gameplayStop(); // Yandex: gameplay ended
+        // The ad runs straight away, while the player is not playing: the hero
+        // is dead and waiting on the death screen, so nothing is happening
+        // behind the spot (rule 4.7).
+        showInterstitial();
         break;
       case 'bossWarn':
         bossWarnUntil = performance.now() + ev.inSec * 1000;
@@ -616,13 +623,7 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   hud.onEquip = (w) => conn.send({ t: 'equip', weapon: w });
   hud.onEat = () => conn.send({ t: 'eat' });
   hud.onReorder = (weapons) => conn.send({ t: 'reorder', weapons });
-  hud.onRespawn = () => {
-    // Yandex 4.4: an ad may only follow a player action at a logical pause.
-    // Dying is not an action — asking to go back in is, and the death screen is
-    // exactly such a pause, so the ad rides on the respawn tap.
-    showInterstitial();
-    conn.send({ t: 'respawn' });
-  };
+  hud.onRespawn = () => conn.send({ t: 'respawn' });
   $('death-shop-btn').onclick = () => shop.show(); // shop from the death screen
   shop.onBuy = (item) => conn.send({ t: 'buy', item });
   shop.onSell = (item) => conn.send({ t: 'sell', weapon: item });
@@ -740,9 +741,24 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
     });
   }
 
+  // ---------- ad pause (Yandex 4.7) ----------
+  // While an ad or its warning owns the screen the game stops dead: no frames
+  // are drawn, no input is read and nothing is sent to the server. The mobile
+  // pads come off screen too, so a stray touch behind the overlay does nothing.
+  onAdVisibility((active) => {
+    if (active) {
+      app.ticker.stop();
+      input.attackHeld = false;
+      mobile?.setVisible(false);
+    } else {
+      mobile?.setVisible(true);
+      app.ticker.start();
+    }
+  });
+
   // input send loop: 20 Hz, mirrors server tick rate
   setInterval(() => {
-    if (!conn.self || selfDead) return;
+    if (!conn.self || selfDead || adActive()) return;
     let { mx, my } = input.moveVector();
     let attack = input.attackHeld;
     if (mobile) {

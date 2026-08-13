@@ -38,6 +38,9 @@ export class Hud {
 
   setMaxLevel(max: number): void {
     this.maxLevel = max;
+    // Render the badge now: the static markup carries a Russian placeholder that
+    // would otherwise show through until the first snapshot lands.
+    $('level-badge').innerHTML = `${t('hud.level', { n: 1 })}<span class="mx">/${max}</span>`;
   }
 
   setRankCfg(cfg: RankCfg): void {

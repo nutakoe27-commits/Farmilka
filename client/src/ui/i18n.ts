@@ -202,6 +202,18 @@ const RU: Dict = {
   'note.tamer_blade': 'в руках: мобы тебя не замечают',
   'note.reaper_scythe': 'казнит мобов ниже 25% HP · вампиризм',
   'note.dragon_bow': 'стрелы пробивают до 4 целей насквозь',
+  'wname.fists': 'Кулаки',
+  'wname.sword': 'Меч',
+  'wname.spear': 'Копьё',
+  'wname.hammer': 'Молот',
+  'wname.bow': 'Лук',
+  'wname.crossbow': 'Арбалет',
+  'wname.daggers': 'Кинжалы',
+  'wname.venom_blade': 'Ядовитый клинок',
+  'wname.scythe': 'Коса',
+  'wname.triple_bow': 'Тройной лук',
+  'wname.vampire_blade': 'Клинок вампира',
+  'wname.ice_staff': 'Ледяной посох',
   'wname.hook_blade': 'Крюк-цепь',
   'wname.mirror_blade': 'Зеркальный клинок',
   'wname.storm_hammer': 'Молот бури',
@@ -209,6 +221,24 @@ const RU: Dict = {
   'wname.reaper_scythe': 'Коса Жнеца',
   'wname.dragon_bow': 'Драконий лук',
   'shop.uniqueSrc': 'только из сундука оружия · исчезает при смерти',
+  // building names
+  'bname.farm': 'Ферма',
+  'bname.mine': 'Шахта',
+  'bname.turret': 'Турель',
+  'bname.vault': 'Хранилище',
+  'bname.wall': 'Стена',
+  // rarity of a hat / unique weapon
+  'tier.common': 'обычная',
+  'tier.rare': 'редкая',
+  'tier.epic': 'эпическая',
+  'tier.legendary': 'легендарная',
+  // prestige tiers (keyed by the Russian name that comes from balance.json)
+  'ptier.Бронза': 'Бронза',
+  'ptier.Серебро': 'Серебро',
+  'ptier.Золото': 'Золото',
+  'ptier.Платина': 'Платина',
+  'ptier.Алмаз': 'Алмаз',
+  'ptier.Легенда': 'Легенда',
   'note.farm': 'пассивный доход',
   'note.mine': 'больше дохода',
   'note.turret': 'бьёт всех: мобов, боссов, игроков · макс. 2',
@@ -421,6 +451,18 @@ const EN: Dict = {
   'note.tamer_blade': 'equipped: mobs ignore you completely',
   'note.reaper_scythe': 'executes mobs below 25% HP · lifesteal',
   'note.dragon_bow': 'arrows pierce through up to 4 targets',
+  'wname.fists': 'Fists',
+  'wname.sword': 'Sword',
+  'wname.spear': 'Spear',
+  'wname.hammer': 'Hammer',
+  'wname.bow': 'Bow',
+  'wname.crossbow': 'Crossbow',
+  'wname.daggers': 'Daggers',
+  'wname.venom_blade': 'Venom Blade',
+  'wname.scythe': 'Scythe',
+  'wname.triple_bow': 'Triple Bow',
+  'wname.vampire_blade': 'Vampire Blade',
+  'wname.ice_staff': 'Ice Staff',
   'wname.hook_blade': 'Hook Chain',
   'wname.mirror_blade': 'Mirror Blade',
   'wname.storm_hammer': 'Storm Hammer',
@@ -428,6 +470,21 @@ const EN: Dict = {
   'wname.reaper_scythe': 'Reaper\'s Scythe',
   'wname.dragon_bow': 'Dragon Bow',
   'shop.uniqueSrc': 'weapon crate only · lost on death',
+  'bname.farm': 'Farm',
+  'bname.mine': 'Mine',
+  'bname.turret': 'Turret',
+  'bname.vault': 'Vault',
+  'bname.wall': 'Wall',
+  'tier.common': 'common',
+  'tier.rare': 'rare',
+  'tier.epic': 'epic',
+  'tier.legendary': 'legendary',
+  'ptier.Бронза': 'Bronze',
+  'ptier.Серебро': 'Silver',
+  'ptier.Золото': 'Gold',
+  'ptier.Платина': 'Platinum',
+  'ptier.Алмаз': 'Diamond',
+  'ptier.Легенда': 'Legend',
   'note.farm': 'passive income',
   'note.mine': 'more income',
   'note.turret': 'hits everyone: mobs, bosses, players · max 2',
@@ -493,13 +550,35 @@ export function hatName(id: string, ruName: string): string {
 }
 
 /**
- * Weapon label for the hotbar and shop. Unique weapons have proper names;
- * ordinary ones use their id with underscores turned into spaces.
+ * Weapon label for the hotbar, shop and kill feed. Every weapon in balance.json
+ * has a name in both dictionaries; an id that somehow has none falls back to a
+ * readable form of the id rather than showing nothing.
  */
 export function weaponName(id: string): string {
-  const unique = t(`wname.${id}`);
-  if (!unique.startsWith('wname.')) return unique;
-  return id.replace(/_/g, ' ');
+  const name = t(`wname.${id}`);
+  return name.startsWith('wname.') ? id.replace(/_/g, ' ') : name;
+}
+
+/** Building label for the shop and the placement toolbar. */
+export function buildingName(id: string): string {
+  const name = t(`bname.${id}`);
+  return name.startsWith('bname.') ? id.replace(/_/g, ' ') : name;
+}
+
+/** Rarity label for hats and unique weapons ("эпическая" / "epic"). */
+export function tierName(tier: string): string {
+  const name = t(`tier.${tier}`);
+  return name.startsWith('tier.') ? tier : name;
+}
+
+/**
+ * Prestige tier label. The tier names live in balance.json in Russian (they are
+ * also what the server puts into the prestige event), so the lookup is keyed by
+ * the Russian name and passes anything unknown through untouched.
+ */
+export function prestigeTierName(ruName: string): string {
+  const name = t(`ptier.${ruName}`);
+  return name.startsWith('ptier.') ? ruName : name;
 }
 
 // Biome names painted onto the ground. Localised here rather than taken from

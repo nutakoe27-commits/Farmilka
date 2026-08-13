@@ -26,10 +26,12 @@ class Joystick {
   dx = 0;
   dy = 0;
   private touchId: number | null = null;
+  private baseEl: HTMLElement;
 
   constructor(zoneId: string, baseId: string, stickId: string) {
     const zone = document.getElementById(zoneId)!;
     const base = document.getElementById(baseId)!;
+    this.baseEl = base;
     const stick = document.getElementById(stickId)!;
     let baseX = 0;
     let baseY = 0;
@@ -80,6 +82,15 @@ class Joystick {
     zone.addEventListener('touchmove', move, { passive: false });
     zone.addEventListener('touchend', end);
     zone.addEventListener('touchcancel', end);
+  }
+
+  /** Drops any in-flight touch — used when the game is taken over (ad break). */
+  reset(): void {
+    this.touchId = null;
+    this.active = false;
+    this.dx = 0;
+    this.dy = 0;
+    this.baseEl.style.display = 'none';
   }
 }
 
@@ -148,6 +159,17 @@ class AttackButton {
   firing(): boolean {
     return this.held || performance.now() < this.tapFireUntil;
   }
+
+  /** Drops any in-flight press — used when the game is taken over (ad break). */
+  reset(): void {
+    this.touchId = null;
+    this.held = false;
+    this.manualAim = null;
+    this.tapFireUntil = 0;
+    document.getElementById('atk-btn')?.classList.remove('pressed');
+    const dir = document.getElementById('atk-dir');
+    if (dir) dir.style.display = 'none';
+  }
 }
 
 /** Simple tap button that reliably fires exactly once per touch or click. */
@@ -194,6 +216,18 @@ export class MobileControls {
 
   setFoodCount(n: number): void {
     document.getElementById('mob-eat-cnt')!.textContent = String(n);
+  }
+
+  /**
+   * Hides the pads and releases whatever was held. Used while an ad owns the
+   * screen: the game is paused, so nothing may keep firing behind the overlay.
+   */
+  setVisible(on: boolean): void {
+    document.body.classList.toggle('pads-off', !on);
+    if (!on) {
+      this.left.reset();
+      this.atk.reset();
+    }
   }
 
   setWeapon(icon: string, name: string): void {
