@@ -1,7 +1,11 @@
-// Ad-pause check for Yandex requirement 4.7 (and the timing the moderator
-// asked for): the fullscreen ad must run the moment the player dies — while
-// they are not playing — and the game must stand still for as long as the ad,
-// or the "advert in N seconds" warning before it, owns the screen.
+// Ad-placement check for Yandex requirements 4.4 and 4.7.
+//
+//  4.4 — the spot may only follow a *non-game* action at a logical pause, and
+//        must start within 0.33 s of it. Dying is not an action the player took;
+//        tapping "Возродиться" on the death screen is, and that pause is exactly
+//        the platform's own example. Play resumes only once the ad is closed.
+//  4.7 — the game stands still for the whole time the ad, or the warning that
+//        precedes it, owns the screen.
 //
 // The page is opened on portal.test (mapped to localhost) so the client takes
 // itself for a portal build and loads /sdk.js — which is served here by a stub
@@ -91,6 +95,7 @@ check('no ad before the player dies', (await adState()).requested === 0);
 check('the game runs while the player is alive', (await paused()) === false);
 
 // walk until something bites: on this rig one hit is fatal
+const dead = () => page.locator('#death-screen:not(.hidden)').count().then((n) => n > 0);
 const t0 = Date.now();
 let died = false;
 const dirs = ['KeyW', 'KeyD', 'KeyS', 'KeyA'];
@@ -100,41 +105,57 @@ for (let i = 0; Date.now() - t0 < 90_000; i++) {
   await page.keyboard.down(k);
   for (let j = 0; j < 8; j++) {
     await sleep(200);
-    if ((await adState()).requested > 0) { died = true; await page.keyboard.up(k); break outer; }
+    if (await dead()) { died = true; await page.keyboard.up(k); break outer; }
   }
   await page.keyboard.up(k);
 }
-check('the ad is requested on death, with no player action in between', died);
+check('the player died', died);
 
 if (died) {
-  // the death screen is up and the respawn button is still waiting: the ad did
-  // not ride on a respawn tap, it came with the death itself
-  check('the death screen is up while the ad plays', (await page.locator('#death-screen:not(.hidden)').count()) > 0);
+  // 4.4: dying is not a player action, so nothing may run off it
+  await sleep(1500);
+  check('death alone shows no ad', (await adState()).requested === 0);
+  check('the death screen is up, waiting on the player', await dead());
+
+  const btn = page.locator('#respawn-btn');
+  for (let i = 0; i < 40 && (await btn.isDisabled()); i++) await sleep(500);
+  // Time the gap inside the page, from the click event itself: measuring it
+  // from here would time Playwright's own round trips, not the game.
+  await page.evaluate(() => {
+    window.__tapAt = 0;
+    document.getElementById('respawn-btn').addEventListener(
+      'click', () => { window.__tapAt = performance.now(); }, true);
+  });
+  await btn.click();
+
+  // 4.4: the spot must start within 0.33 s of the action that asked for it
+  for (let i = 0; i < 20 && !(await adState()).requested; i++) await sleep(50);
+  const ad0 = await adState();
+  const tapAt = await page.evaluate(() => window.__tapAt);
+  check('the ad follows the respawn tap', ad0.requested === 1);
+  check('and starts within the 0.33 s the rules allow',
+    tapAt > 0 && ad0.requestedAt > 0 && ad0.requestedAt - tapAt < 330,
+    `${Math.round(ad0.requestedAt - tapAt)}ms`);
+
+  // 4.4: the hero must still be dead behind the ad — play resumes after it
+  await sleep(WARNING_MS + Math.round(AD_MS / 2));
+  check('the hero is still dead while the ad plays', await dead());
 
   for (let i = 0; i < 40 && !(await adState()).closedAt; i++) await sleep(200);
-  await sleep(600);
+  await sleep(1200);
 
   const { ad, samples } = await page.evaluate(() => ({ ad: window.__ad, samples: window.__samples }));
   const inAd = samples.filter(([t]) => t >= ad.requestedAt && t <= ad.closedAt);
   const running = inAd.filter(([, p]) => p !== true);
   check('the ad closed', ad.closedAt > 0);
+  // 4.7: paused for the whole window, warning included
   check('the game is paused for the whole ad, warning included',
     inAd.length > 5 && running.length === 0,
     `${inAd.length} samples, ${running.length} of them running`);
-  const after = samples.filter(([t]) => t > ad.closedAt + 200);
+  const after = samples.filter(([t]) => t > ad.closedAt + 300);
   check('the game runs again once the ad closes', after.length > 0 && after.every(([, p]) => p === false));
-  check('exactly one ad for one death', ad.requested === 1);
-
-  // The respawn tap must not pull in a second ad. An ad on the tap would fire
-  // with it, so a short window after the click is enough — and short enough
-  // that the freshly spawned hero cannot have died again.
-  const btn = page.locator('#respawn-btn');
-  for (let i = 0; i < 30 && (await btn.isDisabled()); i++) await sleep(500);
-  const before = (await adState()).requested;
-  await btn.click();
-  await sleep(800);
-  check('no ad on the respawn tap', (await adState()).requested === before);
-  check('the game runs after respawn', (await paused()) === false);
+  check('exactly one ad for one respawn', ad.requested === 1);
+  check('and the hero is back in the world', (await page.locator('#death-screen.hidden').count()) > 0);
 }
 
 check('no page errors', errors.length === 0, errors.slice(0, 2).join(' / '));

@@ -143,7 +143,8 @@ dead code and nothing is loaded from it.)
 - **Gameplay markers** — `gameplayStart()` on entering the world and after
   respawn, `gameplayStop()` on death, so their metrics and ad timing are right.
 - **Ads** — a midgame ad at the death break only (a natural pause, never mid-
-  fight), fired the moment the hero dies rather than on the respawn tap.
+  fight), fired by the respawn tap rather than by the death itself: the spot has
+  to follow something the player did. The respawn waits for the ad to close.
 - **Paused for the ad** — from the request until the SDK hands the screen back,
   the render loop is stopped, input is not read, nothing is sent to the server,
   the touch pads come off screen and the audio is muted. A watchdog lifts the

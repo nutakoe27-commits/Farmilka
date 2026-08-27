@@ -556,10 +556,6 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
         audio.death();
         hud.showDeath(ev);
         gameplayStop(); // Yandex: gameplay ended
-        // The ad runs straight away, while the player is not playing: the hero
-        // is dead and waiting on the death screen, so nothing is happening
-        // behind the spot (rule 4.7).
-        showInterstitial();
         break;
       case 'bossWarn':
         bossWarnUntil = performance.now() + ev.inSec * 1000;
@@ -623,7 +619,14 @@ async function initGame(conn: Connection, welcome: WelcomeMsg): Promise<void> {
   hud.onEquip = (w) => conn.send({ t: 'equip', weapon: w });
   hud.onEat = () => conn.send({ t: 'eat' });
   hud.onReorder = (weapons) => conn.send({ t: 'reorder', weapons });
-  hud.onRespawn = () => conn.send({ t: 'respawn' });
+  hud.onRespawn = () => {
+    // Yandex 4.4: the spot has to follow a *non-game* action at a logical pause.
+    // Dying is not an action the player took — asking to go back in is, and the
+    // death screen is exactly such a pause. So the ad rides on this tap, starts
+    // in the same turn (well inside the 0.33 s the rules allow), and the respawn
+    // itself waits for it: play resumes only once the screen is ours again.
+    showInterstitial(() => conn.send({ t: 'respawn' }));
+  };
   $('death-shop-btn').onclick = () => shop.show(); // shop from the death screen
   shop.onBuy = (item) => conn.send({ t: 'buy', item });
   shop.onSell = (item) => conn.send({ t: 'sell', weapon: item });

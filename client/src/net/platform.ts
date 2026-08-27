@@ -136,30 +136,54 @@ export function adActive(): boolean {
 function setAdActive(active: boolean): void {
   if (adOn === active) return;
   adOn = active;
-  if (adWatchdog !== null) {
-    clearTimeout(adWatchdog);
-    adWatchdog = null;
-  }
-  // An SDK that never calls back must not leave the game frozen for good.
-  if (active) adWatchdog = setTimeout(() => setAdActive(false), 120_000);
   for (const fn of adListeners) {
     try { fn(active); } catch { /* a broken listener must not strand the pause */ }
   }
 }
 
-/** Fullscreen/midgame ad at a natural break (death). Pauses the game for its duration. */
-export function showInterstitial(): void {
-  if (!onPlatform()) return; // standalone site: no ads, so nothing to pause for
+/**
+ * Opens the ad window: pauses the game and hands back the one callback that
+ * closes it again. Whatever the caller was going to do next — resume, respawn —
+ * hangs off `onDone`, so it can only happen once the screen is ours.
+ */
+function beginAd(onDone: () => void): () => void {
   setAdActive(true);
-  const done = (): void => setAdActive(false);
+  let fired = false;
+  const finish = (): void => {
+    if (fired) return;
+    fired = true;
+    if (adWatchdog !== null) {
+      clearTimeout(adWatchdog);
+      adWatchdog = null;
+    }
+    setAdActive(false);
+    onDone();
+  };
+  // An SDK that never calls back must not freeze the game for good — nor strand
+  // a player on the death screen waiting for a respawn that hangs off this.
+  adWatchdog = setTimeout(finish, 60_000);
+  return finish;
+}
+
+/**
+ * Fullscreen/midgame ad, and then `onDone`.
+ *
+ * Yandex 4.4 wants the spot to follow a *non-game* action at a logical pause and
+ * to start within 0.33 s of it, with play resuming only once the player closes
+ * it. So this is called straight from the button handler, and whatever restarts
+ * play is passed in as `onDone` rather than run alongside the ad. Off-platform
+ * there is no ad, and `onDone` runs immediately.
+ */
+export function showInterstitial(onDone: () => void = () => {}): void {
+  if (!onPlatform()) { onDone(); return; } // standalone site: no ads
+  const done = beginAd(onDone);
   if (isCrazyGames) cgMidgameAd(done);
   else yaInterstitial(done);
 }
 
-export function showRewarded(onReward: () => void): void {
-  if (!onPlatform()) return;
-  setAdActive(true);
-  const done = (): void => setAdActive(false);
+export function showRewarded(onReward: () => void, onDone: () => void = () => {}): void {
+  if (!onPlatform()) { onDone(); return; }
+  const done = beginAd(onDone);
   if (isCrazyGames) cgRewardedAd(onReward, done);
   else yaRewarded(onReward, done);
 }
