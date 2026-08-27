@@ -23,12 +23,10 @@ const check = (label, ok, extra = '') => {
 
 const CYRILLIC = /[А-Яа-яЁё]/;
 // Words that are legitimately the same in both languages: the title, the
-// language switcher, key caps, genre shorthand and one deliberately bilingual
-// label (the language row in Settings reads "Язык / Language" by design).
+// language switcher's own labels, key caps, genre shorthand and brand names.
 const ALLOWED = new Set([
   'farmclash', 'farm', 'clash', 'ru', 'en', 'wasd', 'q', 'b', 'w', 'a', 's', 'd',
   'hp', 'x', 'v', 'vs', 'fps', 'id', 'esc', 'pvp', 'pve', 'aoe', 'telegram',
-  'language', 'язык',
 ]);
 
 const browser = await chromium.launch({

@@ -54,7 +54,7 @@ const RU: Dict = {
   'set.shake': 'Тряска экрана',
   'set.dmg': 'Числа урона',
   'set.feed': 'Лента убийств',
-  'set.lang': 'Язык / Language',
+  'set.lang': 'Язык',
   'set.tg': '📢 Новости и чат — Telegram',
   'set.share': '🔗 Поделиться игрой',
   'set.continue': 'Продолжить игру',
@@ -310,7 +310,7 @@ const EN: Dict = {
   'set.shake': 'Screen shake',
   'set.dmg': 'Damage numbers',
   'set.feed': 'Kill feed',
-  'set.lang': 'Язык / Language',
+  'set.lang': 'Language',
   'set.tg': '📢 News & chat — Telegram',
   'set.share': '🔗 Share the game',
   'set.continue': 'Resume game',
@@ -632,19 +632,20 @@ export function setLang(l: Lang): void {
 }
 
 /**
- * Switch language live (no reload, not persisted). Used to follow the Yandex
- * platform language (ysdk.environment.i18n.lang) when the player hasn't made a
- * manual choice — so the interface auto-matches their locale (rule 2.14).
+ * Adopt the language the platform reports (ysdk.environment.i18n.lang) as the
+ * only truth, without a reload.
+ *
+ * On Yandex a draft is published per language, and every text the player sees
+ * has to be in the language of that draft (rule 8.2.3). A locally remembered
+ * choice — or the browser's own locale — is exactly how a Russian draft ends up
+ * showing an English interface, so this overrides both and wipes the stored
+ * choice; the portal build hides the RU/EN switch so nothing writes it again.
  */
-export function setLangLive(l: Lang): void {
+export function setLangFromPlatform(l: Lang): void {
+  try { localStorage.removeItem(KEY); } catch { /* storage may be blocked */ }
   if (l === lang) return;
   lang = l;
   applyStaticI18n();
-}
-
-/** Whether the player has explicitly picked a language (which must win over the SDK). */
-export function hasManualLang(): boolean {
-  return localStorage.getItem(KEY) === 'ru' || localStorage.getItem(KEY) === 'en';
 }
 
 /**

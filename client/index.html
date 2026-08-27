@@ -59,6 +59,9 @@
     /* portals forbid links off-site: hide site/Telegram/share on any of them */
     body.on-yandex .yandex-hide,
     body.on-crazygames .yandex-hide { display: none !important; }
+    /* Yandex 8.2.3: the platform picks the language (one draft per language),
+       so the game must not offer a second, competing language switch. */
+    body.on-yandex .lang-row { display: none !important; }
 
     /* Yandex 1.19: the game must not be clickable before GameReady fires.
        This veil covers everything and swallows every pointer event until then. */
@@ -253,7 +256,7 @@
       <div style="font-size:13px;color:#8a8fa3;margin-bottom:6px" data-i18n="set.server">Игровой сервер (смена переподключит):</div>
       <div id="server-list" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
-    <div class="set-row"><span data-i18n="set.lang">Язык / Language</span><span class="lang-switch"><button data-lang="ru">RU</button><button data-lang="en">EN</button></span></div>
+    <div class="set-row lang-row"><span data-i18n="set.lang">Язык</span><span class="lang-switch"><button data-lang="ru">RU</button><button data-lang="en">EN</button></span></div>
     <div class="set-row" id="set-fullscreen-row"><span data-i18n="set.fullscreen">Полный экран</span><button class="srv-btn" id="set-fullscreen-btn"></button></div>
     <div class="set-row"><span data-i18n="set.sound">Звук</span><input type="checkbox" id="set-sound" checked></div>
     <div class="set-row"><span data-i18n="set.shake">Тряска экрана</span><input type="checkbox" id="set-shake" checked></div>
@@ -371,7 +374,7 @@
       <div id="acc-hint" class="yandex-hide" data-i18n="menu.accHint">Без пароля — гостевой вход (прогресс не сохраняется).<br>С аккаунтом золото и оружие сохраняются между сеансами.</div>
       <button class="btn share-btn yandex-hide" id="menu-share" data-i18n="menu.share">🔗 Поделиться игрой</button>
       <a class="tg-link yandex-hide" href="https://t.me/farmclashonline" target="_blank" rel="noopener" data-i18n="menu.tg">📢 Новости и чат — Telegram-канал</a>
-      <div class="lang-switch menu-lang"><button data-lang="ru">RU</button><button data-lang="en">EN</button></div>
+      <div class="lang-switch menu-lang lang-row"><button data-lang="ru">RU</button><button data-lang="en">EN</button></div>
     </div>
   </div>
 

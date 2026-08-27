@@ -46,6 +46,42 @@ const PORTAL = BASE.replace(/\/\/[^/:]+/, '//portal.test');
   await page.close();
 }
 
+// ---------- 8.2.3: the platform owns the language ----------
+// A draft is published per language, so the interface must be in the language
+// the SDK reports — and the game must not offer a competing switch of its own,
+// nor remember a choice that could contradict the next draft.
+for (const sdkLang of ['ru', 'en']) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await ctx.newPage();
+  // Stub the SDK so it reports `sdkLang`, and plant the opposite language in
+  // storage first: the platform must win over anything remembered locally.
+  await page.route(/sdk\.js|yandex\.ru\/games\/sdk/, (r) => r.fulfill({
+    contentType: 'application/javascript',
+    body: `window.YaGames={init:()=>Promise.resolve({environment:{i18n:{lang:'${sdkLang}'}},`
+      + `features:{LoadingAPI:{ready(){}},GameplayAPI:{start(){},stop(){}}},`
+      + `getPlayer:()=>Promise.reject(new Error('guest')),`
+      + `auth:{openAuthDialog:()=>Promise.reject(new Error('guest'))},adv:{}})};`,
+  }));
+  await page.addInitScript((other) => localStorage.setItem('farmclash-lang', other), sdkLang === 'ru' ? 'en' : 'ru');
+  await page.goto(PORTAL, { waitUntil: 'commit' });
+  await page.waitForSelector('#boot-veil', { state: 'detached', timeout: 12000 });
+  await sleep(400);
+
+  const shown = await page.evaluate(() => ({
+    html: document.documentElement.lang,
+    play: document.getElementById('play-btn')?.textContent?.trim() ?? '',
+    stored: localStorage.getItem('farmclash-lang'),
+    switches: [...document.querySelectorAll('.lang-switch')]
+      .filter((el) => el.getBoundingClientRect().width > 0).length,
+  }));
+  const wantPlay = sdkLang === 'ru' ? 'Играть' : 'Play';
+  check(`SDK says ${sdkLang}: the interface follows it, not the stored choice`,
+    shown.html === sdkLang && shown.play === wantPlay, `${shown.html} / "${shown.play}"`);
+  check(`SDK says ${sdkLang}: the stored choice is cleared`, shown.stored === null, String(shown.stored));
+  check(`SDK says ${sdkLang}: no language switch is offered`, shown.switches === 0, `${shown.switches} visible`);
+  await ctx.close();
+}
+
 // ---------- 1.6.x: no selection, no context menu ----------
 {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });

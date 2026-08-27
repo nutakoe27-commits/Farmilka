@@ -6,7 +6,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { IS_SELF_HOST } from '../config.js';
-import { setLangLive, hasManualLang } from '../ui/i18n.js';
+import { setLangFromPlatform } from '../ui/i18n.js';
 import { audio } from '../game/audio.js';
 
 interface State {
@@ -71,8 +71,11 @@ export async function initYandex(): Promise<void> {
     try {
       const l = state.sdk.environment?.i18n?.lang;
       state.lang = l === 'ru' ? 'ru' : 'en';
-      // follow the platform language unless the player picked one manually (rule 2.14)
-      if (!hasManualLang()) setLangLive(state.lang);
+      // The platform language is the only one that counts here: a draft is
+      // published per language and every text must be in that draft's language
+      // (rule 8.2.3). Neither a remembered choice nor the browser locale may
+      // override it, so the portal build also hides the RU/EN switch.
+      setLangFromPlatform(state.lang);
     } catch { /* no environment */ }
     await readPlayer();
   } catch {
