@@ -86,8 +86,17 @@
     #money .risk { color: #ff9d5c; }
     #money .rank { color: #9ecbff; font-size: 15px; }
     #zone-label { position: fixed; top: calc(42px + var(--sat)); left: 50%; transform: translateX(-50%); font-size: 12px; color: #7ee787; text-shadow: 0 1px 3px #000; white-space: nowrap; }
-    #onboarding { position: fixed; top: calc(72px + var(--sat)); left: 50%; transform: translateX(-50%); max-width: 90vw; background: linear-gradient(135deg,#1f6feb,#1a5fd0); color: #fff; padding: 10px 18px; border-radius: 22px; font-size: 14px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.5); z-index: 14; text-align: center; transition: opacity .4s; }
-    body.touch #onboarding { top: calc(212px + var(--sat)); font-size: 13px; padding: 9px 15px; } /* below leaderboard + minimap */
+    /* The boss warning, the build toolbar and the onboarding tip are all centred
+       transient strips, and any two of them can be up at once. One flex column
+       holds all three: they stack instead of landing on each other, whatever
+       length the text runs to (Yandex 1.10.3). The column is capped to the gap
+       between the leaderboard and the kill feed so it cannot reach either. */
+    #banners { position: fixed; top: calc(68px + var(--sat)); left: 50%; transform: translateX(-50%); z-index: 16;
+               display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content;
+               max-width: min(560px, calc(100vw - 204px - 2 * min(300px, 26vw) - var(--sal) - var(--sar)));
+               pointer-events: none; }
+    #onboarding { max-width: 100%; background: linear-gradient(135deg,#1f6feb,#1a5fd0); color: #fff; padding: 10px 18px; border-radius: 22px; font-size: 14px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,.5); text-align: center; transition: opacity .4s; }
+    body.touch #onboarding { font-size: 13px; padding: 9px 15px; }
     #hotbar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + var(--sab)); display: flex; gap: 8px; }
     .slot { width: 56px; height: 56px; border-radius: 10px; background: rgba(14,17,25,.85); border: 2px solid #2c3242; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; color: #bfc4d4; position: relative; user-select: none; }
     .slot.active { border-color: #7ee787; box-shadow: 0 0 12px rgba(126,231,135,.35); }
@@ -99,10 +108,10 @@
     #food-slot .cnt { font-size: 11px; color: #ffd76e; font-weight: 700; }
     #food-slot .key { position: absolute; top: 2px; left: 5px; font-size: 9px; color: #6a7085; }
     #food-cd { position: absolute; inset: 0; background: rgba(0,0,0,.65); transform-origin: bottom; transform: scaleY(0); }
-    #killfeed { position: fixed; top: calc(12px + var(--sat)); right: calc(56px + var(--sar)); display: flex; flex-direction: column; gap: 4px; align-items: flex-end; width: min(320px, calc(100vw - 120px - var(--sal) - var(--sar))); }
+    #killfeed { position: fixed; top: calc(12px + var(--sat)); right: calc(102px + var(--sar)); display: flex; flex-direction: column; gap: 4px; align-items: flex-end; width: min(300px, 26vw); max-height: 168px; overflow: hidden; }
     .kf { background: rgba(14,17,25,.8); border-radius: 6px; padding: 4px 10px; font-size: 12px; color: #cfd4e4; border: 1px solid #262b38; max-width: 100%; overflow-wrap: anywhere; }
     .kf b { color: #ff7b72; }
-    #boss-banner { position: fixed; top: calc(68px + var(--sat)); left: 50%; transform: translateX(-50%); background: rgba(60,10,60,.85); border: 1px solid #b565d8; color: #f0c8ff; padding: 8px 22px; border-radius: 10px; font-size: 15px; font-weight: 600; text-shadow: 0 1px 3px #000; max-width: 90vw; text-align: center; }
+    #boss-banner { max-width: 100%; background: rgba(60,10,60,.85); border: 1px solid #b565d8; color: #f0c8ff; padding: 8px 22px; border-radius: 10px; font-size: 15px; font-weight: 600; text-shadow: 0 1px 3px #000; text-align: center; }
     #hint { position: fixed; bottom: calc(20px + var(--sab)); left: calc(16px + var(--sal)); font-size: 11px; color: #6a7085; line-height: 1.7; }
     #minimap { position: fixed; right: calc(14px + var(--sar)); bottom: calc(14px + var(--sab)); border: 1px solid #2c3242; border-radius: 8px; background: rgba(10,12,18,.85); }
 
@@ -155,11 +164,11 @@
     .dstat .dv { display: block; font-size: 20px; font-weight: 800; color: #ffd76e; }
     .dstat .dl { display: block; font-size: 10px; color: #8a8fa3; margin-top: 2px; }
 
-    #place-hint { position: fixed; top: calc(100px + var(--sat)); left: 50%; transform: translateX(-50%); background: rgba(20,40,20,.92); border: 1px solid #2ea043; padding: 6px 8px 6px 16px; border-radius: 8px; font-size: 13px; z-index: 16; max-width: 92vw; display: flex; align-items: center; gap: 10px; }
+    #place-hint { background: rgba(20,40,20,.92); border: 1px solid #2ea043; padding: 6px 8px 6px 16px; border-radius: 8px; font-size: 13px; max-width: 100%; display: flex; align-items: center; gap: 10px; pointer-events: auto; }
     #place-hint.demolish { background: rgba(48,20,20,.92); border-color: #e0574f; }
     #place-done { cursor: pointer; border: none; border-radius: 6px; padding: 6px 14px; font-size: 13px; font-weight: 700; background: #238636; color: #fff; white-space: nowrap; }
     #place-hint.demolish #place-done { background: #b8433c; }
-    body.touch #place-hint { top: calc(72px + var(--sat)); font-size: 14px; }
+    body.touch #place-hint { font-size: 14px; }
 
     /* mobile controls */
     .joy-zone { position: fixed; bottom: 0; top: 35%; left: 0; width: 55%; z-index: 11; pointer-events: auto; display: none; }
@@ -181,7 +190,7 @@
     body.pads-off .joy-zone, body.pads-off #atk-btn, body.pads-off #mob-buttons { display: none !important; }
     body.touch #hotbar { display: none; } /* weapon switch is the right-side button */
     /* mobile HUD: bigger and clearer, kept clear of the action buttons */
-    body.touch #hp-wrap { left: 36%; bottom: calc(122px + var(--sab)); width: min(300px, 60vw); }
+    body.touch #hp-wrap { bottom: calc(148px + var(--sab)); width: min(300px, 60vw); }
     body.touch #hp-bar-bg { height: 18px; border-radius: 10px; }
     body.touch #hp-bar { border-radius: 10px; }
     body.touch #hp-text { font-size: 13px; margin-top: 4px; }
@@ -206,12 +215,45 @@
     .lb-badge { font-weight: 700; }
     .lb-you { margin-top: 5px; padding-top: 5px; border-top: 1px solid #2c3242; color: #7ee787; font-weight: 700; font-size: 11px; }
     body.touch #minimap { right: calc(12px + var(--sar)); top: calc(12px + var(--sat)); bottom: auto; width: 110px; height: 110px; }
-    body.touch #killfeed { top: calc(136px + var(--sat)); right: calc(12px + var(--sar)); width: min(46vw, calc(100vw - 24px - var(--sal) - var(--sar))); }
+    body.touch #killfeed { top: calc(136px + var(--sat)); right: calc(12px + var(--sar)); width: min(46vw, calc(100vw - 24px - var(--sal) - var(--sar))); max-height: 108px; }
     body.touch #settings-btn { left: calc(12px + var(--sal)); right: auto; }
     body.touch #fullscreen-btn { left: calc(58px + var(--sal)); right: auto; }
     body.touch #food-slot { display: none; } /* mobile uses the side button */
     body.touch #leaderboard { top: calc(104px + var(--sat)); left: calc(8px + var(--sal)); width: 150px; font-size: 11px; padding: 6px 8px; }
     body.touch #leaderboard .lb-row:nth-child(n+5) { display: none; } /* top 3 + title on phones */
+    body.touch #banners { top: calc(252px + var(--sat)); max-width: calc(100vw - 24px - var(--sal) - var(--sar)); }
+    body.touch #boss-banner { font-size: 13px; padding: 7px 14px; }
+
+    /* A phone held sideways gets a short, wide window — in the Yandex frame
+       barely 300px tall. The portrait stack does not fit in it: the vitals ran
+       into the leaderboard and the kill feed, and the tips ran into the pads
+       (Yandex 1.10.3). This lays the HUD out for that shape instead: one top
+       row, vitals and pads along the bottom, banners in the band between them.
+       The leaderboard is the one thing with nowhere left to go, so on this
+       shape it steps aside — everything it shows is also on the score screen. */
+    @media (max-height: 460px) {
+      body.touch #leaderboard { display: none; }
+      body.touch #settings-btn { top: calc(8px + var(--sat)); left: calc(10px + var(--sal)); width: 34px; height: 34px; font-size: 18px; }
+      body.touch #fullscreen-btn { top: calc(8px + var(--sat)); left: calc(50px + var(--sal)); width: 34px; height: 34px; font-size: 18px; }
+      body.touch #money { top: calc(10px + var(--sat)); left: calc(94px + var(--sal)); font-size: 17px;
+                          max-width: calc(100vw - 200px - var(--sal) - var(--sar)); }
+      body.touch #zone-label { top: calc(34px + var(--sat)); left: calc(94px + var(--sal)); }
+      body.touch #minimap { top: calc(8px + var(--sat)); right: calc(10px + var(--sar)); width: 72px; height: 72px; }
+      body.touch #killfeed { top: calc(88px + var(--sat)); right: calc(10px + var(--sar)); width: min(22vw, calc(100vw - 20px - var(--sal) - var(--sar))); max-height: 72px; }
+      body.touch #banners { top: calc(56px + var(--sat)); left: calc(10px + var(--sal)); transform: none;
+                            align-items: flex-start; max-width: 220px; }
+      body.touch #boss-banner { font-size: 12px; padding: 5px 12px; }
+      body.touch #onboarding { font-size: 12px; padding: 6px 12px; text-align: left; }
+      body.touch #hp-wrap { bottom: calc(104px + var(--sab)); width: min(260px, 40vw); }
+      body.touch #level-badge { font-size: 12px; margin-bottom: 3px; }
+      body.touch #hp-bar-bg { height: 14px; }
+      body.touch #hp-text { font-size: 11px; margin-top: 2px; }
+      body.touch #atk-btn { width: 84px; height: 84px; font-size: 34px; right: calc(16px + var(--sar)); bottom: calc(12px + var(--sab)); }
+      body.touch .mob-btn { width: 48px; height: 48px; font-size: 20px; border-radius: 14px; }
+      body.touch .mob-btn .sub { font-size: 9px; }
+      body.touch #mob-buttons { right: calc(110px + var(--sar)); bottom: calc(30px + var(--sab)); gap: 8px; }
+      body.touch #place-hint { font-size: 12px; padding: 4px 6px 4px 12px; }
+    }
   </style>
 </head>
 <body>
@@ -220,7 +262,7 @@
 
   <div id="hud" class="hidden">
     <div id="money">💰 0</div>
-    <div id="onboarding" class="hidden"></div>
+
     <div id="leaderboard" class="hidden"></div>
     <div id="zone-label" class="hidden" data-i18n="hud.protect">🛡 Защита после возрождения</div>
     <div id="hp-wrap">
@@ -236,7 +278,11 @@
       <div id="food-cd"></div>
     </div>
     <div id="killfeed"></div>
-    <div id="boss-banner" class="hidden"></div>
+    <div id="banners">
+      <div id="boss-banner" class="hidden"></div>
+      <div id="place-hint" class="hidden"><span id="place-hint-text"></span><button id="place-done">✓</button></div>
+      <div id="onboarding" class="hidden"></div>
+    </div>
     <div id="hint" data-i18n="hud.hint">WASD — движение · мышь — прицел · ЛКМ — атака<br>B — магазин · Q — еда · 1–4 — оружие · перетаскивай слоты</div>
     <canvas id="minimap" width="160" height="160"></canvas>
     <button id="fullscreen-btn" data-i18n-title="hud.fullscreenTitle" title="Полный экран">⛶</button>
@@ -247,8 +293,6 @@
     <div id="boot-logo">Farm<b>Clash</b></div>
     <div id="boot-spin"></div>
   </div>
-
-  <div id="place-hint" class="hidden"><span id="place-hint-text"></span><button id="place-done">✓</button></div>
 
   <div id="settings" class="panel hidden">
     <h2 data-i18n="set.title">⚙ Настройки</h2>
