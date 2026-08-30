@@ -242,8 +242,17 @@ await driveTo(page, { x: home.x - 520, y: home.y - 380 }, { ms: dur(26000), spin
 await brawl(page, dur(12000));
 beat('combat');
 
-// 2. back home, and wall the base in
+// 2. back home, and wall the base in. The gold has to come out of the vault
+// first: walking past your own vault banks whatever you are carrying, and
+// buildings are paid for out of the carried purse — so without this the whole
+// build beat is a row of greyed-out buttons.
 await driveTo(page, { x: home.x, y: home.y }, { ms: dur(26000), stopAt: 90, wobble: 30 });
+await openShop(page, 'buildings');
+{
+  const takeOut = page.locator('#withdraw-btn');
+  if (await takeOut.count() && !(await takeOut.isDisabled())) { await takeOut.click(); await sleep(900); }
+  else console.warn('nothing to withdraw before the build beat');
+}
 for (let i = -2; i <= 2; i++) await build(page, 'wall', 250, i * 66, z);
 await build(page, 'turret', -60, -210, z);
 await build(page, 'farm', -250, 150, z);
@@ -251,17 +260,13 @@ await page.keyboard.press('Escape');
 await sleep(700);
 beat('built');
 
-// 3. the vault: bank the run, and the Base Rank line that banking moves
+// 3. the vault and the Base Rank line that banking moves
 await openShop(page, 'buildings');
 await sleep(dur(2600));
 await page.keyboard.press('Escape');
 beat('banked');
 
-// 4. the crate — a unique weapon reveal. Take the gold back out first: walking
-// past your own vault banks what you carry, which would leave nothing to spend.
-await openShop(page, 'buildings');
-const takeAll = page.locator('#withdraw-btn');
-if (await takeAll.count() && !(await takeAll.isDisabled())) { await takeAll.click(); await sleep(700); }
+// 4. the crate — a unique weapon reveal
 await openShop(page, 'weapons');
 const crate = page.locator('#weapon-lootbox-btn');
 if (await crate.count() && !(await crate.isDisabled())) { await crate.click(); await sleep(dur(2600)); }
