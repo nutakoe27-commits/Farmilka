@@ -77,5 +77,11 @@ for (const b of Object.values(bal.bosses)) {
 // the crate beat has to land every time
 bal.weaponLootbox = { ...bal.weaponLootbox, legendaryChance: 1, epicChance: 0, weaponChance: 0, goldChance: 0 };
 
+// The raid beat is the point of the raid beat. Live, a base goes briefly immune
+// the moment one of its buildings falls, so owners cannot be farmed — which on
+// camera means the hero smashes one wall and then swings at nothing. The video
+// is showing the mechanic, not the guard around it.
+bal.economy.raidShieldSec = 0;
+
 writeFileSync(join(DIR, 'video-rig-balance.json'), JSON.stringify(bal));
 console.log(`wrote video-rig-balance.json (slow-motion ×${S})`);

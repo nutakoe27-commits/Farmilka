@@ -1,0 +1,377 @@
+// Records the gameplay video for the store from real play, at a true 60 fps.
+//
+//   SLOWMO=5 node make-video-rig.mjs        # once, to build the rig balance
+//   DATA_DIR=/tmp/vid PORT=3993 BALANCE_PATH=marketing/video-rig-balance.json \
+//     npx tsx src/index.ts                  # from server/
+//   VID_LANG=ru node marketing/record-gameplay.mjs
+//
+// Why it is recorded in slow motion
+// --------------------------------
+// Headless Chromium has no GPU: WebGL falls back to SwiftShader and the game
+// renders about 12 fps at 720p, measured. So the *world* runs at 1/S speed and
+// the *video* is sped back up by S at encode time. Every frame the browser did
+// manage to draw then lands on a distinct moment, and 12 raw fps × S=5 gives
+// ~63 distinct frames per second of finished video — enough to fill 60 fps
+// honestly rather than by duplicating frames.
+//
+// Frames are pulled through CDP screencast rather than Playwright's recordVideo,
+// because each frame arrives with the timestamp of its own swap. Those stamps
+// drive the concat list, so a capture hiccup lands at the right moment in the
+// finished cut instead of smearing the motion around it.
+
+import { chromium } from 'playwright';
+import { spawnSync } from 'node:child_process';
+import { mkdirSync, writeFileSync, rmSync, readdirSync, statSync } from 'node:fs';
+import { dirname, join as pathJoin } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import ffmpeg from 'ffmpeg-static';
+
+const DIR = dirname(fileURLToPath(import.meta.url));
+const OUT = process.env.VID_TMP || '/tmp/farmclash-gameplay';
+const BASE = process.env.VID_URL || 'http://localhost:3993/';
+const WORLD = Number(process.env.RIG_WORLD_SIZE || 3600);
+const SLOWMO = Number(process.env.SLOWMO || 5); // must match make-video-rig.mjs
+const LANG = process.env.VID_LANG || 'ru';
+const FPS = Number(process.env.VID_FPS || 60);
+const W = 1280, H = 720;   // capture size; upscaled to 1080p at encode time
+const CX = W / 2, CY = H / 2;
+const NAME = process.env.VID_OUT || `farmclash-gameplay-${LANG}.mp4`;
+/** Scales every choreography duration. VID_BEAT=0.12 smoke-tests the pipeline. */
+const BEAT = Number(process.env.VID_BEAT || 1);
+const dur = (x) => Math.max(120, Math.round(x * BEAT));
+
+rmSync(OUT, { recursive: true, force: true });
+mkdirSync(`${OUT}/frames`, { recursive: true });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const browser = await chromium.launch({
+  executablePath: process.env.CHROMIUM_PATH || '/opt/pw-browsers/chromium',
+  args: ['--enable-webgl', '--hide-scrollbars', '--disable-gpu-vsync', '--disable-frame-rate-limit'],
+});
+
+const errors = [];
+const beats = [];
+/** Beats are stamped on the same clock as the frames, so cuts land exactly. */
+const beat = (n) => {
+  const t = Date.now() / 1000;
+  beats.push({ n, t });
+  console.log(`beat ${n} @ ${frames.length} frames`);
+};
+
+async function join(name, { lang = LANG } = {}) {
+  const ctx = await browser.newContext({ viewport: { width: W, height: H } });
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => errors.push(`${name}: ${e}`));
+  await page.goto(BASE, { waitUntil: 'networkidle' });
+  await page.evaluate((l) => localStorage.setItem('farmclash-lang', l), lang);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.fill('#name-input', name);
+  await page.click('#play-btn');
+  await page.waitForSelector('#hud:not(.hidden)', { timeout: 20000 }).catch(() => {});
+  await sleep(3000);
+  return { ctx, page };
+}
+
+// ---------- actor helpers ----------
+
+const where = (page) => page.evaluate(([x, y]) => window.farmclashView?.screenToWorld(x, y) ?? null, [CX, CY]);
+const zoomOf = (page) => page.evaluate(() => window.farmclashView?.zoom() ?? 1);
+
+const held = new Map();
+async function keys(page, want) {
+  const cur = held.get(page) ?? new Set();
+  for (const k of cur) if (!want.has(k)) { await page.keyboard.up(k); cur.delete(k); }
+  for (const k of want) if (!cur.has(k)) { await page.keyboard.down(k); cur.add(k); }
+  held.set(page, cur);
+}
+const aimAt = (page, ang, r = 300) => page.mouse.move(CX + Math.cos(ang) * r, CY + Math.sin(ang) * r);
+
+/**
+ * Walks toward a world point. `spin` keeps the aim turning, which reads as
+ * fighting through rather than commuting; `wobble` adds a little drift to the
+ * heading so the path is not a machine-straight line.
+ */
+async function driveTo(page, target, { ms = 20000, stopAt = 120, attack = false, spin = false, wobble = 0 } = {}) {
+  const start = Date.now();
+  let spinA = Math.random() * 6;
+  let arrived = false;
+  if (attack) await page.mouse.down();
+  while (Date.now() - start < ms) {
+    const me = await where(page);
+    if (!me) break;
+    const drift = wobble ? Math.sin((Date.now() - start) / 900) * wobble : 0;
+    const dx = target.x - me.x + drift, dy = target.y - me.y + drift;
+    const d = Math.hypot(dx, dy);
+    if (d < stopAt) { arrived = true; break; }
+    const k = new Set();
+    if (dy < -20) k.add('KeyW');
+    if (dy > 20) k.add('KeyS');
+    if (dx < -20) k.add('KeyA');
+    if (dx > 20) k.add('KeyD');
+    await keys(page, k);
+    if (spin) { spinA += 0.45; await aimAt(page, spinA); }
+    else await aimAt(page, Math.atan2(dy, dx));
+    await sleep(130);
+  }
+  await keys(page, new Set());
+  if (attack) await page.mouse.up();
+  return arrived;
+}
+
+/** Fights in place, sweeping the aim around. */
+async function brawl(page, ms, { sweep = 0.3 } = {}) {
+  await page.mouse.down();
+  const start = Date.now();
+  let a = Math.random() * 6;
+  while (Date.now() - start < ms) { a += sweep; await aimAt(page, a); await sleep(130); }
+  await page.mouse.up();
+}
+
+async function openShop(page, tab) {
+  if (await page.locator('#shop.hidden').count()) {
+    await page.keyboard.press('b');
+    await page.waitForSelector('#shop:not(.hidden)', { timeout: 5000 });
+  }
+  await page.click(`.shop-tab[data-tab="${tab}"]`);
+  await sleep(400);
+}
+
+async function buy(page, tab, sel) {
+  await openShop(page, tab);
+  const row = page.locator(sel);
+  if (!(await row.count()) || (await row.isDisabled())) return false;
+  await row.click();
+  await sleep(400);
+  return true;
+}
+
+/** Buys a building and drops it at a world offset from the hero. */
+async function build(page, item, wx, wy, z) {
+  await openShop(page, 'buildings');
+  const row = page.locator(`#shop-buildings .shop-item[data-item="${item}"] button`);
+  if (!(await row.count()) || (await row.isDisabled())) { await page.keyboard.press('Escape'); return false; }
+  await row.click();
+  await sleep(300);
+  await page.mouse.move(CX + wx * z, CY + wy * z); // let the ghost show where it lands
+  await sleep(260);
+  await page.mouse.click(CX + wx * z, CY + wy * z);
+  await sleep(320);
+  return true;
+}
+
+/** Reads the boss pip (light purple) off the minimap, as a 0..1 world fraction. */
+const findBoss = (page) => page.evaluate(() => {
+  const c = document.getElementById('minimap');
+  const g = c?.getContext('2d');
+  if (!g) return null;
+  const S = c.width || 160;
+  const d = g.getImageData(0, 0, S, S).data;
+  let bx = 0, by = 0, n = 0;
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+    const i = (y * S + x) * 4;
+    if (d[i + 3] < 40) continue;
+    if (d[i] > 228 && d[i] < 250 && d[i + 1] > 188 && d[i + 1] < 214 && d[i + 2] > 246) { bx += x; by += y; n++; }
+  }
+  return n ? { x: bx / n / S, y: by / n / S } : null;
+});
+
+// ---------- frame capture ----------
+
+const frames = []; // { file, t } — t is the swap timestamp in seconds
+let capturing = false;
+
+async function startCapture(ctx, page) {
+  const cdp = await ctx.newCDPSession(page);
+  cdp.on('Page.screencastFrame', (f) => {
+    if (capturing) {
+      const file = `f_${String(frames.length).padStart(6, '0')}.jpg`;
+      writeFileSync(pathJoin(OUT, 'frames', file), Buffer.from(f.data, 'base64'));
+      frames.push({ file, t: f.metadata.timestamp });
+    }
+    cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => {});
+  });
+  capturing = true;
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 88, maxWidth: W, maxHeight: H, everyNthFrame: 1 });
+  return async () => { capturing = false; await cdp.send('Page.stopScreencast').catch(() => {}); };
+}
+
+// ---------- off camera: a neighbour whose base is worth breaking into ----------
+
+const nb = await join('Neighbour');
+{
+  const z = await zoomOf(nb.page);
+  for (let i = -2; i <= 2; i++) await build(nb.page, 'wall', 250, i * 66, z);
+  await build(nb.page, 'mine', -230, 140, z);
+  await build(nb.page, 'farm', -240, -160, z);
+  await nb.page.keyboard.press('Escape');
+}
+const target = await where(nb.page);
+console.log('raid target at', target);
+// It has to stay connected: a guest's buildings are removed the moment they
+// disconnect, and this base is the thing we are going to break into. But every
+// frame it draws comes out of the same software rasteriser that is drawing the
+// take, so it is shrunk to a stamp and throttled down to a crawl. It keeps its
+// socket, and hands the GPU process back to the page being filmed.
+await nb.page.setViewportSize({ width: 60, height: 60 });
+{
+  const nbCdp = await nb.ctx.newCDPSession(nb.page);
+  await nbCdp.send('Emulation.setCPUThrottlingRate', { rate: 20 });
+}
+
+// ---------- the hero ----------
+
+const hero = await join('FarmClash');
+const page = hero.page;
+
+// Pre-roll, off camera: a weapon in hand, so the video opens on a real fight
+// instead of on shopping.
+await buy(page, 'weapons', '#shop-weapons .shop-item[data-item="scythe"] .buy');
+await page.keyboard.press('Escape');
+await sleep(400);
+await page.keyboard.press('Digit2');
+await sleep(600);
+
+const stopCapture = await startCapture(hero.ctx, page);
+beat('start');
+
+const z = await zoomOf(page);
+const home = await where(page);
+
+// 1. cold open — straight into a fight
+await driveTo(page, { x: home.x - 520, y: home.y - 380 }, { ms: dur(26000), spin: true, attack: true, wobble: 40 });
+await brawl(page, dur(12000));
+beat('combat');
+
+// 2. back home, and wall the base in
+await driveTo(page, { x: home.x, y: home.y }, { ms: dur(26000), stopAt: 90, wobble: 30 });
+for (let i = -2; i <= 2; i++) await build(page, 'wall', 250, i * 66, z);
+await build(page, 'turret', -60, -210, z);
+await build(page, 'farm', -250, 150, z);
+await page.keyboard.press('Escape');
+await sleep(700);
+beat('built');
+
+// 3. the vault: bank the run, and the Base Rank line that banking moves
+await openShop(page, 'buildings');
+await sleep(dur(2600));
+await page.keyboard.press('Escape');
+beat('banked');
+
+// 4. the crate — a unique weapon reveal. Take the gold back out first: walking
+// past your own vault banks what you carry, which would leave nothing to spend.
+await openShop(page, 'buildings');
+const takeAll = page.locator('#withdraw-btn');
+if (await takeAll.count() && !(await takeAll.isDisabled())) { await takeAll.click(); await sleep(700); }
+await openShop(page, 'weapons');
+const crate = page.locator('#weapon-lootbox-btn');
+if (await crate.count() && !(await crate.isDisabled())) { await crate.click(); await sleep(dur(2600)); }
+else console.warn('crate beat skipped — not affordable');
+await page.keyboard.press('Escape');
+await sleep(600);
+await page.keyboard.press('Digit2');
+beat('crate');
+
+// 5. the raid: cross to the neighbour's base and break the wall down
+await driveTo(page, { x: target.x + 520, y: target.y }, { ms: dur(50000), spin: true, attack: true, wobble: 50 });
+await driveTo(page, { x: target.x + 330, y: target.y }, { ms: dur(16000), stopAt: 60 });
+beat('at-wall');
+await page.mouse.down();
+await aimAt(page, Math.PI);
+await sleep(dur(16000));
+await page.mouse.up();
+beat('breached');
+await driveTo(page, { x: target.x + 120, y: target.y }, { ms: dur(14000), stopAt: 50, attack: true });
+beat('looted');
+
+// 6. the boss finale
+{
+  const t = Date.now();
+  let seen = false;
+  while (Date.now() - t < 120_000) {
+    const b = await findBoss(page);
+    if (b) {
+      if (!seen) { seen = true; beat('boss'); }
+      await driveTo(page, { x: b.x * WORLD, y: b.y * WORLD }, { ms: dur(7000), stopAt: 210, attack: true });
+      await brawl(page, dur(3500), { sweep: 0.22 });
+    } else {
+      await driveTo(page, { x: WORLD / 2, y: WORLD / 2 }, { ms: dur(5000), spin: true, attack: true });
+    }
+  }
+}
+beat('end');
+
+await keys(page, new Set());
+await sleep(600);
+await stopCapture();
+await hero.ctx.close();
+await nb.ctx.close();
+await browser.close();
+
+const bytes = readdirSync(pathJoin(OUT, 'frames')).reduce((a, f) => a + statSync(pathJoin(OUT, 'frames', f)).size, 0);
+const span = frames.length ? frames[frames.length - 1].t - frames[0].t : 0;
+console.log(`captured ${frames.length} frames over ${span.toFixed(1)}s = ${(frames.length / span).toFixed(1)} fps, ${(bytes / 1e6).toFixed(0)} MB`);
+console.log('errors:', errors.length ? errors.slice(0, 3).join(' | ') : 'none');
+writeFileSync(`${OUT}/beats.json`, JSON.stringify({ beats, errors, frames: frames.length, span }, null, 2));
+
+// ---------- cut ----------
+// The take runs several minutes; a store preview is half a minute. These are the
+// windows that carry the pitch, in story order, each capped so no beat drags.
+
+const at = (n) => beats.find((b) => b.n === n)?.t ?? null;
+
+function windows() {
+  const win = [];
+  /** Keep the last `maxFinal` seconds of finished video from the [from, to] span. */
+  const push = (from, to, maxFinal) => {
+    if (from == null || to == null || to <= from) return;
+    win.push([Math.max(from, to - maxFinal * SLOWMO), to]);
+  };
+  push(at('start'), at('combat'), 5);      // a fight, straight away
+  push(at('combat'), at('built'), 5);      // walling the base in
+  push(at('built'), at('banked'), 1.5);    // the vault and Base Rank
+  push(at('banked'), at('crate'), 2);      // a unique weapon out of the crate
+  push(at('at-wall'), at('breached'), 4);  // smashing into someone's base
+  push(at('breached'), at('looted'), 1.5); // scooping the spill
+  push(at('boss'), at('end'), 5);          // the boss
+  return win;
+}
+
+const win = windows();
+if (!win.length) throw new Error('no beats recorded — nothing to cut');
+
+/**
+ * One concat list holding only the frames inside the windows, each carrying its
+ * own measured duration divided by SLOWMO. ffmpeg then resamples that to a
+ * constant 60 fps, so real timing survives the speed-up.
+ */
+const lines = ['ffconcat version 1.0'];
+let kept = 0;
+for (const [a, b] of win) {
+  const idx = [];
+  for (let i = 0; i < frames.length; i++) if (frames[i].t >= a && frames[i].t <= b) idx.push(i);
+  for (let j = 0; j < idx.length; j++) {
+    const i = idx[j];
+    // gap to the next captured frame, or the median step for the last one
+    const raw = j + 1 < idx.length ? frames[idx[j + 1]].t - frames[i].t : 1 / 12;
+    lines.push(`file 'frames/${frames[i].file}'`);
+    lines.push(`duration ${Math.max(0.001, Math.min(raw, 0.5) / SLOWMO).toFixed(6)}`);
+    kept++;
+  }
+}
+lines.push(`file 'frames/${frames[frames.length - 1].file}'`); // concat needs a trailing file
+writeFileSync(`${OUT}/list.txt`, lines.join('\n'));
+
+const finalSec = win.reduce((a, [x, y]) => a + (y - x) / SLOWMO, 0);
+console.log(`cut: ${win.length} windows, ${kept} frames, ${finalSec.toFixed(1)}s final ` +
+  `(${(kept / finalSec).toFixed(0)} distinct fps into a ${FPS} fps master)`);
+
+const out = pathJoin(DIR, NAME);
+const r = spawnSync(ffmpeg, [
+  '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', `${OUT}/list.txt`,
+  '-vf', `scale=1920:1080:flags=lanczos,fps=${FPS}`,
+  '-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', '21',
+  '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-level', '4.2',
+  '-movflags', '+faststart', out,
+], { cwd: OUT, stdio: ['ignore', 'ignore', 'inherit'] });
+if (r.status !== 0) throw new Error('ffmpeg failed');
+console.log('wrote', out, `${(statSync(out).size / 1e6).toFixed(1)} MB`);
