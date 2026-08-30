@@ -20,11 +20,10 @@
 // finished cut instead of smearing the motion around it.
 
 import { chromium } from 'playwright';
-import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, rmSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join as pathJoin } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ffmpeg from 'ffmpeg-static';
+import { cutAndEncode } from './video-cut.mjs';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.VID_TMP || '/tmp/farmclash-gameplay';
@@ -40,8 +39,19 @@ const NAME = process.env.VID_OUT || `farmclash-gameplay-${LANG}.mp4`;
 const BEAT = Number(process.env.VID_BEAT || 1);
 const dur = (x) => Math.max(120, Math.round(x * BEAT));
 
-rmSync(OUT, { recursive: true, force: true });
-mkdirSync(`${OUT}/frames`, { recursive: true });
+/**
+ * Re-cut an existing take instead of filming a new one. The frames and the beat
+ * stamps are already on disk, so changing which windows are kept — or dropping
+ * a beat that did not come off — costs an encode, not another take.
+ */
+const RECUT = process.env.VID_RECUT === '1';
+/** Beat names to leave out of the cut, comma-separated (VID_DROP=crate). */
+const DROP = new Set((process.env.VID_DROP || '').split(',').filter(Boolean));
+
+if (!RECUT) {
+  rmSync(OUT, { recursive: true, force: true });
+  mkdirSync(`${OUT}/frames`, { recursive: true });
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const browser = await chromium.launch({
@@ -159,6 +169,38 @@ async function build(page, item, wx, wy, z) {
   return true;
 }
 
+/** Gold in hand, read off the HUD. Buildings and crates are paid from this. */
+const carried = (page) => page.evaluate(() => {
+  const el = document.querySelector('#money .carry');
+  return Number((el?.textContent ?? '').replace(/[^0-9]/g, '')) || 0;
+});
+
+/**
+ * Empties the vault into the purse, standing next to it.
+ *
+ * Withdrawing is refused unless the hero is actually at his own vault, and
+ * walking home at slow-motion speed does not always arrive inside the budget —
+ * so this checks the purse afterwards and closes the distance before retrying
+ * rather than assuming the click worked.
+ */
+async function withdrawAtVault(page, home) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await driveTo(page, home, { ms: dur(9000), stopAt: 55 });
+    await openShop(page, 'buildings');
+    const before = await carried(page);
+    const btn = page.locator('#withdraw-btn');
+    if (await btn.count() && !(await btn.isDisabled())) {
+      await btn.click();
+      await sleep(900);
+      if ((await carried(page)) > before) return true;
+    }
+    await page.keyboard.press('Escape');
+    await sleep(300);
+  }
+  console.warn('withdrawal never landed — the hero never got close enough to his vault');
+  return false;
+}
+
 /** Reads the boss pip (light purple) off the minimap, as a 0..1 world fraction. */
 const findBoss = (page) => page.evaluate(() => {
   const c = document.getElementById('minimap');
@@ -247,12 +289,7 @@ beat('combat');
 // buildings are paid for out of the carried purse — so without this the whole
 // build beat is a row of greyed-out buttons.
 await driveTo(page, { x: home.x, y: home.y }, { ms: dur(26000), stopAt: 90, wobble: 30 });
-await openShop(page, 'buildings');
-{
-  const takeOut = page.locator('#withdraw-btn');
-  if (await takeOut.count() && !(await takeOut.isDisabled())) { await takeOut.click(); await sleep(900); }
-  else console.warn('nothing to withdraw before the build beat');
-}
+await withdrawAtVault(page, home);
 for (let i = -2; i <= 2; i++) await build(page, 'wall', 250, i * 66, z);
 await build(page, 'turret', -60, -210, z);
 await build(page, 'farm', -250, 150, z);
@@ -266,7 +303,10 @@ await sleep(dur(2600));
 await page.keyboard.press('Escape');
 beat('banked');
 
-// 4. the crate — a unique weapon reveal
+// 4. the crate — a unique weapon reveal. The purse went into the walls, and
+// whatever survived that was banked again on the way past the vault, so the
+// gold has to come back out before the crate is affordable.
+await withdrawAtVault(page, home);
 await openShop(page, 'weapons');
 const crate = page.locator('#weapon-lootbox-btn');
 if (await crate.count() && !(await crate.isDisabled())) { await crate.click(); await sleep(dur(2600)); }
@@ -316,67 +356,7 @@ const bytes = readdirSync(pathJoin(OUT, 'frames')).reduce((a, f) => a + statSync
 const span = frames.length ? frames[frames.length - 1].t - frames[0].t : 0;
 console.log(`captured ${frames.length} frames over ${span.toFixed(1)}s = ${(frames.length / span).toFixed(1)} fps, ${(bytes / 1e6).toFixed(0)} MB`);
 console.log('errors:', errors.length ? errors.slice(0, 3).join(' | ') : 'none');
-writeFileSync(`${OUT}/beats.json`, JSON.stringify({ beats, errors, frames: frames.length, span }, null, 2));
+writeFileSync(`${OUT}/beats.json`, JSON.stringify({ beats, errors, frames, span }, null, 2));
 
 // ---------- cut ----------
-// The take runs several minutes; a store preview is half a minute. These are the
-// windows that carry the pitch, in story order, each capped so no beat drags.
-
-const at = (n) => beats.find((b) => b.n === n)?.t ?? null;
-
-function windows() {
-  const win = [];
-  /** Keep the last `maxFinal` seconds of finished video from the [from, to] span. */
-  const push = (from, to, maxFinal) => {
-    if (from == null || to == null || to <= from) return;
-    win.push([Math.max(from, to - maxFinal * SLOWMO), to]);
-  };
-  push(at('start'), at('combat'), 5);      // a fight, straight away
-  push(at('combat'), at('built'), 5);      // walling the base in
-  push(at('built'), at('banked'), 1.5);    // the vault and Base Rank
-  push(at('banked'), at('crate'), 2);      // a unique weapon out of the crate
-  push(at('at-wall'), at('breached'), 4);  // smashing into someone's base
-  push(at('breached'), at('looted'), 1.5); // scooping the spill
-  push(at('boss'), at('end'), 5);          // the boss
-  return win;
-}
-
-const win = windows();
-if (!win.length) throw new Error('no beats recorded — nothing to cut');
-
-/**
- * One concat list holding only the frames inside the windows, each carrying its
- * own measured duration divided by SLOWMO. ffmpeg then resamples that to a
- * constant 60 fps, so real timing survives the speed-up.
- */
-const lines = ['ffconcat version 1.0'];
-let kept = 0;
-for (const [a, b] of win) {
-  const idx = [];
-  for (let i = 0; i < frames.length; i++) if (frames[i].t >= a && frames[i].t <= b) idx.push(i);
-  for (let j = 0; j < idx.length; j++) {
-    const i = idx[j];
-    // gap to the next captured frame, or the median step for the last one
-    const raw = j + 1 < idx.length ? frames[idx[j + 1]].t - frames[i].t : 1 / 12;
-    lines.push(`file 'frames/${frames[i].file}'`);
-    lines.push(`duration ${Math.max(0.001, Math.min(raw, 0.5) / SLOWMO).toFixed(6)}`);
-    kept++;
-  }
-}
-lines.push(`file 'frames/${frames[frames.length - 1].file}'`); // concat needs a trailing file
-writeFileSync(`${OUT}/list.txt`, lines.join('\n'));
-
-const finalSec = win.reduce((a, [x, y]) => a + (y - x) / SLOWMO, 0);
-console.log(`cut: ${win.length} windows, ${kept} frames, ${finalSec.toFixed(1)}s final ` +
-  `(${(kept / finalSec).toFixed(0)} distinct fps into a ${FPS} fps master)`);
-
-const out = pathJoin(DIR, NAME);
-const r = spawnSync(ffmpeg, [
-  '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', `${OUT}/list.txt`,
-  '-vf', `scale=1920:1080:flags=lanczos,fps=${FPS}`,
-  '-an', '-c:v', 'libx264', '-preset', 'slow', '-crf', '21',
-  '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-level', '4.2',
-  '-movflags', '+faststart', out,
-], { cwd: OUT, stdio: ['ignore', 'ignore', 'inherit'] });
-if (r.status !== 0) throw new Error('ffmpeg failed');
-console.log('wrote', out, `${(statSync(out).size / 1e6).toFixed(1)} MB`);
+cutAndEncode({ frames, beats, out: OUT, dir: DIR, name: NAME, slowmo: SLOWMO, fps: FPS, drop: DROP });

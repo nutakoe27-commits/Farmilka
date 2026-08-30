@@ -11,6 +11,8 @@
     "shots:ru": "CAP_LANG=ru CAP_PREFIX=yandex-ru- node capture-screens.mjs",
     "shots:en": "CAP_LANG=en CAP_PREFIX=yandex-en- node capture-screens.mjs",
     "preview": "node record-preview.mjs",
+    "gameplay": "node record-gameplay.mjs",
+    "recut": "node recut-gameplay.mjs",
     "ux": "node ux-check.mjs",
     "fs": "node fs-check.mjs",
     "yx": "node yandex-check.mjs",
