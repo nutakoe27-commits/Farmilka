@@ -1,18 +1,24 @@
 // Records the gameplay video for the store from real play, at a true 60 fps.
 //
-//   SLOWMO=5 node make-video-rig.mjs        # once, to build the rig balance
+//   SLOWMO=14 node make-video-rig.mjs       # once, to build the rig balance
 //   DATA_DIR=/tmp/vid PORT=3993 BALANCE_PATH=marketing/video-rig-balance.json \
 //     npx tsx src/index.ts                  # from server/
-//   VID_LANG=ru node marketing/record-gameplay.mjs
+//   SLOWMO=14 VID_BEAT=2.8 VID_LANG=ru node marketing/record-gameplay.mjs
 //
 // Why it is recorded in slow motion
 // --------------------------------
-// Headless Chromium has no GPU: WebGL falls back to SwiftShader and the game
-// renders about 12 fps at 720p, measured. So the *world* runs at 1/S speed and
-// the *video* is sped back up by S at encode time. Every frame the browser did
-// manage to draw then lands on a distinct moment, and 12 raw fps × S=5 gives
-// ~63 distinct frames per second of finished video — enough to fill 60 fps
-// honestly rather than by duplicating frames.
+// Headless Chromium has no GPU: WebGL falls back to SwiftShader, which pegs
+// three of the four cores, and the game draws 4-6 fps at 720p while a take is
+// running — measured, not assumed. So the *world* runs at 1/S speed and the
+// *video* is sped back up by S at encode time. Every frame the browser did
+// manage to draw then lands on a distinct moment, and ~4.5 raw fps × S=14 puts
+// about 62 distinct frames into each second of finished video — enough to fill
+// 60 fps honestly rather than by duplicating frames.
+//
+// S costs wall clock and nothing else: a second of finished video takes S
+// seconds to film. VID_BEAT scales the choreography to match, so the same beats
+// come out the same length whatever S is — measure the capture rate first, set
+// S to 60/rate, set VID_BEAT to S/5.
 //
 // Frames are pulled through CDP screencast rather than Playwright's recordVideo,
 // because each frame arrives with the timestamp of its own swap. Those stamps
@@ -29,7 +35,7 @@ const DIR = dirname(fileURLToPath(import.meta.url));
 const OUT = process.env.VID_TMP || '/tmp/farmclash-gameplay';
 const BASE = process.env.VID_URL || 'http://localhost:3993/';
 const WORLD = Number(process.env.RIG_WORLD_SIZE || 3600);
-const SLOWMO = Number(process.env.SLOWMO || 5); // must match make-video-rig.mjs
+const SLOWMO = Number(process.env.SLOWMO || 14); // must match make-video-rig.mjs
 const LANG = process.env.VID_LANG || 'ru';
 const FPS = Number(process.env.VID_FPS || 60);
 const W = 1280, H = 720;   // capture size; upscaled to 1080p at encode time
