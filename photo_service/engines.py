@@ -1,7 +1,6 @@
-import json
-
 from PIL import Image, ImageDraw
 
+from .model_files import KLEIN_REPO, read_manifest
 from .settings import WorkerSettings
 
 
@@ -27,12 +26,7 @@ class FluxEngine:
 
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA unavailable: check nvidia-smi and Docker GPU access")
-        manifest = settings.model_dir / "download-manifest.json"
-        if not manifest.is_file():
-            raise RuntimeError("Download the model first: python -m photo_service.download_model")
-        metadata = json.loads(manifest.read_text())
-        if metadata.get("repo_id") != "black-forest-labs/FLUX.2-klein-4B":
-            raise RuntimeError("Unsupported model manifest")
+        read_manifest(settings.model_dir, KLEIN_REPO)
         self.torch = torch
         self.pipe = Flux2KleinPipeline.from_pretrained(
             str(settings.model_dir), torch_dtype=torch.bfloat16,
@@ -59,4 +53,7 @@ class FluxEngine:
 def build_engine(settings: WorkerSettings):
     if settings.engine == "mock":
         return MockEngine()
+    if settings.engine == "flux_lora":
+        from .flux_lora import FluxLoraEngine
+        return FluxLoraEngine(settings)
     return FluxEngine(settings)

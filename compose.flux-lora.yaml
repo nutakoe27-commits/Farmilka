@@ -1,0 +1,14 @@
+# Overlay: docker compose -f compose.yaml -f compose.flux-lora.yaml --profile gpu ...
+services:
+  gpu-worker:
+    image: photo-worker-flux-lora:local
+    build:
+      dockerfile: Dockerfile.flux-lora
+    environment:
+      ENGINE: flux_lora
+      FLUX1_MODEL_DIR: /models/flux1-dev
+      HEARTSYNC_LORA_DIR: /models/heartsync-flux1
+      LORA_SCALE: "${LORA_SCALE:-1.0}"
+      FLUX1_STEPS: "${FLUX1_STEPS:-28}"
+      FLUX1_GUIDANCE: "${FLUX1_GUIDANCE:-3.5}"
+      FLUX1_IMG2IMG_STRENGTH: "${FLUX1_IMG2IMG_STRENGTH:-0.65}"

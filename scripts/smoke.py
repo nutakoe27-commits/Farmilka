@@ -10,7 +10,7 @@ from PIL import Image
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--url", default="http://127.0.0.1:8000")
-parser.add_argument("--expect-engine", choices=["mock", "flux"], required=True)
+parser.add_argument("--expect-engine", choices=["mock", "flux", "flux_lora"], required=True)
 parser.add_argument("--reference", type=Path)
 parser.add_argument("--prompt", help="Optional prompt for a manual quality check")
 parser.add_argument("--output", type=Path, default=Path("/tmp/photo-smoke.png"))
@@ -30,6 +30,8 @@ with httpx.Client(base_url=args.url, headers={"Authorization": f"Bearer {token}"
     if args.reference:
         files["reference"] = (args.reference.name, args.reference.read_bytes(), "application/octet-stream")
     prompt = args.prompt or (
+        "A blue ceramic teapot on a wooden table, natural window light, realistic photograph"
+        if args.reference and args.expect_engine == "flux_lora" else
         "Change the red teapot to a blue teapot. Keep the composition and natural lighting."
         if args.reference else
         "A red ceramic teapot on a wooden table, natural window light, realistic photograph"

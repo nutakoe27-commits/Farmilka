@@ -21,6 +21,12 @@ gpu = [
   "safetensors==0.8.0",
   "huggingface-hub==2.4.0",
 ]
+flux-lora = [
+  "bitsandbytes==0.50.2",
+  "peft==0.21.2",
+  "sentencepiece==0.2.2",
+  "protobuf==7.36.2",
+]
 
 [dependency-groups]
 dev = ["pytest==9.2.0"]

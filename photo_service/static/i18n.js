@@ -24,7 +24,20 @@ const errors = {
   ja: ['アクセスキーを確認してください。','画像が 10 MB を超えています。','有効な PNG、JPEG、WebP をアップロードしてください。','512〜1024 の範囲で 32 の倍数を指定してください。','説明を入力してください。','キューが満杯です。後でお試しください。','生成に失敗しました。ワーカーのログを確認してください。','GPU メモリが不足しています。512 × 512 をお試しください。','ワーカーが切断されました。再起動後にお試しください。','接続できません。サーバーを確認してください。','フォームの内容を確認してください。','ジョブが見つかりません。','画像はまだ完成していません。'],
   ar: ['تحقق من مفتاح الوصول.','حجم الصورة يتجاوز 10 ميغابايت.','ارفع ملف PNG أو JPEG أو WebP صالحًا.','استخدم أبعادًا من 512 إلى 1024 ومن مضاعفات 32.','أدخل وصفًا.','قائمة الانتظار ممتلئة. حاول لاحقًا.','فشل التوليد. تحقق من سجلات عامل المعالجة.','ذاكرة GPU غير كافية. جرّب 512 × 512.','انقطع عامل المعالجة. حاول بعد إعادة تشغيله.','فشل الاتصال. تحقق من الخادم.','تحقق من حقول النموذج.','المهمة غير موجودة.','الصورة ليست جاهزة بعد.'],
 };
+const imageHints = {
+  en: 'Describe the complete target image. The reference guides generation; small details may change.',
+  ru: 'Опишите желаемое изображение целиком. Исходное фото направляет генерацию; мелкие детали могут измениться.',
+  es: 'Describe toda la imagen deseada. La referencia guía la generación; los detalles pueden cambiar.',
+  de: 'Beschreibe das vollständige Zielbild. Das Referenzbild leitet die Generierung; Details können sich ändern.',
+  fr: 'Décrivez toute l’image souhaitée. La référence guide la génération ; les détails peuvent changer.',
+  pt: 'Descreva toda a imagem desejada. A referência orienta a geração; detalhes podem mudar.',
+  tr: 'Hedef görselin tamamını tarif edin. Referans üretime yön verir; küçük ayrıntılar değişebilir.',
+  zh: '请完整描述目标图像。参考照片用于引导生成，细节可能变化。',
+  ja: '完成後の画像全体を説明してください。参考写真が生成を導きますが、細部は変わる場合があります。',
+  ar: 'صف الصورة المطلوبة بالكامل. توجّه الصورة المرجعية عملية التوليد وقد تتغير التفاصيل الصغيرة.',
+};
 export const translations = Object.fromEntries(Object.entries(rows).map(([locale, values]) => [locale, {
+  img2imgHint: imageHints[locale],
   ...Object.fromEntries(keys.map((key, index) => [key, values[index]])),
   ...Object.fromEntries(errorKeys.map((key, index) => [key, errors[locale][index]])),
 }]));

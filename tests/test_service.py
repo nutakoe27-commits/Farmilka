@@ -158,3 +158,11 @@ def test_private_files_and_static_frontend(client):
     assert "Photo Studio" in page.text
     assert "frame-ancestors 'none'" in page.headers["content-security-policy"]
     assert client.get("/i18n.js").status_code == 200
+
+
+def test_lora_worker_is_identified_by_health_and_can_claim(client):
+    job_id = submit(client).json()["id"]
+    response = client.post("/internal/claim", json={"engine": "flux_lora"}, headers=WORKER)
+    assert response.status_code == 200
+    assert response.json()["job"]["id"] == job_id
+    assert client.get("/healthz").json()["engine"] == "flux_lora"

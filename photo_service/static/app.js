@@ -4,7 +4,12 @@ const $ = id => document.getElementById(id);
 const preferred = localStorage.getItem('language') || navigator.language.split('-')[0];
 let language = Object.hasOwn(translations, preferred) ? preferred : 'en';
 let outputURL, referenceURL, activeStatus, busy = false;
+let backend;
 const t = key => translations[language][key] ?? translations.en[key] ?? key;
+
+function updateReferenceHint() {
+  $('reference-mode-hint').hidden = backend !== 'flux_lora' || !$('reference').files.length;
+}
 
 function applyLanguage() {
   document.documentElement.lang = language;
@@ -28,6 +33,8 @@ async function refreshHealth() {
     const response = await fetch('/healthz');
     if (!response.ok) throw new Error('network_error');
     const health = await response.json();
+    backend = health.engine;
+    updateReferenceHint();
     $('connection').textContent = t(health.worker_online ? 'online' : 'offline');
     $('demo').hidden = health.engine !== 'mock';
   } catch { $('connection').textContent = t('network_error'); }
@@ -48,6 +55,7 @@ async function api(path, options = {}) {
 }
 
 $('reference').addEventListener('change', () => {
+  updateReferenceHint();
   if (referenceURL) URL.revokeObjectURL(referenceURL);
   const file = $('reference').files[0];
   $('reference-preview').hidden = !file;
