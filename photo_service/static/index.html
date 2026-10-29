@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Photo Studio</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header>
+    <a class="brand" href="/">◈ <span>Photo Studio</span></a>
+    <select id="language" aria-label="Language">
+      <option value="ru">Русский</option><option value="en">English</option>
+      <option value="es">Español</option><option value="de">Deutsch</option>
+      <option value="fr">Français</option><option value="pt">Português</option>
+      <option value="tr">Türkçe</option><option value="zh">中文</option>
+      <option value="ja">日本語</option><option value="ar">العربية</option>
+    </select>
+  </header>
+  <main>
+    <div class="intro"><span class="eyebrow" data-i18n="eyebrow"></span>
+      <h1 data-i18n="title"></h1><p data-i18n="subtitle"></p>
+    </div>
+    <p id="demo" class="notice" hidden data-i18n="demo"></p>
+    <div class="workspace">
+      <form id="generation-form" class="panel">
+        <label for="token" data-i18n="token"></label>
+        <input id="token" type="password" autocomplete="off" minlength="32" required>
+        <small data-i18n="tokenHint"></small>
+        <label for="prompt" data-i18n="prompt"></label>
+        <textarea id="prompt" name="prompt" rows="6" maxlength="4000" required></textarea>
+        <label for="reference" data-i18n="reference"></label>
+        <input id="reference" name="reference" type="file" accept="image/png,image/jpeg,image/webp">
+        <small data-i18n="referenceHint"></small>
+        <img id="reference-preview" class="reference-preview" alt="" hidden>
+        <div class="dimensions">
+          <div><label for="width" data-i18n="width"></label>
+            <select id="width" name="width"><option>512</option><option selected>768</option><option>1024</option></select></div>
+          <div><label for="height" data-i18n="height"></label>
+            <select id="height" name="height"><option>512</option><option selected>768</option><option>1024</option></select></div>
+        </div>
+        <button id="generate" type="submit" data-i18n="generate"></button>
+        <p id="error" class="error" role="alert" hidden></p>
+      </form>
+      <section class="panel result-panel" aria-label="Result">
+        <div class="result-heading"><h2 data-i18n="result"></h2><span id="connection" class="badge"></span></div>
+        <div id="canvas" class="canvas">
+          <div id="empty"><span class="empty-symbol">✧</span><p data-i18n="empty"></p></div>
+          <img id="output" alt="" hidden>
+          <div id="progress" hidden><span class="spinner"></span><p id="job-status" role="status" aria-live="polite"></p></div>
+        </div>
+        <div class="result-footer"><small id="job-info"></small><a id="download" class="download" hidden data-i18n="download"></a></div>
+      </section>
+    </div>
+    <footer data-i18n="footer"></footer>
+  </main>
+</body>
+</html>

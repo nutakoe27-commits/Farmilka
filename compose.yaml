@@ -1,0 +1,68 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: photo-api:local
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+    ports:
+      - "127.0.0.1:${API_PORT:-8000}:8000"
+    volumes:
+      - photo-data:/data
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  demo-worker:
+    profiles: [demo]
+    image: photo-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      CONTROL_URL: http://api:8000
+      ENGINE: mock
+    command: ["python", "-m", "photo_service.worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  gpu-worker:
+    profiles: [gpu]
+    image: photo-worker:local
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    env_file: .env
+    environment:
+      CONTROL_URL: http://api:8000
+      ENGINE: flux
+      MODEL_DIR: /models/flux2-klein-4b
+      HF_HOME: /models/hf
+      MODEL_CPU_OFFLOAD: "true"
+    volumes:
+      - photo-models:/models
+    gpus: all
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: "on-failure:3"
+    stop_grace_period: 120s
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+volumes:
+  photo-data:
+  photo-models:

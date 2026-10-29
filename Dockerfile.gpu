@@ -1,0 +1,20 @@
+# CUDA libraries are supplied by the pinned PyTorch cu128 wheels.
+# The host still needs an NVIDIA driver and NVIDIA Container Toolkit.
+FROM python:3.12-slim-bookworm@sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 UV_LINK_MODE=copy
+WORKDIR /app
+RUN --mount=type=secret,id=build_ca,required=false \
+    if [ -s /run/secrets/build_ca ]; then export PIP_CERT=/run/secrets/build_ca; fi; \
+    pip install --no-cache-dir uv==0.12.23
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=secret,id=build_ca,required=false \
+    if [ -s /run/secrets/build_ca ]; then export SSL_CERT_FILE=/run/secrets/build_ca; fi; \
+    uv sync --frozen --no-dev --extra gpu
+COPY --chown=10001:10001 photo_service ./photo_service
+COPY --chown=10001:10001 scripts/start-gpu.sh ./scripts/start-gpu.sh
+COPY --chown=10001:10001 scripts/gpu_probe.py ./scripts/gpu_probe.py
+RUN groupadd --gid 10001 app && useradd --uid 10001 --gid 10001 app \
+    && mkdir /models && chown app:app /models
+ENV PATH="/app/.venv/bin:$PATH" MODEL_DIR=/models/flux2-klein-4b HF_HOME=/models/hf ENGINE=flux
+USER app
+CMD ["sh", "scripts/start-gpu.sh"]
