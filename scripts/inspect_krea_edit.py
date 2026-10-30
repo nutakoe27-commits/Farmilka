@@ -1,0 +1,82 @@
+"""Inspect the publisher's small Krea Edit workflow without downloading weights."""
+import hashlib
+import json
+import os
+import re
+import urllib.error
+import urllib.parse
+
+from photo_service.download_lustify import request_with_auth
+
+VERSION_ID = 3159388
+FILE_ID = 3040376
+VERSION_URL = f"https://civitai.com/api/v1/model-versions/{VERSION_ID}"
+FILE_PATTERN = re.compile(r"[\w .+@()\-]+\.(?:safetensors|gguf|ckpt|pt|pth|bin)", re.IGNORECASE)
+
+
+def collect_files(workflow):
+    found = set()
+
+    def inspect(value):
+        if isinstance(value, dict):
+            if isinstance(value.get("type"), str):
+                widgets = json.dumps(value.get("widgets_values", []), ensure_ascii=False)
+                for name in FILE_PATTERN.findall(widgets):
+                    found.add((value["type"], name.strip()))
+            for child in value.values():
+                inspect(child)
+        elif isinstance(value, list):
+            for child in value:
+                inspect(child)
+
+    inspect(workflow)
+    return sorted(found)
+
+
+def inspect_workflow(state):
+    with request_with_auth(VERSION_URL, state) as response:
+        data = response.read(8 * 1024 * 1024 + 1)
+    if len(data) > 8 * 1024 * 1024:
+        raise RuntimeError("Unexpected metadata size")
+    version = json.loads(data)
+    if version.get("id") != VERSION_ID or version.get("baseModel") != "Krea 2":
+        raise RuntimeError("Unexpected workflow version")
+    files = [f for f in version.get("files", []) if f.get("id") == FILE_ID and f.get("type") == "Config"]
+    if len(files) != 1:
+        raise RuntimeError("Expected workflow config not found")
+    item = files[0]
+    expected = str(item.get("hashes", {}).get("SHA256", "")).lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise RuntimeError("Workflow checksum missing")
+    url = item.get("downloadUrl", "")
+    parsed = urllib.parse.urlsplit(url)
+    if (parsed.scheme != "https" or parsed.hostname != "civitai.com" or parsed.username or parsed.password
+            or not parsed.path.startswith("/api/download/models/")
+            or any(k.lower() in {"token", "authorization", "api_key"}
+                   for k, _ in urllib.parse.parse_qsl(parsed.query))):
+        raise RuntimeError("Unexpected workflow download address")
+    with request_with_auth(url, state) as response:
+        data = response.read(1024 * 1024 + 1)
+    if len(data) > 1024 * 1024 or hashlib.sha256(data).hexdigest() != expected:
+        raise RuntimeError("Workflow size or SHA256 check failed")
+    return version.get("name"), expected, collect_files(json.loads(data))
+
+
+def main():
+    try:
+        name, checksum, files = inspect_workflow({"token": os.environ.get("CIVITAI_TOKEN")})
+        print(f"Workflow: {name}; SHA-256: {checksum} (PASS)")
+        print("Referenced files:")
+        for kind, filename in files:
+            print(f"  {kind}: {filename}")
+        if not files:
+            print("  No filenames were found in node widgets.")
+        print("No model weights were downloaded.")
+    except urllib.error.HTTPError as error:
+        raise SystemExit(f"Civitai returned HTTP {error.code}") from None
+    except urllib.error.URLError as error:
+        raise SystemExit(f"Civitai connection failed: {type(error.reason).__name__}") from None
+
+
+if __name__ == "__main__":
+    main()
