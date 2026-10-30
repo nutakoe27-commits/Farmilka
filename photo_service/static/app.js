@@ -9,6 +9,15 @@ const t = key => translations[language][key] ?? translations.en[key] ?? key;
 
 function updateReferenceHint() {
   $('reference-mode-hint').hidden = !['flux_lora', 'lustify'].includes(backend) || !$('reference').files.length;
+  const textOnly = backend === 'lustify_krea';
+  $('reference').disabled = textOnly;
+  $('reference-disabled-hint').hidden = !textOnly;
+  if (textOnly && $('reference').files.length) {
+    $('reference').value = '';
+    $('reference-preview').hidden = true;
+    if (referenceURL) URL.revokeObjectURL(referenceURL);
+    referenceURL = undefined;
+  }
 }
 
 function applyLanguage() {

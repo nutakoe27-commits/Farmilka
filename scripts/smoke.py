@@ -10,7 +10,7 @@ from PIL import Image
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--url", default="http://127.0.0.1:8000")
-parser.add_argument("--expect-engine", choices=["mock", "flux", "flux_lora", "qwen_gguf", "lustify"], required=True)
+parser.add_argument("--expect-engine", choices=["mock", "flux", "flux_lora", "qwen_gguf", "lustify", "lustify_krea"], required=True)
 parser.add_argument("--reference", type=Path)
 parser.add_argument("--prompt", help="Optional prompt for a manual quality check")
 parser.add_argument("--output", type=Path, default=Path("/tmp/photo-smoke.png"))

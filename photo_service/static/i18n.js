@@ -36,7 +36,20 @@ const imageHints = {
   ja: '完成後の画像全体を説明してください。参考写真が生成を導きますが、細部は変わる場合があります。',
   ar: 'صف الصورة المطلوبة بالكامل. توجّه الصورة المرجعية عملية التوليد وقد تتغير التفاصيل الصغيرة.',
 };
+const textOnlyHints = {
+  en: 'Photo editing is unavailable for the current model.',
+  ru: 'Редактирование фото для текущей модели пока недоступно.',
+  es: 'La edición de fotos aún no está disponible para este modelo.',
+  de: 'Bildbearbeitung ist für dieses Modell derzeit nicht verfügbar.',
+  fr: 'La retouche photo n’est pas encore disponible pour ce modèle.',
+  pt: 'A edição de fotos ainda não está disponível para este modelo.',
+  tr: 'Bu model için fotoğraf düzenleme henüz kullanılamıyor.',
+  zh: '当前模型暂不支持照片编辑。',
+  ja: '現在のモデルでは写真編集はまだ利用できません。',
+  ar: 'تعديل الصور غير متاح حاليًا لهذا النموذج.',
+};
 export const translations = Object.fromEntries(Object.entries(rows).map(([locale, values]) => [locale, {
+  reference_not_supported: textOnlyHints[locale],
   img2imgHint: imageHints[locale],
   ...Object.fromEntries(keys.map((key, index) => [key, values[index]])),
   ...Object.fromEntries(errorKeys.map((key, index) => [key, errors[locale][index]])),

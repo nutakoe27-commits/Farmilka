@@ -62,4 +62,7 @@ def build_engine(settings: WorkerSettings):
     if settings.engine == "lustify":
         from .lustify import LustifyEngine
         return LustifyEngine(settings)
+    if settings.engine == "lustify_krea":
+        from .krea import KreaEngine
+        return KreaEngine(settings)
     return FluxEngine(settings)

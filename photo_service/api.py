@@ -17,7 +17,7 @@ STATIC = Path(__file__).parent / "static"
 
 
 class Claim(BaseModel):
-    engine: Literal["mock", "flux", "flux_lora", "qwen_gguf", "lustify"]
+    engine: Literal["mock", "flux", "flux_lora", "qwen_gguf", "lustify", "lustify_krea"]
 
 
 class Failure(BaseModel):
@@ -101,6 +101,10 @@ def create_app(settings: APISettings | None = None) -> FastAPI:
             raise HTTPException(422, "empty_prompt")
         if width % 32 or height % 32:
             raise HTTPException(422, "invalid_dimensions")
+        worker_health = store.health()
+        if reference is not None and worker_health["worker_online"] and worker_health["engine"] == "lustify_krea":
+            await reference.close()
+            raise HTTPException(422, "reference_not_supported")
         job_id = str(uuid4())
         reference_path = None
         if reference is not None:

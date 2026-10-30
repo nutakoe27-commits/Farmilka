@@ -22,7 +22,7 @@ class APISettings(CommonSettings):
 class WorkerSettings(CommonSettings):
     worker_token: SecretStr = Field(min_length=32)
     control_url: str = "http://127.0.0.1:8000"
-    engine: Literal["mock", "flux", "flux_lora", "qwen_gguf", "lustify"] = "mock"
+    engine: Literal["mock", "flux", "flux_lora", "qwen_gguf", "lustify", "lustify_krea"] = "mock"
     model_dir: Path = Path("models/flux2-klein-4b")
     model_cpu_offload: bool = True
     poll_seconds: float = 2
@@ -41,3 +41,4 @@ class WorkerSettings(CommonSettings):
     lustify_steps: int = Field(default=25, ge=1, le=100)
     lustify_cfg: float = Field(default=5.0, ge=0, le=20)
     lustify_strength: float = Field(default=0.6, gt=0, le=1)
+    krea_model_dir: Path = Path("models/lustify-krea")
