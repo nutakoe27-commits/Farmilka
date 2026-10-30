@@ -18,7 +18,7 @@ ARCHIVES = (
 
 
 def patch_glibc_math_header(prefix: Path):
-    """Match modern glibc's noexcept declaration for four CUDA math functions.
+    """Match modern glibc's noexcept declarations for six CUDA math functions.
 
     The downloaded archive is verified before extraction. This explicit local
     source compatibility patch does not change implementation or verification.
@@ -32,7 +32,8 @@ def patch_glibc_math_header(prefix: Path):
                         "#define PHOTO_CUDA_MATH_NOEXCEPT noexcept\n#else\n"
                         "#define PHOTO_CUDA_MATH_NOEXCEPT\n#endif\n", 1)
     for name, kind in (("sinpi", "double"), ("cospi", "double"),
-                       ("sinpif", "float"), ("cospif", "float")):
+                       ("sinpif", "float"), ("cospif", "float"),
+                       ("rsqrt", "double"), ("rsqrtf", "float")):
         old = f"{name}({kind} x);"
         if text.count(old) != 1:
             raise RuntimeError(f"Unexpected CUDA math header: cannot safely patch {name}")
