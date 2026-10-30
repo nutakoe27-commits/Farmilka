@@ -33,6 +33,41 @@ def collect_files(workflow):
     return sorted(found)
 
 
+def collect_lora_settings(workflow):
+    found = []
+    allowed = {"on", "lora", "strength", "strengthTwo", "model_strength", "clip_strength"}
+
+    def inspect(value):
+        if isinstance(value, dict):
+            if isinstance(value.get("type"), str) and "lora" in value["type"].lower():
+                settings = []
+
+                def collect(entry):
+                    if isinstance(entry, dict):
+                        safe = {k: v for k, v in entry.items() if k in allowed and (
+                            isinstance(v, (int, float, bool)) or
+                            (k == "lora" and isinstance(v, str) and FILE_PATTERN.fullmatch(v)))}
+                        if safe:
+                            settings.append(safe)
+                        for child in entry.values():
+                            if isinstance(child, (dict, list)):
+                                collect(child)
+                    elif isinstance(entry, list):
+                        for child in entry:
+                            collect(child)
+
+                collect(value.get("widgets_values", []))
+                found.append({"type": value["type"], "mode": value.get("mode"), "settings": settings})
+            for child in value.values():
+                inspect(child)
+        elif isinstance(value, list):
+            for child in value:
+                inspect(child)
+
+    inspect(workflow)
+    return found
+
+
 def inspect_workflow(state):
     with request_with_auth(VERSION_URL, state) as response:
         data = response.read(8 * 1024 * 1024 + 1)
@@ -59,18 +94,32 @@ def inspect_workflow(state):
         data = response.read(1024 * 1024 + 1)
     if len(data) > 1024 * 1024 or hashlib.sha256(data).hexdigest() != expected:
         raise RuntimeError("Workflow size or SHA256 check failed")
-    return version.get("name"), expected, collect_files(json.loads(data))
+    workflow = json.loads(data)
+    return version.get("name"), expected, collect_files(workflow), collect_lora_settings(workflow)
 
 
 def main():
     try:
-        name, checksum, files = inspect_workflow({"token": os.environ.get("CIVITAI_TOKEN")})
+        name, checksum, files, loras = inspect_workflow({"token": os.environ.get("CIVITAI_TOKEN")})
         print(f"Workflow: {name}; SHA-256: {checksum} (PASS)")
         print("Referenced files:")
         for kind, filename in files:
             print(f"  {kind}: {filename}")
         if not files:
             print("  No filenames were found in node widgets.")
+        print("LoRA node settings:")
+        print(json.dumps(loras, ensure_ascii=False, indent=2))
+        print("\nPossible identity adapter repository:")
+        try:
+            from huggingface_hub import HfApi
+            info = HfApi(token=False).model_info("conradlocke/krea2-identity-edit", files_metadata=True)
+            card = getattr(info, "card_data", None)
+            print(f"revision={info.sha} gated={info.gated} license={card.get('license') if card else None}")
+            for file in info.siblings:
+                if file.rfilename.lower().endswith((".safetensors", ".gguf")):
+                    print(f"  file={file.rfilename} bytes={file.size} lfs={file.lfs}")
+        except Exception as error:
+            print(f"  Hugging Face lookup failed: {type(error).__name__}")
         print("No model weights were downloaded.")
     except urllib.error.HTTPError as error:
         raise SystemExit(f"Civitai returned HTTP {error.code}") from None

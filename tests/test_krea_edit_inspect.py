@@ -9,7 +9,8 @@ from scripts import inspect_krea_edit
 
 def test_inspects_only_model_filenames_and_checks_workflow_hash(monkeypatch):
     workflow = {"nodes": [
-        {"type": "LoraLoader", "widgets_values": ["krea_edit.safetensors", 0.75]},
+        {"type": "LoraLoader", "mode": 0,
+         "widgets_values": [{"lora": "krea_edit.safetensors", "on": True, "strength": 0.75, "token": "secret"}]},
         {"type": "TextEncoder", "widgets_values": ["qwen.gguf"]},
         {"type": "Prompt", "widgets_values": ["Do not print my prompt"]},
     ]}
@@ -21,9 +22,11 @@ def test_inspects_only_model_filenames_and_checks_workflow_hash(monkeypatch):
     }]}
     responses = iter([io.BytesIO(json.dumps(metadata).encode()), io.BytesIO(payload)])
     monkeypatch.setattr(inspect_krea_edit, "request_with_auth", lambda *args: next(responses))
-    name, actual, files = inspect_krea_edit.inspect_workflow({})
+    name, actual, files, loras = inspect_krea_edit.inspect_workflow({})
     assert name == "KREA 2 Edit" and actual == sha
     assert files == [("LoraLoader", "krea_edit.safetensors"), ("TextEncoder", "qwen.gguf")]
+    assert loras == [{"type": "LoraLoader", "mode": 0,
+                      "settings": [{"lora": "krea_edit.safetensors", "on": True, "strength": 0.75}]}]
 
 
 def test_rejects_untrusted_download_address_before_fetching(monkeypatch):
