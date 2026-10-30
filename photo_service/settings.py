@@ -22,7 +22,7 @@ class APISettings(CommonSettings):
 class WorkerSettings(CommonSettings):
     worker_token: SecretStr = Field(min_length=32)
     control_url: str = "http://127.0.0.1:8000"
-    engine: Literal["mock", "flux", "flux_lora"] = "mock"
+    engine: Literal["mock", "flux", "flux_lora", "qwen_gguf"] = "mock"
     model_dir: Path = Path("models/flux2-klein-4b")
     model_cpu_offload: bool = True
     poll_seconds: float = 2
@@ -32,3 +32,8 @@ class WorkerSettings(CommonSettings):
     flux1_steps: int = Field(default=28, ge=4, le=60)
     flux1_guidance: float = Field(default=3.5, ge=0, le=15)
     flux1_img2img_strength: float = Field(default=0.65, gt=0, le=1)
+    qwen_model_dir: Path = Path("models/qwen-image-2.1-turbo")
+    qwen_server_binary: Path = Path("/opt/sdcpp/sd-server")
+    qwen_backend_port: int = Field(default=1234, ge=1024, le=65535)
+    qwen_load_timeout: int = Field(default=1200, ge=30, le=3600)
+    qwen_job_timeout: int = Field(default=1200, ge=30, le=3600)

@@ -664,6 +664,9 @@ gpu = [
     { name = "torch" },
     { name = "transformers" },
 ]
+qwen = [
+    { name = "huggingface-hub" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -678,6 +681,7 @@ requires-dist = [
     { name = "fastapi", specifier = "==0.162.0" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "huggingface-hub", marker = "extra == 'gpu'", specifier = "==2.4.0" },
+    { name = "huggingface-hub", marker = "extra == 'qwen'", specifier = "==2.4.0" },
     { name = "peft", marker = "extra == 'flux-lora'", specifier = "==0.21.2" },
     { name = "pillow", specifier = "==13.0.0" },
     { name = "protobuf", marker = "extra == 'flux-lora'", specifier = "==7.36.2" },
@@ -689,7 +693,7 @@ requires-dist = [
     { name = "transformers", marker = "extra == 'gpu'", specifier = "==5.22.0" },
     { name = "uvicorn", specifier = "==0.54.0" },
 ]
-provides-extras = ["gpu", "flux-lora"]
+provides-extras = ["gpu", "flux-lora", "qwen"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = "==9.2.0" }]

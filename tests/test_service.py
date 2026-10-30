@@ -160,9 +160,10 @@ def test_private_files_and_static_frontend(client):
     assert client.get("/i18n.js").status_code == 200
 
 
-def test_lora_worker_is_identified_by_health_and_can_claim(client):
+@pytest.mark.parametrize("engine", ["flux_lora", "qwen_gguf"])
+def test_model_worker_is_identified_by_health_and_can_claim(client, engine):
     job_id = submit(client).json()["id"]
-    response = client.post("/internal/claim", json={"engine": "flux_lora"}, headers=WORKER)
+    response = client.post("/internal/claim", json={"engine": engine}, headers=WORKER)
     assert response.status_code == 200
     assert response.json()["job"]["id"] == job_id
-    assert client.get("/healthz").json()["engine"] == "flux_lora"
+    assert client.get("/healthz").json()["engine"] == engine

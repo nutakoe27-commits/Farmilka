@@ -56,4 +56,7 @@ def build_engine(settings: WorkerSettings):
     if settings.engine == "flux_lora":
         from .flux_lora import FluxLoraEngine
         return FluxLoraEngine(settings)
+    if settings.engine == "qwen_gguf":
+        from .qwen_gguf import QwenGGUFEngine
+        return QwenGGUFEngine(settings)
     return FluxEngine(settings)

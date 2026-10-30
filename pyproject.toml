@@ -27,6 +27,7 @@ flux-lora = [
   "sentencepiece==0.2.2",
   "protobuf==7.36.2",
 ]
+qwen = ["huggingface-hub==2.4.0"]
 
 [dependency-groups]
 dev = ["pytest==9.2.0"]

@@ -1,0 +1,17 @@
+services:
+  gpu-worker:
+    image: photo-worker-qwen:local
+    build:
+      context: .
+      dockerfile: Dockerfile.qwen-gguf
+      args:
+        CUDA_ARCHITECTURES: "86"
+        BUILD_JOBS: "4"
+    init: true
+    environment:
+      ENGINE: qwen_gguf
+      QWEN_MODEL_DIR: /models/qwen-image-2.1-turbo
+      QWEN_SERVER_BINARY: /opt/sdcpp/sd-server
+      QWEN_LOAD_TIMEOUT: ${QWEN_LOAD_TIMEOUT:-1200}
+      QWEN_JOB_TIMEOUT: ${QWEN_JOB_TIMEOUT:-1200}
+    command: ["python", "-m", "photo_service.worker"]

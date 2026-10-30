@@ -80,27 +80,32 @@ def main():
     log.info("Loading engine: %s", settings.engine)
     engine = build_engine(settings)
     log.info("Engine ready: %s", settings.engine)
-    with httpx.Client(
-        base_url=settings.control_url.rstrip("/"), timeout=60,
-        headers={"Authorization": f"Bearer {settings.worker_token.get_secret_value()}"},
-    ) as client:
-        while not stopped.is_set():
-            try:
-                response = client.post("/internal/claim", json={"engine": settings.engine})
-                response.raise_for_status()
-                job = response.json()["job"]
-                if job:
-                    process_job(client, engine, job)
-                else:
-                    stopped.wait(settings.poll_seconds)
-            except httpx.HTTPStatusError as exc:
-                if exc.response.status_code in (401, 403):
-                    raise RuntimeError("Worker authentication failed; check WORKER_TOKEN") from None
-                log.warning("Control API returned HTTP %s", exc.response.status_code)
-                stopped.wait(5)
-            except httpx.TransportError:
-                log.warning("Control API unavailable; retrying")
-                stopped.wait(5)
+    try:
+        with httpx.Client(
+            base_url=settings.control_url.rstrip("/"), timeout=60,
+            headers={"Authorization": f"Bearer {settings.worker_token.get_secret_value()}"},
+        ) as client:
+            while not stopped.is_set():
+                try:
+                    response = client.post("/internal/claim", json={"engine": settings.engine})
+                    response.raise_for_status()
+                    job = response.json()["job"]
+                    if job:
+                        process_job(client, engine, job)
+                    else:
+                        stopped.wait(settings.poll_seconds)
+                except httpx.HTTPStatusError as exc:
+                    if exc.response.status_code in (401, 403):
+                        raise RuntimeError("Worker authentication failed; check WORKER_TOKEN") from None
+                    log.warning("Control API returned HTTP %s", exc.response.status_code)
+                    stopped.wait(5)
+                except httpx.TransportError:
+                    log.warning("Control API unavailable; retrying")
+                    stopped.wait(5)
+    finally:
+        close = getattr(engine, "close", None)
+        if close is not None:
+            close()
 
 
 if __name__ == "__main__":

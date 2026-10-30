@@ -1,0 +1,40 @@
+# RTX 3090 Ti = sm_86. Build only that architecture, without Node/UI/video.
+# Ubuntu 22.04 glibc is older than the Debian 12 runtime in photo-worker.
+# A binary built on Ubuntu 24.04 would require an incompatible newer glibc.
+FROM nvidia/cuda:12.8.1-devel-ubuntu22.04@sha256:a99a1860ba8e2916e5c3e73b72ec4c4301653a84586e05bfc9a2aa2d58027e97 AS sdcpp-build
+ARG BUILD_JOBS=4
+ARG CUDA_ARCHITECTURES=86
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential ca-certificates cmake git && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+RUN --mount=type=secret,id=build_ca,required=false \
+    if [ -s /run/secrets/build_ca ]; then export GIT_SSL_CAINFO=/run/secrets/build_ca; fi; \
+    git init && git remote add origin https://github.com/leejet/stable-diffusion.cpp.git \
+    && git fetch --depth 1 origin e239e4b0fd3de49834cec67031a44796ca465abc \
+    && git checkout --detach FETCH_HEAD \
+    && test "$(git rev-parse HEAD)" = e239e4b0fd3de49834cec67031a44796ca465abc \
+    && git submodule update --init --recursive --depth 1 ggml
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DSD_CUDA=ON \
+    -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHITECTURES} -DGGML_NATIVE=OFF \
+    -DSD_SERVER_BUILD_FRONTEND=OFF -DSD_WEBP=OFF -DSD_WEBM=OFF \
+    && cmake --build build --target sd-server --parallel ${BUILD_JOBS}
+
+# Reuse the proven CUDA/Python base, preserving photo-worker:local for rollback.
+FROM photo-worker:local
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 libstdc++6 \
+    && rm -rf /var/lib/apt/lists/*
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=secret,id=build_ca,required=false \
+    if [ -s /run/secrets/build_ca ]; then export SSL_CERT_FILE=/run/secrets/build_ca; fi; \
+    uv sync --frozen --no-dev --extra gpu --extra qwen --no-cache
+COPY --from=sdcpp-build /src/build/bin/sd-server /opt/sdcpp/sd-server
+COPY --from=sdcpp-build /src/LICENSE /opt/sdcpp/LICENSE
+COPY --from=sdcpp-build /src/ggml/src/ggml-cuda/vendors/cutlass/LICENSE.txt /opt/sdcpp/cutlass-LICENSE.txt
+COPY --chown=10001:10001 photo_service ./photo_service
+COPY --chown=10001:10001 scripts/qwen_probe.py scripts/qwen_diagnose.py ./scripts/
+ENV ENGINE=qwen_gguf QWEN_MODEL_DIR=/models/qwen-image-2.1-turbo QWEN_SERVER_BINARY=/opt/sdcpp/sd-server
+ENV LD_LIBRARY_PATH=/app/.venv/lib/python3.12/site-packages/nvidia/cuda_runtime/lib:/app/.venv/lib/python3.12/site-packages/nvidia/cublas/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
+RUN /opt/sdcpp/sd-server --help > /dev/null
+USER app
+CMD ["python", "-m", "photo_service.worker"]
