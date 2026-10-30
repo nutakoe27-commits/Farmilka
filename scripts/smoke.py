@@ -10,11 +10,13 @@ from PIL import Image
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--url", default="http://127.0.0.1:8000")
-parser.add_argument("--expect-engine", choices=["mock", "flux", "flux_lora", "qwen_gguf"], required=True)
+parser.add_argument("--expect-engine", choices=["mock", "flux", "flux_lora", "qwen_gguf", "lustify"], required=True)
 parser.add_argument("--reference", type=Path)
 parser.add_argument("--prompt", help="Optional prompt for a manual quality check")
 parser.add_argument("--output", type=Path, default=Path("/tmp/photo-smoke.png"))
 parser.add_argument("--timeout", type=int, default=600)
+parser.add_argument("--width", type=int, default=512)
+parser.add_argument("--height", type=int, default=512)
 args = parser.parse_args()
 token = os.environ.get("API_TOKEN") or dotenv_values(".env").get("API_TOKEN")
 if not token:
@@ -31,14 +33,14 @@ with httpx.Client(base_url=args.url, headers={"Authorization": f"Bearer {token}"
         files["reference"] = (args.reference.name, args.reference.read_bytes(), "application/octet-stream")
     prompt = args.prompt or (
         "A blue ceramic teapot on a wooden table, natural window light, realistic photograph"
-        if args.reference and args.expect_engine == "flux_lora" else
+        if args.reference and args.expect_engine in ("flux_lora", "lustify") else
         "Change the red teapot to a blue teapot. Keep the composition and natural lighting."
         if args.reference else
         "A red ceramic teapot on a wooden table, natural window light, realistic photograph"
     )
     response = client.post("/api/jobs", data={
         "prompt": prompt,
-        "width": 512, "height": 512, "seed": 42,
+        "width": args.width, "height": args.height, "seed": 42,
     }, files=files)
     response.raise_for_status()
     job_id = response.json()["id"]
@@ -53,10 +55,10 @@ with httpx.Client(base_url=args.url, headers={"Authorization": f"Bearer {token}"
             output.raise_for_status()
             args.output.write_bytes(output.content)
             with Image.open(args.output) as image:
-                if image.format != "PNG" or image.size != (512, 512):
+                if image.format != "PNG" or image.size != (args.width, args.height):
                     raise SystemExit("Unexpected output format or dimensions")
             print(f"PASS engine={health['engine']} reference={bool(args.reference)} "
-                  f"size=512x512 elapsed={time.monotonic()-started:.1f}s output={args.output}")
+                  f"size={args.width}x{args.height} elapsed={time.monotonic()-started:.1f}s output={args.output}")
             break
         time.sleep(2)
     else:

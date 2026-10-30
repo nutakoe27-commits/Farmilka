@@ -22,7 +22,7 @@ class APISettings(CommonSettings):
 class WorkerSettings(CommonSettings):
     worker_token: SecretStr = Field(min_length=32)
     control_url: str = "http://127.0.0.1:8000"
-    engine: Literal["mock", "flux", "flux_lora", "qwen_gguf"] = "mock"
+    engine: Literal["mock", "flux", "flux_lora", "qwen_gguf", "lustify"] = "mock"
     model_dir: Path = Path("models/flux2-klein-4b")
     model_cpu_offload: bool = True
     poll_seconds: float = 2
@@ -37,3 +37,7 @@ class WorkerSettings(CommonSettings):
     qwen_backend_port: int = Field(default=1234, ge=1024, le=65535)
     qwen_load_timeout: int = Field(default=1200, ge=30, le=3600)
     qwen_job_timeout: int = Field(default=1200, ge=30, le=3600)
+    lustify_model_dir: Path = Path("models/lustify")
+    lustify_steps: int = Field(default=25, ge=1, le=100)
+    lustify_cfg: float = Field(default=5.0, ge=0, le=20)
+    lustify_strength: float = Field(default=0.6, gt=0, le=1)

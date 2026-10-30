@@ -17,7 +17,7 @@ STATIC = Path(__file__).parent / "static"
 
 
 class Claim(BaseModel):
-    engine: Literal["mock", "flux", "flux_lora", "qwen_gguf"]
+    engine: Literal["mock", "flux", "flux_lora", "qwen_gguf", "lustify"]
 
 
 class Failure(BaseModel):

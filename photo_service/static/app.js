@@ -8,7 +8,7 @@ let backend;
 const t = key => translations[language][key] ?? translations.en[key] ?? key;
 
 function updateReferenceHint() {
-  $('reference-mode-hint').hidden = backend !== 'flux_lora' || !$('reference').files.length;
+  $('reference-mode-hint').hidden = !['flux_lora', 'lustify'].includes(backend) || !$('reference').files.length;
 }
 
 function applyLanguage() {

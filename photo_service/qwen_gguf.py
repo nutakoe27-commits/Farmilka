@@ -54,9 +54,21 @@ def server_command(settings: WorkerSettings, bundle: dict) -> list[str]:
 
 
 class QwenGGUFEngine:
+    backend_label = "Qwen"
+    ready_message = "Qwen backend loaded all four pinned components"
+
+    def load_bundle(self):
+        return read_bundle(self.settings.qwen_model_dir)
+
+    def make_server_command(self):
+        return server_command(self.settings, self.bundle)
+
+    def make_generation_payload(self, job, reference):
+        return generation_payload(job, reference)
+
     def __init__(self, settings: WorkerSettings):
         self.settings = settings
-        self.bundle = read_bundle(settings.qwen_model_dir)
+        self.bundle = self.load_bundle()
         self.process = None
         self.backend_log = None
         self.client = httpx.Client(
@@ -86,32 +98,32 @@ class QwenGGUFEngine:
         except httpx.TransportError:
             pass
         else:
-            raise RuntimeError("Qwen private backend port is already in use")
+            raise RuntimeError(f"{self.backend_label} private backend port is already in use")
         # Keep diagnostic output private; never echo model prompts into
         # the application's normal logs. sd-server runs at error log level.
         self.backend_log = tempfile.TemporaryFile(mode="w+b")
         environment = os.environ.copy()
-        for name in ("API_TOKEN", "WORKER_TOKEN", "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"):
+        for name in ("API_TOKEN", "WORKER_TOKEN", "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "CIVITAI_TOKEN"):
             environment.pop(name, None)
         self.process = subprocess.Popen(
-            server_command(self.settings, self.bundle),
+            self.make_server_command(),
             stdin=subprocess.DEVNULL, stdout=self.backend_log, stderr=subprocess.STDOUT,
             env=environment,
         )
         deadline = time.monotonic() + self.settings.qwen_load_timeout
         while time.monotonic() < deadline:
             if self.process.poll() is not None:
-                raise RuntimeError("Qwen backend exited during model loading; run the diagnostic command in docs/qwen-ru.md")
+                raise RuntimeError(f"{self.backend_label} backend exited during model loading; inspect the model diagnostics")
             try:
                 response = self.client.get("/sdcpp/v1/models/status", timeout=2)
                 if response.is_success and response.json().get("state") == "ready":
-                    log.info("Qwen backend loaded all four pinned components")
+                    log.info("%s", self.ready_message)
                     return
             except httpx.TransportError:
                 pass
             time.sleep(0.5)
         self._stop_backend()
-        raise TimeoutError("Qwen backend did not become ready within QWEN_LOAD_TIMEOUT")
+        raise TimeoutError(f"{self.backend_label} backend did not become ready within QWEN_LOAD_TIMEOUT")
 
     def _stop_backend(self):
         if self.process is not None:
@@ -135,35 +147,35 @@ class QwenGGUFEngine:
         path = None
         try:
             self._start()
-            response = self.client.post("/sdcpp/v1/img_gen", json=generation_payload(job, reference))
+            response = self.client.post("/sdcpp/v1/img_gen", json=self.make_generation_payload(job, reference))
             response.raise_for_status()
             backend_id = response.json()["id"]
             # Use the fixed native route, never a URL returned by the backend.
             if not backend_id or not all(c.isalnum() or c in "_-" for c in backend_id):
-                raise RuntimeError("Invalid Qwen backend job ID")
+                raise RuntimeError(f"Invalid {self.backend_label} backend job ID")
             path = f"/sdcpp/v1/jobs/{backend_id}"
             deadline = time.monotonic() + self.settings.qwen_job_timeout
             while time.monotonic() < deadline:
                 if self.process.poll() is not None:
-                    raise RuntimeError("Qwen backend exited during generation")
+                    raise RuntimeError(f"{self.backend_label} backend exited during generation")
                 response = self.client.get(path)
                 response.raise_for_status()
                 status = response.json()
                 if status["status"] == "completed":
                     encoded = status["result"]["images"][0]["b64_json"]
                     if len(encoded) > 16 * 1024 * 1024:
-                        raise RuntimeError("Qwen backend returned an oversized image")
+                        raise RuntimeError(f"{self.backend_label} backend returned an oversized image")
                     with Image.open(io.BytesIO(base64.b64decode(encoded, validate=True))) as image:
                         if image.format != "PNG" or image.size != (job["width"], job["height"]):
-                            raise RuntimeError("Qwen backend returned unexpected output dimensions or format")
+                            raise RuntimeError(f"{self.backend_label} backend returned unexpected output dimensions or format")
                         return image.convert("RGB")
                 if status["status"] in ("failed", "cancelled"):
                     message = str(status.get("error", "")).lower()
                     if "out of memory" in message or "out_of_memory" in message:
-                        raise QwenOutOfMemoryError("Qwen CUDA ran out of memory")
-                    raise RuntimeError("Qwen backend failed to generate an image")
+                        raise QwenOutOfMemoryError(f"{self.backend_label} CUDA ran out of memory")
+                    raise RuntimeError(f"{self.backend_label} backend failed to generate an image")
                 time.sleep(1)
-            raise TimeoutError("Qwen generation exceeded QWEN_JOB_TIMEOUT")
+            raise TimeoutError(f"{self.backend_label} generation exceeded QWEN_JOB_TIMEOUT")
         except BaseException:
             # A timed-out native job must never keep consuming the GPU after its
             # queue lease is released. The next request starts a fresh backend.

@@ -59,4 +59,7 @@ def build_engine(settings: WorkerSettings):
     if settings.engine == "qwen_gguf":
         from .qwen_gguf import QwenGGUFEngine
         return QwenGGUFEngine(settings)
+    if settings.engine == "lustify":
+        from .lustify import LustifyEngine
+        return LustifyEngine(settings)
     return FluxEngine(settings)

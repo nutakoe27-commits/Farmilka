@@ -38,12 +38,13 @@ def file_hash(path: Path) -> str:
     return digest.hexdigest()
 
 
-def check_format(path: Path):
+def check_format(path: Path, *, format_suffix: str | None = None):
+    suffix = format_suffix or path.suffix.lower()
     with path.open("rb") as stream:
-        if path.suffix.lower() == ".gguf":
+        if suffix == ".gguf":
             if stream.read(4) != b"GGUF":
                 raise RuntimeError(f"Not a GGUF file: {path.name}")
-        elif path.suffix.lower() == ".safetensors":
+        elif suffix == ".safetensors":
             length = int.from_bytes(stream.read(8), "little")
             if not 2 <= length <= 16 * 1024 * 1024:
                 raise RuntimeError(f"Invalid safetensors header: {path.name}")
